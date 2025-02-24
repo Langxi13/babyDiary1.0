@@ -118,7 +118,7 @@
                 <version>${spring-boot.version}</version>
                 <configuration>
                     <mainClass>com.langxi.babydiary.BabyDiaryApplication</mainClass>
-                    <skip>true</skip>
+                    <skip>false</skip>
                 </configuration>
                 <executions>
                     <execution>

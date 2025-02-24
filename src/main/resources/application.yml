@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 8091
   servlet:
     context-path: /
 
@@ -28,5 +28,5 @@ spring:
     cache: false # 开发时关闭缓存，实时查看页面变化
     suffix: .html
 
-diaryFilePath: E:\babyImages\ # 存放图片的目录
+diaryFilePath: /usr/local/java/babyImages/ # 存放图片的目录
 diaryPageSize: 10
