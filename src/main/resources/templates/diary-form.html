@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Write Diary</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.0/css/bootstrap.min.css}">
+    <style>
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .image-preview img {
+            max-width: 100px;
+            max-height: 100px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/home}">Baby Diary</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/form}">Write Diary</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/list}">View Diaries</a>
+                </li>
+            </ul>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-danger">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="text-center">Write a Diary</h1>
+    <form th:action="@{/diary/save}" method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title:</label>
+            <input type="text" id="title" name="title" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="date" class="form-label">Date:</label>
+            <input type="date" id="date" name="date" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content:</label>
+            <textarea id="content" name="content" class="form-control" rows="5" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="imageFiles" class="form-label">Upload Images (optional):</label>
+            <input type="file" id="imageFiles" name="imageFiles" class="form-control" multiple accept="image/*">
+            <div class="image-preview" id="imagePreview"></div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Save Diary</button>
+        <!-- 添加取消按钮 -->
+        <a th:href="@{/home}" class="btn btn-secondary w-100 mt-2">Cancel</a>
+    </form>
+</div>
+
+<script>
+    // 图片预览功能
+    const imageFilesInput = document.getElementById('imageFiles');
+    const imagePreview = document.getElementById('imagePreview');
+
+    imageFilesInput.addEventListener('change', function () {
+        imagePreview.innerHTML = ''; // 清空预览
+        Array.from(this.files).forEach(file => {
+            if (file.type.startsWith('image')) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    imagePreview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+</script>
+</body>
+</html>

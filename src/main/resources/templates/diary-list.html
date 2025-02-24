@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>View Diaries</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.0/css/bootstrap.min.css}">
+    <style>
+        body {
+            padding-top: 56px; /* 导航栏高度 */
+        }
+        .card {
+            height: auto; /* 取消固定高度 */
+            overflow: hidden; /* 内容超出时隐藏 */
+        }
+        .card-text {
+            white-space: nowrap; /* 不换行 */
+            overflow: hidden; /* 超出部分隐藏 */
+            text-overflow: ellipsis; /* 显示省略号 */
+        }
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* 图片间距 */
+        }
+        .image-preview img {
+            max-width: 100px;
+            max-height: 100px;
+            object-fit: cover; /* 保持图片比例 */
+            cursor: pointer; /* 鼠标悬停时显示手型 */
+        }
+        #goToPageButton {
+            margin-right: 5px;
+        }
+        /* 全屏样式 */
+        .fullscreen-image {
+            width: 100%;
+            height: auto;
+            max-height: 100vh; /* 最大高度为屏幕高度 */
+            object-fit: contain; /* 保持图片比例 */
+            cursor: zoom-out; /* 鼠标悬停时显示缩小图标 */
+        }
+
+        /* 全屏容器 */
+        .fullscreen-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9); /* 黑色半透明背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* 确保在最上层 */
+            overflow: auto; /* 允许滚动 */
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/home}">Baby Diary</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/form}">Write Diary</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/list}">View Diaries</a>
+                </li>
+            </ul>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-danger">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="text-center">View Diaries</h1>
+    <!-- 时间范围查询表单 -->
+    <form th:action="@{/diary/list}" method="get" class="mb-4">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="startDate" class="form-label">Start Date:</label>
+                <input type="date" id="startDate" name="startDate" class="form-control" th:value="${startDate}">
+            </div>
+            <div class="col-md-4">
+                <label for="endDate" class="form-label">End Date:</label>
+                <input type="date" id="endDate" name="endDate" class="form-control" th:value="${endDate}">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100 me-2">Filter</button>
+                <a id="exportZipLink"
+                   th:href="@{/diary/export(startDate=${startDate}, endDate=${endDate})}"
+                   class="btn btn-success w-100">Export Images as ZIP</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- 日记列表 -->
+    <div th:if="${diaries.isEmpty()}" class="alert alert-info">
+        No diaries found for the selected date range.
+    </div>
+    <div th:each="diary : ${diaries.content}" class="card mb-3">
+        <div class="card-body">
+            <!-- 删除和编辑按钮 -->
+            <div class="d-flex justify-content-end">
+                <a th:href="@{/diary/edit/{diaryId}(diaryId=${diary.diaryId})}" class="btn btn-sm btn-primary me-2">Edit</a>
+                <a th:href="@{/diary/delete/{diaryId}(diaryId=${diary.diaryId})}" class="btn btn-sm btn-danger" onclick="return confirm('是否确认永久删除？')">Delete</a>
+            </div>
+            <h5 class="card-title" th:text="${diary.title}">Title</h5>
+            <h6 class="card-subtitle mb-2 text-muted" th:text="${#dates.format(diary.date, 'yyyy-MM-dd')}">Date</h6>
+            <p class="card-text" th:text="${diary.content}">Content</p>
+            <!-- 显示多个图片 -->
+            <div th:if="${diary.imagePaths}" class="image-preview">
+                <img th:each="imagePath : ${diary.imagePaths.split(',')}"
+                     th:src="'/images/' + ${imagePath.trim()}"
+                     class="img-fluid diary-image" alt="Diary Image">
+            </div>
+        </div>
+    </div>
+
+    <!-- 分页组件 -->
+    <nav th:if="${diaries.totalPages > 1}">
+        <ul class="pagination justify-content-center">
+            <!-- Top 按钮：跳转到第一页 -->
+            <li class="page-item" th:classappend="${diaries.first} ? 'disabled' : ''">
+                <a class="page-link" th:href="@{/diary/list(startDate=${startDate}, endDate=${endDate}, page=0, size=${diaries.size})}">Top</a>
+            </li>
+            <!-- 添加间距 -->
+            <li class="page-item disabled">
+                <span class="page-link" style="border: none; background: none; padding: 0 10px;">  </span>
+            </li>
+            <!-- 上一页按钮 -->
+            <li class="page-item" th:classappend="${diaries.first} ? 'disabled' : ''">
+                <a class="page-link" th:href="@{/diary/list(startDate=${startDate}, endDate=${endDate}, page=${diaries.number - 1}, size=${diaries.size})}"><</a>
+            </li>
+            <!-- 当前页码输入框 -->
+            <li class="page-item">
+                <div class="d-flex align-items-center">
+                    <input type="number" id="pageInput" class="form-control" min="1" th:max="${diaries.totalPages}"
+                           th:value="${diaries.number + 1}" style="width: 60px; margin: 0 5px;">
+                    <span>/ <span th:text="${diaries.totalPages}"></span></span>
+                    <button id="goToPageButton" class="btn btn-outline-primary ms-2" type="button">Go</button>
+                </div>
+            </li>
+            <!-- 下一页按钮 -->
+            <li class="page-item" th:classappend="${diaries.last} ? 'disabled' : ''">
+                <a class="page-link" th:href="@{/diary/list(startDate=${startDate}, endDate=${endDate}, page=${diaries.number + 1}, size=${diaries.size})}">></a>
+            </li>
+            <!-- 添加间距 -->
+            <li class="page-item disabled">
+                <span class="page-link" style="border: none; background: none; padding: 0 10px;">  </span>
+            </li>
+            <!-- Bottom 按钮：跳转到最后一页 -->
+            <li class="page-item" th:classappend="${diaries.last} ? 'disabled' : ''">
+                <a class="page-link" th:href="@{/diary/list(startDate=${startDate}, endDate=${endDate}, page=${diaries.totalPages - 1}, size=${diaries.size})}">Bottom</a>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<script>
+    // 图片全屏功能
+    document.querySelectorAll('.diary-image').forEach(image => {
+        image.addEventListener('click', () => {
+            // 创建全屏容器
+            const fullscreenContainer = document.createElement('div');
+            fullscreenContainer.classList.add('fullscreen-container');
+
+            // 创建全屏图片
+            const fullscreenImage = document.createElement('img');
+            fullscreenImage.src = image.src;
+            fullscreenImage.classList.add('fullscreen-image');
+
+            // 点击退出全屏
+            fullscreenImage.addEventListener('click', (event) => {
+                event.stopPropagation(); // 阻止事件冒泡
+                document.body.removeChild(fullscreenContainer);
+            });
+
+            // 将图片添加到容器
+            fullscreenContainer.appendChild(fullscreenImage);
+            document.body.appendChild(fullscreenContainer);
+        });
+    });
+
+    // 导出 ZIP 确认功能
+    const exportZipLink = document.getElementById('exportZipLink');
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    exportZipLink.addEventListener('click', function (event) {
+        const confirmMessage = `是否将 ${startDate} 到 ${endDate} 的照片导出为 ZIP？`;
+        if (!confirm(confirmMessage)) {
+            event.preventDefault(); // 阻止默认的链接跳转行为
+        }
+    });
+
+    // 跳转到指定页码功能
+    const pageInput = document.getElementById('pageInput');
+    const goToPageButton = document.getElementById('goToPageButton');
+
+    goToPageButton.addEventListener('click', function () {
+        const page = parseInt(pageInput.value) - 1; // 转换为 0-based 页码
+        if (page >= 0 && page < parseInt(pageInput.max)) {
+            const url = `/diary/list?startDate=${startDate}&endDate=${endDate}&page=${page}&size=${pageInput.max}`;
+            window.location.href = url;
+        } else {
+            alert('请输入有效的页码！');
+        }
+    });
+
+    // 监听输入框的 Enter 键
+    pageInput.addEventListener('keypress', function (event) {
+        if (event.key === 'Enter') {
+            goToPageButton.click(); // 触发 Go 按钮的点击事件
+        }
+    });
+</script>
+</body>
+</html>

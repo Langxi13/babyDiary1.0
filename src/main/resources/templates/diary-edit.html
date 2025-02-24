@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Diary</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.0/css/bootstrap.min.css}">
+    <style>
+        .image-preview {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .image-preview img {
+            max-width: 100px;
+            max-height: 100px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" th:href="@{/home}">Baby Diary</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/form}">Write Diary</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/list}">View Diaries</a>
+                </li>
+            </ul>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-danger">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="text-center">Edit Diary</h1>
+    <form th:action="@{/diary/update}" method="post" enctype="multipart/form-data">
+        <!-- 隐藏字段，确保提交时保留 diaryId -->
+        <input type="hidden" name="diaryId" th:value="${diary.diaryId}">
+
+        <div class="mb-3">
+            <label for="title" class="form-label">Title:</label>
+            <input type="text" id="title" name="title" class="form-control" th:value="${diary.title}" required>
+        </div>
+        <div class="mb-3">
+            <label for="date" class="form-label">Date:</label>
+            <input type="date" id="date" name="date" class="form-control" th:value="${#dates.format(diary.date, 'yyyy-MM-dd')}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content:</label>
+            <textarea id="content" name="content" class="form-control" rows="5" required th:text="${diary.content}"></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="imageFiles" class="form-label">Upload Images (optional):</label>
+            <input type="file" id="imageFiles" name="imageFiles" class="form-control" multiple accept="image/*">
+            <!-- 图片预览区域 -->
+            <div class="image-preview" id="imagePreview">
+                <!-- 如果 imagePaths 不为空，显示已有图片 -->
+                <div th:if="${not #lists.isEmpty(imagePaths)}">
+                    <img th:each="imagePath : ${imagePaths}"
+                         th:src="'/images/' + ${imagePath.trim()}"
+                         class="img-fluid" alt="Diary Image" style="max-width: 100px; max-height: 100px; margin: 5px;">
+                </div>
+            </div>
+        </div>
+        <!-- 提交和取消按钮 -->
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">Update Diary</button>
+            <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // 图片预览功能
+    const imageFilesInput = document.getElementById('imageFiles');
+    const imagePreview = document.getElementById('imagePreview');
+
+    imageFilesInput.addEventListener('change', function () {
+        imagePreview.innerHTML = ''; // 清空预览
+        Array.from(this.files).forEach(file => {
+            if (file.type.startsWith('image')) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.margin = '5px';
+                    imagePreview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+</script>
+</body>
+</html>

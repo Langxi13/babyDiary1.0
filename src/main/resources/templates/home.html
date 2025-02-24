@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Home</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.0/css/bootstrap.min.css}">
+    <style>
+        body {
+            padding-top: 56px; /* 导航栏高度 */
+        }
+        .function-links {
+            margin-top: 20px; /* 与上方内容的间距 */
+            text-align: center; /* 居中显示 */
+        }
+        .function-links a {
+            margin: 0 10px; /* 链接之间的间距 */
+            font-size: 1.2rem; /* 字体大小 */
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+    <div class="container-fluid">
+        <!-- 修改 href 属性，点击跳转到 home 页面 -->
+        <a class="navbar-brand" th:href="@{/home}">Baby Diary</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/form}">Write Diary</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/diary/list}">View Diaries</a>
+                </li>
+            </ul>
+            <form th:action="@{/logout}" method="post" class="d-flex">
+                <button type="submit" class="btn btn-outline-danger">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="text-center">Welcome to Baby Diary!</h1>
+    <p class="text-center">Start writing your memories today.</p>
+
+    <!-- 功能链接 -->
+    <div class="function-links">
+        <a th:href="@{/diary/form}" class="btn btn-primary">Write Diary</a>
+        <a th:href="@{/diary/list}" class="btn btn-success">View Diaries</a>
+    </div>
+</div>
+</body>
+</html>

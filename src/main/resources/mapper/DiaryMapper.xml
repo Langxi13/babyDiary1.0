@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.DiaryMapper">
+    <resultMap id="diaryResultMap" type="Diary">
+        <id property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="title" column="title"/>
+        <result property="date" column="date"/>
+        <result property="content" column="content"/>
+        <result property="imagePaths" column="image_paths"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+<!--按照日期范围查找日记-->
+    <select id="findDiariesByDateRange" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d');
+    </select>
+
+<!--导出images-->
+    <select id="findImagePathsByDateRange" resultType="String">
+        SELECT DISTINCT image_paths FROM diary
+        WHERE user_id = #{userId}
+          AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d');
+    </select>
+
+<!--普通增删改查-->
+    <insert id="insertDiary" parameterType="Diary">
+        INSERT INTO diary (user_id, title, date, content, image_paths, created_at)
+        VALUES (#{userId}, #{title}, #{date}, #{content}, #{imagePaths}, NOW())
+    </insert>
+    <select id="findAllDiaries" resultMap="diaryResultMap">
+        SELECT * FROM diary
+    </select>
+    <select id="findDiaryById" resultMap="diaryResultMap">
+        SELECT * FROM diary WHERE diary_id = #{diaryId}
+    </select>
+    <select id="findUsernameByUserId" resultType="String">
+        SELECT username FROM user WHERE user_id = #{userId}
+    </select>
+    <select id="findUsernameByDiaryId" resultType="String">
+        SELECT username FROM user WHERE user_id = (SELECT user_id FROM diary WHERE diary_id = #{diaryId})
+    </select>
+    <update id="updateDiary" parameterType="Diary">
+        UPDATE diary
+        SET title = #{title},
+            date = #{date},
+            content = #{content},
+            image_paths = #{imagePaths}
+        WHERE diary_id = #{diaryId}
+    </update>
+    <delete id="deleteDiary" parameterType="int">
+        DELETE FROM diary WHERE diary_id = #{diaryId}
+    </delete>
+
+<!--    分页功能-->
+    <select id="findDiariesPageByDateRange" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDiariesByDateRange" resultType="int">
+        SELECT COUNT(*) FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
+    </select>
+</mapper>

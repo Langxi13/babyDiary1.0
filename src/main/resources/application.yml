@@ -1,0 +1,32 @@
+server:
+  port: 8081
+  servlet:
+    context-path: /
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.langxi.babydiary.entity
+
+# 数据库配置
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://47.109.73.14:3306/baby-diary?serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: LxundAngel.
+
+  # 设置文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # Thymeleaf 配置（如果使用）
+  thymeleaf:
+    prefix: classpath:/templates/ # 配置模板路径
+    cache: false # 开发时关闭缓存，实时查看页面变化
+    suffix: .html
+
+diaryFilePath: E:\babyImages\ # 存放图片的目录
+diaryPageSize: 10
