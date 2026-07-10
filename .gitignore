@@ -1,0 +1,28 @@
+# Dependencies
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+backend/target/
+deploy/frontend/
+deploy/backend/*.jar
+
+# Runtime data and backups
+.superpowers/
+.private/
+data/images/
+backups/
+logs/
+
+# Local secrets and environment files
+.env
+*.env
+config/*.local.yml
+!.env.example
+
+# OS/editor/temp files
+.DS_Store
+*.log
+*.tmp
+*.swp
+*~

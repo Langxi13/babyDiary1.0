@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.DiaryDraftMapper">
+    <resultMap id="draftResultMap" type="DiaryDraft">
+        <id property="draftId" column="draft_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="draftKey" column="draft_key"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="title" column="title"/>
+        <result property="date" column="date"/>
+        <result property="content" column="content"/>
+        <result property="contentFormat" column="content_format"/>
+        <result property="moodKey" column="mood_key"/>
+        <result property="tagIds" column="tag_ids"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findDraftsByUserId" resultMap="draftResultMap">
+        SELECT draft_id,
+               user_id,
+               draft_key,
+               diary_id,
+               title,
+               date,
+               LEFT(content, 512) AS content,
+               content_format,
+               mood_key,
+               tag_ids,
+               updated_at
+        FROM diary_draft
+        WHERE user_id = #{userId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="findByDraftKey" resultMap="draftResultMap">
+        SELECT * FROM diary_draft WHERE user_id = #{userId} AND draft_key = #{draftKey}
+    </select>
+
+    <insert id="upsertDraft" parameterType="DiaryDraft">
+        INSERT INTO diary_draft (user_id, draft_key, diary_id, title, date, content, content_format, mood_key, tag_ids)
+        VALUES (#{userId}, #{draftKey}, #{diaryId}, #{title}, #{date}, #{content}, #{contentFormat}, #{moodKey}, #{tagIds})
+        ON DUPLICATE KEY UPDATE
+          diary_id = VALUES(diary_id),
+          title = VALUES(title),
+          date = VALUES(date),
+          content = VALUES(content),
+          content_format = VALUES(content_format),
+          mood_key = VALUES(mood_key),
+          tag_ids = VALUES(tag_ids),
+          updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteDraft">
+        DELETE FROM diary_draft WHERE user_id = #{userId} AND draft_id = #{draftId}
+    </delete>
+
+    <delete id="deleteDraftByKey">
+        DELETE FROM diary_draft WHERE user_id = #{userId} AND draft_key = #{draftKey}
+    </delete>
+</mapper>

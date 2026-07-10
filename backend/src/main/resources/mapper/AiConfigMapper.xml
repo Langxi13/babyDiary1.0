@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.AiConfigMapper">
+    <resultMap id="aiConfigResultMap" type="AiConfig">
+        <id property="configId" column="config_id"/>
+        <result property="enabled" column="enabled"/>
+        <result property="baseUrl" column="base_url"/>
+        <result property="model" column="model"/>
+        <result property="encryptedApiKey" column="encrypted_api_key"/>
+        <result property="timeoutSeconds" column="timeout_seconds"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findConfig" resultMap="aiConfigResultMap">
+        SELECT * FROM ai_config WHERE config_id = 1
+    </select>
+
+    <insert id="upsertConfig" parameterType="AiConfig">
+        INSERT INTO ai_config (config_id, enabled, base_url, model, encrypted_api_key, timeout_seconds)
+        VALUES (1, #{enabled}, #{baseUrl}, #{model}, #{encryptedApiKey}, #{timeoutSeconds})
+        ON DUPLICATE KEY UPDATE
+          enabled = VALUES(enabled),
+          base_url = VALUES(base_url),
+          model = VALUES(model),
+          encrypted_api_key = VALUES(encrypted_api_key),
+          timeout_seconds = VALUES(timeout_seconds),
+          updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

@@ -1,0 +1,2 @@
+ALTER TABLE `diary`
+  MODIFY COLUMN `content` mediumtext COLLATE utf8mb4_general_ci NOT NULL;

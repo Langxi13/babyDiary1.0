@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.DiaryMapper">
+    <resultMap id="diaryResultMap" type="Diary">
+        <id property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="title" column="title"/>
+        <result property="date" column="date"/>
+        <result property="content" column="content"/>
+        <result property="moodKey" column="mood_key"/>
+        <result property="contentFormat" column="content_format"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insertDiary" parameterType="Diary" useGeneratedKeys="true" keyProperty="diaryId">
+        INSERT INTO diary (user_id, title, date, content, mood_key, content_format, created_at)
+        VALUES (#{userId}, #{title}, #{date}, #{content}, #{moodKey}, #{contentFormat}, NOW())
+    </insert>
+    <select id="findDiaryById" resultMap="diaryResultMap">
+        SELECT * FROM diary WHERE diary_id = #{diaryId}
+    </select>
+    <update id="updateDiary" parameterType="Diary">
+        UPDATE diary
+        SET title = #{title},
+            date = #{date},
+            content = #{content},
+            mood_key = #{moodKey},
+            content_format = #{contentFormat}
+        WHERE diary_id = #{diaryId}
+    </update>
+    <delete id="deleteDiary" parameterType="int">
+        DELETE FROM diary WHERE diary_id = #{diaryId}
+    </delete>
+
+    <select id="findDiariesPageByDateRange" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        ORDER BY date DESC, created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findDiarySummariesPageByDateRange" resultMap="diaryResultMap">
+        SELECT diary_id,
+               user_id,
+               title,
+               date,
+               LEFT(content, 512) AS content,
+               mood_key,
+               content_format,
+               created_at
+        FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        ORDER BY date DESC, created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDiariesByDateRange" resultType="int">
+        SELECT COUNT(*) FROM diary
+        WHERE user_id = #{userId}
+        AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+    </select>
+
+    <select id="findDiariesPageByDateRangeAndKeyword" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE user_id = #{userId}
+          AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
+          (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        ORDER BY date DESC, created_at DESC
+            LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="findDiarySummariesPageByDateRangeAndKeyword" resultMap="diaryResultMap">
+        SELECT diary_id,
+               user_id,
+               title,
+               date,
+               LEFT(content, 512) AS content,
+               mood_key,
+               content_format,
+               created_at
+        FROM diary
+        WHERE user_id = #{userId}
+          AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
+          (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        ORDER BY date DESC, created_at DESC
+            LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDiariesByDateRangeAndKeyword" resultType="int">
+        SELECT COUNT(*) FROM diary
+        WHERE user_id = #{userId}
+          AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
+          (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+    </select>
+
+    <select id="findDiariesForTimeline" resultMap="diaryResultMap">
+        SELECT diary_id,
+               user_id,
+               title,
+               date,
+               LEFT(content, 512) AS content,
+               mood_key,
+               content_format,
+               created_at
+        FROM diary
+        WHERE user_id = #{userId}
+        <if test="startDate != null and startDate != ''">
+            AND date &gt;= #{startDate}
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND date &lt;= #{endDate}
+        </if>
+        <if test="moodKey != null and moodKey != ''">
+            AND mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = diary.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        ORDER BY date DESC, created_at DESC
+    </select>
+
+    <select id="findDiariesForReport" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE user_id = #{userId}
+          AND date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY date ASC, created_at ASC
+    </select>
+
+    <select id="findCalendarDays" resultType="com.langxi.babydiary.dto.CalendarDayVO">
+        SELECT DATE_FORMAT(d.date, '%Y-%m-%d') AS date,
+               COUNT(*) AS count,
+               MIN(d.diary_id) AS firstDiaryId,
+               SUBSTRING_INDEX(GROUP_CONCAT(d.title ORDER BY d.created_at ASC SEPARATOR '||'), '||', 1) AS firstTitle
+        FROM diary d
+        WHERE d.user_id = #{userId}
+          AND d.date &gt;= #{startDate}
+          AND d.date &lt;= #{endDate}
+        GROUP BY d.date
+        ORDER BY d.date ASC
+    </select>
+</mapper>

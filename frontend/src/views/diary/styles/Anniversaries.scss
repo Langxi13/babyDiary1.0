@@ -1,0 +1,444 @@
+.page-shell {
+  min-height: 100vh;
+  background: #f6f3f0;
+}
+
+.page-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+
+  h1 {
+    font-size: 26px;
+    color: #2f2b28;
+  }
+
+  p {
+    margin-top: 6px;
+    color: #77706a;
+  }
+}
+
+.anniversary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.anniversary-card {
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #eadeda;
+  background: #fff;
+}
+
+.cover {
+  height: 140px;
+  background: linear-gradient(135deg, #b14f64, #3aa69b);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+
+  h2 {
+    font-size: 18px;
+    color: #2f2b28;
+  }
+}
+
+.anniversary-dialog {
+  :deep(.el-dialog) {
+    max-width: calc(100vw - 40px);
+    overflow: hidden;
+    border-radius: 18px;
+    background: #fffdfa;
+    box-shadow: 0 28px 70px rgba(66, 41, 31, 0.2);
+  }
+
+  :deep(.el-dialog__header) {
+    min-height: 72px;
+    padding: 22px 24px 14px;
+    background: linear-gradient(135deg, #fff3ed 0%, #f8fff6 100%);
+    border-bottom: 1px solid rgba(137, 96, 80, 0.12);
+  }
+
+  :deep(.el-dialog__title) {
+    color: #2d2622;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  :deep(.el-dialog__headerbtn) {
+    top: 18px;
+    right: 18px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 0 24px 22px;
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 0 24px 22px;
+  }
+}
+
+.anniversary-form {
+  :deep(.el-form-item) {
+    margin-bottom: 0;
+  }
+
+  :deep(.el-form-item__label) {
+    min-height: auto;
+    margin-bottom: 8px;
+    color: #4c3f39;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  :deep(.el-input__wrapper),
+  :deep(.el-textarea__inner) {
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px rgba(137, 96, 80, 0.16) inset;
+  }
+
+  :deep(.el-input__wrapper) {
+    min-height: 42px;
+  }
+}
+
+.anniversary-dialog-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px;
+  padding-top: 22px;
+  min-width: 0;
+}
+
+.anniversary-cover-panel,
+.anniversary-fields-panel {
+  min-width: 0;
+}
+
+.anniversary-cover-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid rgba(153, 104, 86, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(255, 245, 240, 0.96), rgba(244, 255, 250, 0.92)),
+    #fffdfa;
+}
+
+.cover-panel-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+
+  span {
+    width: fit-content;
+    max-width: 100%;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(177, 79, 100, 0.1);
+    color: #9c4055;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  strong {
+    color: #2f2b28;
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  p {
+    color: #7d6f68;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
+
+.anniversary-fields-panel {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.fields-heading {
+  min-width: 0;
+  padding: 14px 16px;
+  border-left: 4px solid #3aa69b;
+  border-radius: 12px;
+  background: #f2fbf7;
+
+  span {
+    display: block;
+    color: #2f5f58;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  p {
+    margin-top: 4px;
+    color: #6e7b75;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+}
+
+.cover-upload-field {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.cover-upload-card {
+  width: 100%;
+
+  :deep(.el-upload) {
+    width: 100%;
+  }
+
+  :deep(.el-upload-dragger) {
+    width: 100%;
+    padding: 0;
+    border: 1px dashed rgba(183, 109, 97, 0.58);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff8f4;
+  }
+}
+
+.cover-upload-preview {
+  width: 100%;
+  min-height: 230px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #8a6259;
+  background: #fff8f4;
+  background-size: cover;
+  background-position: center;
+  border-radius: 14px;
+  text-align: center;
+  line-height: 1.4;
+
+  .el-icon {
+    font-size: 30px;
+    color: #b76d61;
+  }
+
+  strong {
+    font-size: 15px;
+    color: #5a4039;
+  }
+
+  span {
+    max-width: 100%;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  &.has-cover {
+    min-height: 252px;
+    position: relative;
+    color: #fff;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(41, 28, 23, 0.48), rgba(41, 28, 23, 0.05));
+    }
+  }
+}
+
+.cover-preview-mask {
+  position: relative;
+  z-index: 1;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(47, 36, 31, 0.68);
+  color: #fff;
+}
+
+.cover-remove-button {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  white-space: normal;
+}
+
+.anniversary-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(137, 96, 80, 0.12);
+
+  :deep(.el-button) {
+    min-width: 96px;
+    margin-left: 0;
+    border-radius: 12px;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.description {
+  min-height: 42px;
+  margin-top: 10px;
+  color: #67605b;
+  line-height: 1.5;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+
+  div {
+    border-radius: 8px;
+    background: #f8eeee;
+    padding: 12px;
+  }
+
+  strong {
+    display: block;
+    color: #b14f64;
+    font-size: 24px;
+  }
+
+  span {
+    color: #796f6a;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .anniversary-dialog {
+    :deep(.el-dialog) {
+      width: calc(100vw - 28px) !important;
+      max-width: calc(100vw - 28px);
+      margin: 6vh auto;
+      border-radius: 18px;
+    }
+
+    :deep(.el-dialog__header) {
+      min-height: auto;
+      padding: 18px 18px 12px;
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 0 16px 18px;
+    }
+
+    :deep(.el-dialog__footer) {
+      padding: 0 16px 18px;
+    }
+  }
+
+  .anniversary-dialog-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding-top: 16px;
+  }
+
+  .anniversary-cover-panel {
+    padding: 14px;
+  }
+
+  .anniversary-fields-panel {
+    gap: 14px;
+  }
+
+  .page-title-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .anniversary-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .anniversary-card {
+    border-radius: 22px;
+    overflow: hidden;
+  }
+
+  .cover {
+    height: 150px;
+  }
+
+  .cover-upload-preview {
+    min-height: 180px;
+    padding: 16px;
+
+    &.has-cover {
+      min-height: 210px;
+    }
+  }
+
+  .card-body {
+    padding: 16px;
+  }
+
+  .card-head {
+    gap: 10px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 6px;
+
+    :deep(.el-button) {
+      margin-left: 0;
+    }
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .anniversary-dialog-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    :deep(.el-button) {
+      width: 100%;
+      min-width: 0;
+    }
+  }
+}

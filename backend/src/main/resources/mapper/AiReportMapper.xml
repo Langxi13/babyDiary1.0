@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.AiReportMapper">
+    <resultMap id="aiReportResultMap" type="AiReport">
+        <id property="reportId" column="report_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="type" column="type"/>
+        <result property="period" column="period"/>
+        <result property="periodStart" column="period_start"/>
+        <result property="periodEnd" column="period_end"/>
+        <result property="title" column="title"/>
+        <result property="contentMarkdown" column="content_markdown"/>
+        <result property="diaryCount" column="diary_count"/>
+        <result property="model" column="model"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="AiReport" useGeneratedKeys="true" keyProperty="reportId">
+        INSERT INTO ai_report (user_id, type, period, period_start, period_end, title, content_markdown, diary_count, model)
+        VALUES (#{userId}, #{type}, #{period}, #{periodStart}, #{periodEnd}, #{title}, #{contentMarkdown}, #{diaryCount}, #{model})
+    </insert>
+
+    <select id="findById" resultMap="aiReportResultMap">
+        SELECT * FROM ai_report WHERE user_id = #{userId} AND report_id = #{reportId}
+    </select>
+
+    <select id="findPage" resultMap="aiReportResultMap">
+        SELECT * FROM ai_report
+        WHERE user_id = #{userId}
+        <if test="type != null and type != ''">
+            AND type = #{type}
+        </if>
+        ORDER BY created_at DESC, report_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(*) FROM ai_report
+        WHERE user_id = #{userId}
+        <if test="type != null and type != ''">
+            AND type = #{type}
+        </if>
+    </select>
+
+    <delete id="delete">
+        DELETE FROM ai_report WHERE user_id = #{userId} AND report_id = #{reportId}
+    </delete>
+</mapper>

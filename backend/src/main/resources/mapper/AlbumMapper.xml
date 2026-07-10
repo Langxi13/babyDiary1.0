@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.AlbumMapper">
+    <resultMap id="albumGroupResultMap" type="AlbumGroup">
+        <id property="groupId" column="group_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="name" column="name"/>
+        <result property="type" column="type"/>
+        <result property="sort" column="sort"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="albumResultMap" type="Album">
+        <id property="albumId" column="album_id"/>
+        <result property="groupId" column="group_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="type" column="type"/>
+        <result property="coverImagePath" column="cover_image_path"/>
+        <result property="sort" column="sort"/>
+        <result property="photoCount" column="photo_count"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="photoResultMap" type="Photo">
+        <id property="imageId" column="image_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="imagePath" column="image_path"/>
+        <result property="sort" column="sort"/>
+        <result property="diaryTitle" column="diary_title"/>
+        <result property="diaryDate" column="diary_date"/>
+        <result property="moodKey" column="mood_key"/>
+        <result property="favorite" column="favorite"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="albumColumnsWithPhotoCover">
+        a.album_id,
+        a.group_id,
+        a.user_id,
+        a.name,
+        a.description,
+        a.type,
+        COALESCE(a.cover_image_path, (
+            SELECT i.image_path
+            FROM album_photo ap_cover
+            INNER JOIN diary_image i ON i.image_id = ap_cover.image_id
+            INNER JOIN diary d_cover ON d_cover.diary_id = i.diary_id AND d_cover.user_id = a.user_id
+            WHERE ap_cover.album_id = a.album_id
+            ORDER BY ap_cover.sort ASC, i.image_id ASC
+            LIMIT 1
+        )) AS cover_image_path,
+        a.sort,
+        (SELECT COUNT(*)
+         FROM album_photo ap_count
+         INNER JOIN diary_image i_count ON i_count.image_id = ap_count.image_id
+         INNER JOIN diary d_count ON d_count.diary_id = i_count.diary_id AND d_count.user_id = a.user_id
+         WHERE ap_count.album_id = a.album_id) AS photo_count,
+        a.created_at,
+        a.updated_at
+    </sql>
+
+    <select id="ensureAiGroup" resultMap="albumGroupResultMap">
+        SELECT * FROM album_group
+        WHERE user_id = #{userId} AND type = 'AI' AND name = 'AI 整理'
+        LIMIT 1
+    </select>
+
+    <insert id="insertGroup" parameterType="AlbumGroup" useGeneratedKeys="true" keyProperty="groupId">
+        INSERT INTO album_group (user_id, name, type, sort)
+        VALUES (#{userId}, #{name}, #{type}, #{sort})
+    </insert>
+
+    <update id="updateGroup" parameterType="AlbumGroup">
+        UPDATE album_group
+        SET name = #{name}
+        WHERE user_id = #{userId} AND group_id = #{groupId} AND type = 'CUSTOM'
+    </update>
+
+    <delete id="deleteGroup">
+        DELETE FROM album_group WHERE user_id = #{userId} AND group_id = #{groupId} AND type = 'CUSTOM'
+    </delete>
+
+    <select id="findGroupById" resultMap="albumGroupResultMap">
+        SELECT * FROM album_group WHERE user_id = #{userId} AND group_id = #{groupId}
+    </select>
+
+    <select id="findGroupsByUserId" resultMap="albumGroupResultMap">
+        SELECT * FROM album_group
+        WHERE user_id = #{userId}
+        ORDER BY CASE type WHEN 'AI' THEN 10 ELSE 20 END, sort ASC, group_id ASC
+    </select>
+
+    <insert id="insertAlbum" parameterType="Album" useGeneratedKeys="true" keyProperty="albumId">
+        INSERT INTO album (group_id, user_id, name, description, type, cover_image_path, sort)
+        VALUES (#{groupId}, #{userId}, #{name}, #{description}, #{type}, #{coverImagePath}, #{sort})
+    </insert>
+
+    <update id="updateAlbum" parameterType="Album">
+        UPDATE album
+        SET name = #{name},
+            description = #{description},
+            cover_image_path = #{coverImagePath}
+        WHERE user_id = #{userId} AND album_id = #{albumId} AND type IN ('AI', 'CUSTOM')
+    </update>
+
+    <delete id="deleteAlbum">
+        DELETE FROM album WHERE user_id = #{userId} AND album_id = #{albumId} AND type IN ('AI', 'CUSTOM')
+    </delete>
+
+    <select id="findAlbumById" resultMap="albumResultMap">
+        SELECT
+        <include refid="albumColumnsWithPhotoCover"/>
+        FROM album a
+        WHERE a.user_id = #{userId} AND a.album_id = #{albumId}
+    </select>
+
+    <select id="findAlbumsByGroupIds" resultMap="albumResultMap">
+        SELECT
+        <include refid="albumColumnsWithPhotoCover"/>
+        FROM album a
+        WHERE a.group_id IN
+        <foreach collection="groupIds" item="groupId" open="(" separator="," close=")">
+            #{groupId}
+        </foreach>
+        ORDER BY a.sort ASC, a.album_id ASC
+    </select>
+
+    <select id="findAiAlbumsByUserId" resultMap="albumResultMap">
+        SELECT
+        <include refid="albumColumnsWithPhotoCover"/>
+        FROM album a
+        WHERE a.user_id = #{userId} AND a.type = 'AI'
+        ORDER BY a.updated_at DESC, a.album_id DESC
+    </select>
+
+    <insert id="insertAlbumPhotos">
+        INSERT IGNORE INTO album_photo (album_id, image_id, sort)
+        VALUES
+        <foreach collection="imageIds" item="imageId" index="index" separator=",">
+            (#{albumId}, #{imageId}, #{index})
+        </foreach>
+    </insert>
+
+    <delete id="deleteAlbumPhoto">
+        DELETE FROM album_photo WHERE album_id = #{albumId} AND image_id = #{imageId}
+    </delete>
+
+    <select id="findAlbumPhotos" resultMap="photoResultMap">
+        SELECT i.image_id,
+               i.diary_id,
+               d.user_id,
+               i.image_path,
+               i.sort,
+               d.title AS diary_title,
+               d.date AS diary_date,
+               d.mood_key,
+               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
+               d.created_at
+        FROM album_photo ap
+        INNER JOIN album a ON a.album_id = ap.album_id
+        INNER JOIN diary_image i ON i.image_id = ap.image_id
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
+        ORDER BY ap.sort ASC, ap.image_id ASC
+    </select>
+
+    <select id="findAlbumPhotoPage" resultMap="photoResultMap">
+        SELECT i.image_id,
+               i.diary_id,
+               d.user_id,
+               i.image_path,
+               i.sort,
+               d.title AS diary_title,
+               d.date AS diary_date,
+               d.mood_key,
+               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
+               d.created_at
+        FROM album_photo ap
+        INNER JOIN album a ON a.album_id = ap.album_id
+        INNER JOIN diary_image i ON i.image_id = ap.image_id
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
+        ORDER BY ap.sort ASC, ap.image_id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAlbumPhotos" resultType="int">
+        SELECT COUNT(*)
+        FROM album_photo ap
+        INNER JOIN album a ON a.album_id = ap.album_id
+        INNER JOIN diary_image i ON i.image_id = ap.image_id
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
+    </select>
+</mapper>

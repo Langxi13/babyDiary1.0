@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.PhotoMapper">
+    <resultMap id="photoResultMap" type="Photo">
+        <id property="imageId" column="image_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="imagePath" column="image_path"/>
+        <result property="sort" column="sort"/>
+        <result property="diaryTitle" column="diary_title"/>
+        <result property="diaryDate" column="diary_date"/>
+        <result property="moodKey" column="mood_key"/>
+        <result property="favorite" column="favorite"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="photoSelectColumns">
+        i.image_id,
+        i.diary_id,
+        d.user_id,
+        i.image_path,
+        i.sort,
+        d.title AS diary_title,
+        d.date AS diary_date,
+        d.mood_key,
+        CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
+        d.created_at
+    </sql>
+
+    <sql id="photoSourceAndFilters">
+        FROM diary_image i
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE d.user_id = #{userId}
+        <if test="startDate != null and startDate != ''">
+            AND d.date &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND d.date &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+        </if>
+        <if test="moodKey != null and moodKey != ''">
+            AND d.mood_key = #{moodKey}
+        </if>
+        <if test="tagId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt WHERE dt.diary_id = d.diary_id AND dt.tag_id = #{tagId})
+        </if>
+        <if test="favoriteOnly != null and favoriteOnly">
+            AND fp.image_id IS NOT NULL
+        </if>
+    </sql>
+
+    <select id="findPhotos" resultMap="photoResultMap">
+        SELECT <include refid="photoSelectColumns"/>
+        <include refid="photoSourceAndFilters"/>
+        ORDER BY d.date DESC, i.sort ASC, i.image_id DESC
+    </select>
+
+    <select id="findPhotoPage" resultMap="photoResultMap">
+        SELECT <include refid="photoSelectColumns"/>
+        <include refid="photoSourceAndFilters"/>
+        ORDER BY d.date DESC, i.sort ASC, i.image_id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPhotos" resultType="int">
+        SELECT COUNT(*)
+        <include refid="photoSourceAndFilters"/>
+    </select>
+
+    <select id="findPhotoYears" resultType="int">
+        SELECT DISTINCT YEAR(d.date)
+        FROM diary_image i
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        WHERE d.user_id = #{userId}
+        ORDER BY YEAR(d.date) DESC
+    </select>
+
+    <select id="findCoverImagePath" resultType="string">
+        SELECT i.image_path
+        FROM diary_image i
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE d.user_id = #{userId}
+        <if test="startDate != null and startDate != ''">
+            AND d.date &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND d.date &lt;= STR_TO_DATE(#{endDate}, '%Y-%m-%d')
+        </if>
+        <if test="favoriteOnly != null and favoriteOnly">
+            AND fp.image_id IS NOT NULL
+        </if>
+        ORDER BY d.date DESC, i.sort ASC, i.image_id DESC
+        LIMIT 1
+    </select>
+
+    <select id="findPhotosByIds" resultMap="photoResultMap">
+        SELECT i.image_id,
+               i.diary_id,
+               d.user_id,
+               i.image_path,
+               i.sort,
+               d.title AS diary_title,
+               d.date AS diary_date,
+               d.mood_key,
+               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
+               d.created_at
+        FROM diary_image i
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE d.user_id = #{userId}
+        <choose>
+            <when test="imageIds != null and imageIds.size() > 0">
+                AND i.image_id IN
+                <foreach collection="imageIds" item="imageId" open="(" separator="," close=")">
+                    #{imageId}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
+        ORDER BY d.date ASC, i.sort ASC, i.image_id ASC
+    </select>
+
+    <select id="findPhotoById" resultMap="photoResultMap">
+        SELECT i.image_id,
+               i.diary_id,
+               d.user_id,
+               i.image_path,
+               i.sort,
+               d.title AS diary_title,
+               d.date AS diary_date,
+               d.mood_key,
+               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
+               d.created_at
+        FROM diary_image i
+        INNER JOIN diary d ON d.diary_id = i.diary_id
+        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
+        WHERE d.user_id = #{userId} AND i.image_id = #{imageId}
+    </select>
+
+    <insert id="insertFavorite">
+        INSERT IGNORE INTO favorite_photo (user_id, image_id) VALUES (#{userId}, #{imageId})
+    </insert>
+
+    <delete id="deleteFavorite">
+        DELETE FROM favorite_photo WHERE user_id = #{userId} AND image_id = #{imageId}
+    </delete>
+</mapper>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.TagMapper">
+    <resultMap id="tagResultMap" type="Tag">
+        <id property="tagId" column="tag_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="name" column="name"/>
+        <result property="color" column="color"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findTagsByUserId" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE user_id = #{userId} ORDER BY name ASC
+    </select>
+
+    <select id="findTagsByDiaryId" resultMap="tagResultMap">
+        SELECT t.*
+        FROM tag t
+        INNER JOIN diary_tag dt ON dt.tag_id = t.tag_id
+        WHERE dt.diary_id = #{diaryId}
+        ORDER BY t.name ASC
+    </select>
+
+    <select id="findTagsByDiaryIds" resultType="com.langxi.babydiary.dto.DiaryTagRow">
+        SELECT dt.diary_id AS diaryId,
+               t.tag_id AS tagId,
+               t.user_id AS userId,
+               t.name,
+               t.color,
+               t.created_at AS createdAt
+        FROM diary_tag dt
+        INNER JOIN tag t ON dt.tag_id = t.tag_id
+        WHERE dt.diary_id IN
+        <foreach collection="diaryIds" item="diaryId" open="(" separator="," close=")">
+            #{diaryId}
+        </foreach>
+        ORDER BY dt.diary_id ASC, t.name ASC
+    </select>
+
+    <select id="findTagByName" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE user_id = #{userId} AND name = #{name}
+    </select>
+
+    <select id="findTagById" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE user_id = #{userId} AND tag_id = #{tagId}
+    </select>
+
+    <insert id="insertTag" parameterType="Tag" useGeneratedKeys="true" keyProperty="tagId">
+        INSERT INTO tag (user_id, name, color) VALUES (#{userId}, #{name}, #{color})
+    </insert>
+
+    <delete id="deleteDiaryTagsByDiaryId">
+        DELETE FROM diary_tag WHERE diary_id = #{diaryId}
+    </delete>
+
+    <insert id="insertDiaryTags">
+        INSERT INTO diary_tag (diary_id, tag_id)
+        VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{diaryId}, #{tagId})
+        </foreach>
+    </insert>
+</mapper>

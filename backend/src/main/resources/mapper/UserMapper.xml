@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.UserMapper">
+    <resultMap id="userResultMap" type="User">
+        <id property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="avatarPath" column="avatar_path"/>
+        <result property="tokenVersion" column="token_version"/>
+    </resultMap>
+
+    <select id="findById" parameterType="Integer" resultMap="userResultMap">
+        SELECT * FROM user WHERE user_id = #{userId}
+    </select>
+
+    <select id="findByUsername" parameterType="String" resultMap="userResultMap">
+        SELECT * FROM user WHERE username = #{username}
+    </select>
+
+    <insert id="insertUser" parameterType="User">
+        INSERT INTO user (username, password) VALUES (#{username}, #{password})
+    </insert>
+
+<!--通过用户id查找avatar_path-->
+    <update id="updateAvatarPath">
+        UPDATE user SET avatar_path = #{avatarPath} WHERE user_id = #{userId}
+    </update>
+
+    <update id="updatePasswordAndIncrementTokenVersion">
+        UPDATE user
+        SET password = #{password},
+            token_version = token_version + 1
+        WHERE user_id = #{userId}
+    </update>
+</mapper>

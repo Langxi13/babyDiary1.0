@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+SERVICE_USER="${SERVICE_USER:-baby-diary}"
+SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
+DB_APP_USER="${DB_APP_USER:-baby_diary_app}"
+SYSTEMD_SERVICE_FILE="${SYSTEMD_SERVICE_FILE:-/etc/systemd/system/diary-backend.service}"
+BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
+IMAGE_DIR="${IMAGE_DIR:-$PROJECT_ROOT/data/images}"
+NGINX_USER="${NGINX_USER:-www-data}"
+NGINX_GROUP="${NGINX_GROUP:-www-data}"
+CHECK_OS_USER="${CHECK_OS_USER:-true}"
+
+require_file() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    echo "missing file $path" >&2
+    return 1
+  fi
+}
+
+require_file "$SYSTEMD_SERVICE_FILE"
+require_file "$BACKEND_ENV_FILE"
+
+grep -q "^User=$SERVICE_USER$" "$SYSTEMD_SERVICE_FILE"
+grep -q "^Group=$SERVICE_GROUP$" "$SYSTEMD_SERVICE_FILE"
+if grep -q '^ExecStop=/bin/kill ' "$SYSTEMD_SERVICE_FILE"; then
+  echo "custom ExecStop kill should be removed; systemd default SIGTERM is safer for non-root services" >&2
+  exit 1
+fi
+echo "service user $SERVICE_USER"
+echo "service stop uses systemd default"
+
+env_mode="$(stat -c '%a' "$BACKEND_ENV_FILE")"
+if [ "$env_mode" != "600" ]; then
+  echo "backend.env mode should be 600, got $env_mode" >&2
+  exit 1
+fi
+echo "backend.env mode 600"
+
+set -a
+. "$BACKEND_ENV_FILE"
+set +a
+
+if [ "${DB_USERNAME:-}" != "$DB_APP_USER" ]; then
+  echo "DB_USERNAME should be $DB_APP_USER, got ${DB_USERNAME:-<empty>}" >&2
+  exit 1
+fi
+echo "database user $DB_APP_USER"
+
+require_env_value() {
+  local name="$1"
+  local value="${!name:-}"
+  if [ -z "$value" ]; then
+    echo "$name is required" >&2
+    exit 1
+  fi
+}
+
+reject_placeholder_value() {
+  local name="$1"
+  local value="${!name:-}"
+  case "$value" in
+    replace-with-*|change-me-*|example|example-*)
+      echo "$name still contains an example value" >&2
+      exit 1
+      ;;
+  esac
+}
+
+require_env_value DB_URL
+require_env_value DB_PASSWORD
+require_env_value DIARY_FILE_PATH
+require_env_value JWT_SECRET
+require_env_value INVITATION_CODE
+require_env_value CORS_ALLOWED_ORIGINS
+require_env_value AI_CONFIG_ENCRYPTION_KEY
+
+reject_placeholder_value DB_PASSWORD
+reject_placeholder_value JWT_SECRET
+reject_placeholder_value INVITATION_CODE
+reject_placeholder_value AI_CONFIG_ENCRYPTION_KEY
+
+if [ "${#JWT_SECRET}" -lt 32 ]; then
+  echo "JWT_SECRET should contain at least 32 characters" >&2
+  exit 1
+fi
+if [ "${#AI_CONFIG_ENCRYPTION_KEY}" -lt 32 ]; then
+  echo "AI_CONFIG_ENCRYPTION_KEY should contain at least 32 characters" >&2
+  exit 1
+fi
+if [ "$CORS_ALLOWED_ORIGINS" = "*" ]; then
+  echo "CORS_ALLOWED_ORIGINS must not be '*' in production" >&2
+  exit 1
+fi
+echo "security environment configured"
+
+if [ ! -d "$IMAGE_DIR" ]; then
+  echo "missing image directory $IMAGE_DIR" >&2
+  exit 1
+fi
+
+DATA_DIR="$(dirname "$IMAGE_DIR")"
+image_group="$(stat -c '%G' "$IMAGE_DIR")"
+image_mode="$(stat -c '%a' "$IMAGE_DIR")"
+data_group="$(stat -c '%G' "$DATA_DIR")"
+data_mode="$(stat -c '%a' "$DATA_DIR")"
+
+if [ "$image_group" != "$NGINX_GROUP" ] || [ "$data_group" != "$NGINX_GROUP" ]; then
+  echo "image directory group should be $NGINX_GROUP, got data=$data_group images=$image_group" >&2
+  exit 1
+fi
+
+if [ "$image_mode" != "2750" ] || [ "$data_mode" != "2750" ]; then
+  echo "image directory mode should be 2750, got data=$data_mode images=$image_mode" >&2
+  exit 1
+fi
+echo "image directory readable by nginx group"
+
+if [ "$CHECK_OS_USER" = "true" ]; then
+  id "$SERVICE_USER" >/dev/null
+  if command -v runuser >/dev/null 2>&1; then
+    runuser -u "$SERVICE_USER" -- test -w "$IMAGE_DIR"
+    id "$NGINX_USER" >/dev/null
+    runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"
+    runuser -u "$NGINX_USER" -- test -x "$IMAGE_DIR"
+    first_image="$(find "$IMAGE_DIR" -maxdepth 1 -type f | head -n 1 || true)"
+    if [ -n "$first_image" ]; then
+      runuser -u "$NGINX_USER" -- test -r "$first_image"
+    fi
+  else
+    test -w "$IMAGE_DIR"
+  fi
+fi
+echo "image directory writable"

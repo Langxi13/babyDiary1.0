@@ -1,0 +1,154 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const routeComponents = {
+  Login: () => import('@/views/auth/Login.vue'),
+  Register: () => import('@/views/auth/Register.vue'),
+  Home: () => import('@/views/home/Home.vue'),
+  Profile: () => import('@/views/auth/Profile.vue'),
+  DraftList: () => import('@/views/diary/DraftList.vue'),
+  DiaryList: () => import('@/views/diary/DiaryList.vue'),
+  Timeline: () => import('@/views/diary/Timeline.vue'),
+  DiaryCalendar: () => import('@/views/diary/Calendar.vue'),
+  Anniversaries: () => import('@/views/diary/Anniversaries.vue'),
+  Album: () => import('@/views/diary/Album.vue'),
+  AlbumDetail: () => import('@/views/diary/AlbumDetail.vue'),
+  AiReports: () => import('@/views/diary/AiReports.vue'),
+  DiaryForm: () => import('@/views/diary/DiaryForm.vue'),
+  DiaryDetail: () => import('@/views/diary/DiaryDetail.vue')
+}
+
+const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: routeComponents.Login,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: routeComponents.Register,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/',
+    name: 'Home',
+    component: routeComponents.Home,
+    meta: { requiresAuth: true, mobileTitle: '首页', mobileTab: 'home' }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: routeComponents.Profile,
+    meta: { requiresAuth: true, mobileTitle: '我的', mobileTab: 'account' }
+  },
+  {
+    path: '/drafts',
+    name: 'DraftList',
+    component: routeComponents.DraftList,
+    meta: { requiresAuth: true, mobileTitle: '草稿', mobileTab: 'account' }
+  },
+  {
+    path: '/diaries',
+    name: 'DiaryList',
+    component: routeComponents.DiaryList,
+    meta: { requiresAuth: true, mobileTitle: '日记', mobileTab: 'diaries' }
+  },
+  {
+    path: '/timeline',
+    name: 'Timeline',
+    component: routeComponents.Timeline,
+    meta: { requiresAuth: true, mobileTitle: '时间轴', mobileTab: 'memory' }
+  },
+  {
+    path: '/calendar',
+    name: 'DiaryCalendar',
+    component: routeComponents.DiaryCalendar,
+    meta: { requiresAuth: true, mobileTitle: '日历', mobileTab: 'memory' }
+  },
+  {
+    path: '/anniversaries',
+    name: 'Anniversaries',
+    component: routeComponents.Anniversaries,
+    meta: { requiresAuth: true, mobileTitle: '纪念日', mobileTab: 'memory' }
+  },
+  {
+    path: '/album',
+    name: 'Album',
+    component: routeComponents.Album,
+    meta: { requiresAuth: true, mobileTitle: '相册', mobileTab: 'memory' }
+  },
+  {
+    path: '/album/system/:systemKey',
+    name: 'AlbumSystemDetail',
+    component: routeComponents.AlbumDetail,
+    meta: { requiresAuth: true, mobileTitle: '相册详情', mobileTab: 'memory' }
+  },
+  {
+    path: '/album/item/:albumId',
+    name: 'AlbumItemDetail',
+    component: routeComponents.AlbumDetail,
+    meta: { requiresAuth: true, mobileTitle: '相册详情', mobileTab: 'memory' }
+  },
+  {
+    path: '/ai-reports',
+    name: 'AiReports',
+    component: routeComponents.AiReports,
+    meta: { requiresAuth: true, mobileTitle: 'AI 报告', mobileTab: 'account' }
+  },
+  {
+    path: '/diaries/create',
+    name: 'DiaryCreate',
+    component: routeComponents.DiaryForm,
+    meta: { requiresAuth: true, mobileTitle: '写日记', mobileTab: 'write' }
+  },
+  {
+    path: '/diaries/:id',
+    name: 'DiaryDetail',
+    component: routeComponents.DiaryDetail,
+    meta: { requiresAuth: true, mobileTitle: '日记详情', mobileTab: 'diaries' }
+  },
+  {
+    path: '/diaries/:id/edit',
+    name: 'DiaryEdit',
+    component: routeComponents.DiaryForm,
+    meta: { requiresAuth: true, mobileTitle: '编辑日记', mobileTab: 'write' }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+export function preloadRouteComponent(path) {
+  const route = router.resolve(path)
+  const component = route.matched[route.matched.length - 1]?.components?.default
+  if (typeof component === 'function') {
+    component()
+  }
+}
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+  const hasToken = !!localStorage.getItem('token')
+
+  if (authStore.isLoggedIn && !hasToken) {
+    authStore.clearAuth()
+  }
+  
+  if (to.meta.requiresAuth && !hasToken) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+  } else if ((to.path === '/login' || to.path === '/register') && hasToken) {
+    next('/')
+  } else {
+    next()
+  }
+})
+
+export default router

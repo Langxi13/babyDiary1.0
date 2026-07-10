@@ -1,0 +1,246 @@
+.app-shell {
+  min-height: 100vh;
+}
+
+.mobile-topbar,
+  .mobile-tabbar,
+  .mobile-sheet-mask {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-navbar {
+    display: none;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+    background: #f7f1ed;
+  }
+
+  .mobile-topbar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 120;
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+    gap: 8px;
+    height: calc(58px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 14px 0;
+    border-bottom: 1px solid rgba(123, 93, 78, 0.12);
+    background: rgba(255, 252, 249, 0.94);
+    backdrop-filter: blur(16px);
+  }
+
+  .topbar-brand,
+  .topbar-icon {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 14px;
+    background: #f1e3db;
+    color: #8a5b45;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+  }
+
+  .topbar-icon {
+    cursor: pointer;
+  }
+
+  .topbar-title {
+    min-width: 0;
+    text-align: center;
+
+    strong,
+    span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    strong {
+      color: #302824;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    span {
+      margin-top: 2px;
+      color: #9b8d85;
+      font-size: 11px;
+    }
+  }
+
+  .mobile-shell-content {
+    min-height: 100vh;
+    padding-top: calc(70px + env(safe-area-inset-top));
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-tabbar {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    z-index: 120;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    min-height: calc(72px + env(safe-area-inset-bottom));
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+    border: 1px solid rgba(120, 88, 72, 0.12);
+    border-radius: 22px;
+    background: rgba(255, 252, 249, 0.96);
+    box-shadow: 0 18px 45px rgba(72, 48, 36, 0.16);
+    backdrop-filter: blur(18px);
+  }
+
+  .tabbar-item {
+    border: 0;
+    background: transparent;
+    color: #8b7c73;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 11px;
+    line-height: 1;
+
+    &.active {
+      color: #2f8f83;
+    }
+
+    &.primary {
+      transform: translateY(-4px);
+
+      .tabbar-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 16px;
+        background: #2f8f83;
+        color: white;
+        box-shadow: 0 10px 18px rgba(47, 143, 131, 0.24);
+      }
+    }
+  }
+
+  .tabbar-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+
+    svg {
+      width: 1em;
+      height: 1em;
+      display: block;
+    }
+  }
+
+  .mobile-sheet-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(39, 31, 27, 0.28);
+  }
+
+  .mobile-sheet {
+    width: 100%;
+    max-height: 78vh;
+    overflow: auto;
+    padding: 10px 18px calc(22px + env(safe-area-inset-bottom));
+    border-radius: 24px 24px 0 0;
+    background: #fffdfa;
+    box-shadow: 0 -18px 48px rgba(42, 34, 30, 0.18);
+  }
+
+  .sheet-grabber {
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 18px;
+    border-radius: 999px;
+    background: #d8c9bf;
+  }
+
+  .sheet-section {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
+
+    h2 {
+      grid-column: 1 / -1;
+      color: #3a312d;
+      font-size: 15px;
+    }
+
+    button {
+      min-height: 44px;
+      border: 1px solid #eadfd8;
+      border-radius: 14px;
+      background: #faf4ef;
+      color: #4c403a;
+      font-size: 14px;
+    }
+  }
+
+  .logout-button {
+    color: #b04444 !important;
+  }
+
+  .install-sheet {
+    display: grid;
+    gap: 12px;
+
+    h2 {
+      color: #302824;
+      font-size: 18px;
+    }
+
+    p {
+      color: #6f625b;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  }
+
+  .sheet-primary-button {
+    min-height: 44px;
+    border: 0;
+    border-radius: 14px;
+    color: white;
+    background: #2f8f83;
+    font-size: 15px;
+  }
+
+  .mobile-sheet-enter-active,
+  .mobile-sheet-leave-active {
+    transition: opacity 0.2s ease;
+
+    .mobile-sheet {
+      transition: transform 0.2s ease;
+    }
+  }
+
+  .mobile-sheet-enter-from,
+  .mobile-sheet-leave-to {
+    opacity: 0;
+
+    .mobile-sheet {
+      transform: translateY(18px);
+    }
+  }
+}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.DiaryImageMapper">
+    <resultMap id="diaryImageResultMap" type="DiaryImage">
+        <id property="imageId" column="image_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="imagePath" column="image_path"/>
+        <result property="sort" column="sort"/>
+    </resultMap>
+
+<!--普通增删改查-->
+<!--    插入单个数据-->
+    <insert id="insertDiaryImage" parameterType="DiaryImage">
+        INSERT INTO diary_image (diary_id, image_path, sort)
+        VALUES (#{diaryId}, #{imagePath}, #{sort})
+    </insert>
+
+<!--    插入多个数据-->
+    <insert id="insertDiaryImages" parameterType="java.util.List">
+        INSERT INTO diary_image (diary_id, image_path, sort)
+        VALUES
+        <foreach collection="diaryImages" item="image" separator=",">
+            (#{image.diaryId}, #{image.imagePath}, #{image.sort})
+        </foreach>
+    </insert>
+
+<!--    根据imageId删除数据-->
+    <delete id="deleteDiaryImageById" parameterType="int">
+        DELETE FROM diary_image WHERE image_id = #{imageId}
+    </delete>
+
+<!--    根据diaryId删除数据-->
+    <delete id="deleteDiaryImageByDiaryId" parameterType="int">
+        DELETE FROM diary_image WHERE diary_id = #{diaryId}
+    </delete>
+
+<!--根据diaryId查找数据-->
+    <select id="findDiaryImagesByDiaryId" resultMap="diaryImageResultMap">
+        SELECT * FROM diary_image WHERE diary_id = #{diaryId} ORDER BY sort ASC, image_id ASC
+    </select>
+
+    <select id="findDiaryImagesByDiaryIds" resultMap="diaryImageResultMap">
+        SELECT * FROM diary_image
+        WHERE diary_id IN
+        <foreach collection="diaryIds" item="diaryId" open="(" separator="," close=")">
+            #{diaryId}
+        </foreach>
+        ORDER BY diary_id ASC, sort ASC, image_id ASC
+    </select>
+<!--   根据diaryId查找路径 -->
+    <select id="findImagePathsByDiaryId" resultType="String">
+        SELECT image_path FROM diary_image WHERE diary_id = #{diaryId} ORDER BY sort ASC, image_id ASC
+    </select>
+
+<!--    导出指定日期的用户所有图片-->
+<!--    在diary_image表中根据用户userId查找所有diaryId从而查找所有imagePath，并且过滤日期-->
+    <select id="findImagePathsByUserIdAndDateRange" resultType="String" parameterType="map">
+        SELECT image_path
+        FROM diary_image as i
+                 INNER JOIN diary as d
+                 INNER JOIN user as u
+                            ON d.user_id = u.user_id AND i.diary_id = d.diary_id
+        WHERE u.user_id = #{userId}
+          AND d.date BETWEEN STR_TO_DATE(#{startDate}, '%Y-%m-%d') AND STR_TO_DATE(#{endDate}, '%Y-%m-%d');
+    </select>
+
+</mapper>
