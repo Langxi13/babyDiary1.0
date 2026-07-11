@@ -146,7 +146,7 @@
                       @click.stop
                     >
                       <el-icon><Delete /></el-icon>
-                      删除
+                      <span class="report-delete-label">删除</span>
                     </el-button>
                   </template>
                 </el-popconfirm>

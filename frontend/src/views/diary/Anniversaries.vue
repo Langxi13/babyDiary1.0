@@ -22,10 +22,14 @@
             <div class="card-head">
               <h2>{{ item.title }}</h2>
               <div class="actions">
-                <el-button text size="small" @click="openEdit(item)">编辑</el-button>
+                <el-button text size="small" @click="openEdit(item)">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
                 <el-popconfirm title="删除这个纪念日？" @confirm="removeItem(item.anniversaryId)">
                   <template #reference>
                     <el-button text type="danger" size="small" :loading="deletingId === item.anniversaryId" :disabled="!!deletingId">
+                      <el-icon><Delete /></el-icon>
                       删除
                     </el-button>
                   </template>
@@ -132,9 +136,10 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
-import { Delete, Plus, UploadFilled } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, UploadFilled } from '@element-plus/icons-vue'
 import { anniversaryApi } from '@/api/experience'
 import { formatChineseDate } from '@/utils/dateDisplay'
+import { formatLocalDate } from '@/utils/diaryFormState'
 import { thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
@@ -201,7 +206,7 @@ const resetForm = () => {
   setCoverPreviewUrl('')
   Object.assign(form, {
     title: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: formatLocalDate(),
     description: '',
     coverImagePath: '',
     sort: 0

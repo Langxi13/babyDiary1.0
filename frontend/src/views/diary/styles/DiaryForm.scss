@@ -426,16 +426,21 @@
 
 @media (max-width: 768px) {
   .page-header {
-    display: grid;
-    grid-template-columns: 44px 1fr;
+    display: flex;
+    min-height: 28px;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
+    justify-content: center;
+    margin-bottom: 8px;
+    padding: 0;
 
-    h1 {
-      text-align: left;
-      font-size: 20px;
+    &:not(.has-draft-status) {
+      display: none;
     }
+  }
+
+  .page-back-button,
+  .title-block h1 {
+    display: none;
   }
 
   .header-submit {
@@ -443,7 +448,15 @@
   }
 
   .title-block {
-    text-align: left;
+    text-align: center;
+
+    span {
+      margin-top: 0;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #edf5f2;
+      color: #4f6f68;
+    }
   }
 
   .form-layout {
@@ -453,7 +466,7 @@
 
   .editor-column {
     padding: 16px;
-    border-radius: 20px;
+    border-radius: 8px;
   }
 
   .meta-column {
@@ -462,8 +475,8 @@
   }
 
   .meta-card {
-    padding: 18px 16px;
-    border-radius: 20px;
+    padding: 16px;
+    border-radius: 8px;
 
     :deep(.el-form-item) {
       margin-bottom: 24px;
@@ -475,7 +488,7 @@
 
     :deep(.el-input__wrapper) {
       min-height: 54px;
-      border-radius: 16px;
+      border-radius: 8px;
     }
 
     :deep(.el-input__inner) {
@@ -484,25 +497,32 @@
   }
 
   .editor-wrap {
-    border-radius: 18px;
+    overflow: visible;
+    border-radius: 8px;
   }
 
   .editor-toolbar {
+    position: sticky;
+    top: calc(var(--mobile-topbar-height) + env(safe-area-inset-top));
+    z-index: 18;
     gap: 8px;
     overflow-x: auto;
     padding: 10px;
+    border-radius: 8px 8px 0 0;
+    background: rgba(250, 248, 247, 0.97);
+    backdrop-filter: blur(12px);
 
     button {
       width: 38px;
       height: 38px;
       flex: 0 0 auto;
-      border-radius: 12px;
+      border-radius: 8px;
     }
   }
 
   .rich-editor,
   .rich-editor :deep(.ProseMirror) {
-    min-height: 360px;
+    min-height: 340px;
   }
 
   .rich-editor :deep(.ProseMirror) {
@@ -517,8 +537,8 @@
   }
 
   .mood-card {
-    min-height: 74px;
-    border-radius: 18px;
+    min-height: 66px;
+    border-radius: 8px;
     padding: 10px 6px;
     box-shadow: none;
   }
@@ -553,14 +573,14 @@
   .mobile-native-upload {
     position: relative;
     display: flex;
-    min-height: 84px;
+    min-height: 74px;
     width: 100%;
     margin-top: 10px;
     overflow: hidden;
     align-items: center;
     justify-content: center;
     border: 1px dashed #b9c9c4;
-    border-radius: 16px;
+    border-radius: 8px;
     color: #2f8f83;
     background: #f7fbfa;
     font-size: 12px;
@@ -611,7 +631,7 @@
     margin-top: 10px;
     gap: 10px;
     border: 1px dashed #b9c9c4;
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 12px;
     background: #f7fbfa;
   }
@@ -627,7 +647,7 @@
     width: 100%;
     min-height: 46px;
     border: 1px solid #d7e3df;
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 8px;
     color: #40534f;
     background: #fff;
@@ -639,7 +659,7 @@
     min-height: 34px;
     margin-right: 10px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 0 12px;
     color: #fff;
     background: #2f8f83;
@@ -652,7 +672,7 @@
     justify-content: center;
     min-height: 38px;
     border: 0;
-    border-radius: 12px;
+    border-radius: 8px;
     color: #2f8f83;
     background: #e8f6f3;
     font-size: 13px;
@@ -692,16 +712,17 @@
 
   .diary-form {
     .image-sort-card {
-      border-radius: 16px;
+      border-radius: 8px;
     }
   }
 
   .form-actions {
     position: sticky;
-    bottom: calc(86px + env(safe-area-inset-bottom));
+    bottom: calc(var(--mobile-tabbar-height) + 10px + env(safe-area-inset-bottom));
     z-index: 20;
     padding: 12px;
-    border-radius: 18px;
+    border-radius: 8px;
+    border-color: rgba(79, 111, 104, 0.18);
     background: rgba(255, 253, 250, 0.96);
     backdrop-filter: blur(14px);
   }

@@ -36,6 +36,12 @@ test('anniversary editor spacing is responsive and avoids cramped controls', () 
   assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.anniversary-dialog-body\s*{[\s\S]*?grid-template-columns:\s*1fr;/)
 })
 
+test('new anniversaries default to the local calendar day', () => {
+  assert.match(source, /import\s*\{\s*formatLocalDate\s*\}\s*from '@\/utils\/diaryFormState'/)
+  assert.match(source, /date:\s*formatLocalDate\(\)/)
+  assert.doesNotMatch(source, /new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)/)
+})
+
 test('anniversary api exposes multipart cover upload endpoint', () => {
   assert.match(apiSource, /uploadCover\(file\)/)
   assert.match(apiSource, /const formData = new FormData\(\)/)

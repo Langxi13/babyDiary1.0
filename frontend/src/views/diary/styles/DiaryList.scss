@@ -185,19 +185,18 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
 
-    :deep(.el-button) {
-      align-self: center;
-      padding: 0 14px;
+    .create-diary-button {
+      display: none;
     }
   }
 
   .filter-section {
     margin-bottom: 14px;
     padding: 14px;
-    border-radius: 20px;
+    border-radius: 8px;
 
     .filter-form {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
 
@@ -208,6 +207,44 @@
     :deep(.el-form-item__label) {
       font-size: 13px;
     }
+
+    .search-filter {
+      grid-column: 1 / -1;
+      grid-row: 1;
+    }
+
+    .date-filter {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .tag-filter,
+    .mood-filter {
+      grid-row: 3;
+    }
+
+    .filter-actions {
+      grid-column: 1 / -1;
+      grid-row: 4;
+
+      :deep(.el-form-item__content) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      :deep(.el-button) {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+  }
+
+  .mobile-date-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
   }
 
   .diary-list {
@@ -215,7 +252,7 @@
   }
 
   .diary-card {
-    border-radius: 20px;
+    border-radius: 8px;
     overflow: hidden;
   }
 
@@ -237,10 +274,19 @@
   }
 
   .diary-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
 
     :deep(.el-button) {
-      padding: 0 8px;
+      width: 40px;
+      min-width: 40px;
+      height: 40px;
+      padding: 0;
+      margin-left: 0;
+    }
+
+    .view-action,
+    .action-label {
+      display: none;
     }
   }
 
@@ -269,7 +315,7 @@
     width: 100%;
     height: auto;
     aspect-ratio: 1;
-    border-radius: 14px;
+    border-radius: 8px;
   }
 
   .diary-footer {

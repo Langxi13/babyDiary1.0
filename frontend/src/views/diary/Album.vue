@@ -145,7 +145,7 @@
       </section>
     </main>
 
-    <el-dialog v-model="groupDialogVisible" title="相册组" width="420px">
+    <el-dialog v-model="groupDialogVisible" class="album-editor-dialog" title="相册组" width="420px">
       <el-form label-position="top">
         <el-form-item label="名称">
           <el-input v-model="groupForm.name" placeholder="例如：家庭旅行" />
@@ -157,7 +157,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="albumDialogVisible" title="相册" width="460px">
+    <el-dialog v-model="albumDialogVisible" class="album-editor-dialog" title="相册" width="460px">
       <el-form label-position="top">
         <el-form-item label="名称">
           <el-input v-model="albumForm.name" placeholder="例如：欧洲旅行" />

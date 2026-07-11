@@ -3,7 +3,7 @@
     <main class="page-container album-detail-page">
       <div class="page-title-row">
         <div>
-          <el-button text @click="router.push('/album')">
+          <el-button class="album-back-button" text @click="router.push('/album')">
             <el-icon><ArrowLeft /></el-icon>
             返回相册
           </el-button>

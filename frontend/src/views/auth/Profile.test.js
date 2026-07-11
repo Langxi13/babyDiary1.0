@@ -21,8 +21,8 @@ test('profile avatar upload supports drag and click replacement', () => {
   assert.match(source, /:drag="true"/)
   assert.match(source, /accept="image\/\*"/)
   assert.match(source, /:on-change="handleAvatarChange"/)
-  assert.match(source, /拖拽图片到这里/)
-  assert.match(source, /点击更换头像/)
+  assert.match(source, /拖拽或点击选择图片/)
+  assert.match(source, /从相册选择图片/)
 })
 
 test('profile layout prevents text and controls from overlapping at narrow web widths', () => {

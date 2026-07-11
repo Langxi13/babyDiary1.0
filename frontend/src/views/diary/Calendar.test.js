@@ -24,3 +24,9 @@ test('calendar opens diary detail directly when a day has one diary', () => {
   assert.match(source, /if \(item\.count === 1 && item\.firstDiaryId\) \{[\s\S]*?router\.push\(`\/diaries\/\$\{item\.firstDiaryId\}`\)[\s\S]*?return[\s\S]*?\}/)
   assert.match(source, /router\.push\(`\/diaries\?date=\$\{day\}`\)/)
 })
+
+test('mobile calendar removes the duplicate month picker and keeps navigation in one row', () => {
+  assert.match(source, /:deep\(\.calendar-month-picker\)\s*\{[\s\S]*?display:\s*none;/)
+  assert.match(source, /:deep\(\.el-calendar__button-group\)\s*\{[\s\S]*?width:\s*100%;/)
+  assert.match(source, /:deep\(\.el-calendar__button-group \.el-button-group\)\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/)
+})

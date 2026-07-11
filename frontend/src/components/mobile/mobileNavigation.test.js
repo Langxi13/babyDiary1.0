@@ -17,7 +17,7 @@ test('mobile shell is limited to phone width', () => {
 test('mobile primary navigation uses app shell tabs with write as the center action', () => {
   assert.deepEqual(
     MOBILE_PRIMARY_TABS.map(tab => tab.label),
-    ['首页', '日记', '写', '回忆', '我的']
+    ['首页', '日记', '写日记', '回忆', '我的']
   )
   assert.equal(MOBILE_PRIMARY_TABS[2].path, '/diaries/create')
   assert.equal(MOBILE_PRIMARY_TABS[2].primary, true)

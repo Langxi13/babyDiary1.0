@@ -6,7 +6,7 @@
           <h1>我的日记</h1>
           <p>搜索、筛选和整理每一次记录</p>
         </div>
-        <el-button type="primary" @click="router.push('/diaries/create')">
+        <el-button class="create-diary-button" type="primary" @click="router.push('/diaries/create')">
           <el-icon><Plus /></el-icon>
           写日记
         </el-button>
@@ -14,9 +14,28 @@
 
       <div class="filter-section">
         <el-form :inline="true" :model="filterForm" class="filter-form">
-          <el-form-item label="日期">
+          <el-form-item label="日期" class="date-filter">
+            <div v-if="isMobileViewport" class="mobile-date-fields">
+              <el-date-picker
+                v-model="filterForm.startDate"
+                type="date"
+                placeholder="开始日期"
+                format="YYYY年MM月DD日"
+                value-format="YYYY-MM-DD"
+                @change="handleFilter"
+              />
+              <el-date-picker
+                v-model="filterForm.endDate"
+                type="date"
+                placeholder="结束日期"
+                format="YYYY年MM月DD日"
+                value-format="YYYY-MM-DD"
+                @change="handleFilter"
+              />
+            </div>
             <el-date-picker
-              v-model="filterForm.dateRange"
+              v-else
+              v-model="desktopDateRange"
               type="daterange"
               range-separator="至"
               start-placeholder="开始日期"
@@ -27,19 +46,19 @@
             />
           </el-form-item>
 
-          <el-form-item label="标签">
+          <el-form-item label="标签" class="tag-filter">
             <el-select v-model="filterForm.tagId" placeholder="全部标签" clearable @change="handleFilter">
               <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="心情">
+          <el-form-item label="心情" class="mood-filter">
             <el-select v-model="filterForm.moodKey" placeholder="全部心情" clearable @change="handleFilter">
               <el-option v-for="mood in MOODS" :key="mood.key" :label="mood.label" :value="mood.key" />
             </el-select>
           </el-form-item>
 
-          <el-form-item label="搜索">
+          <el-form-item label="搜索" class="search-filter">
             <el-input
               v-model="filterForm.keyword"
               placeholder="标题或内容"
@@ -54,7 +73,7 @@
             </el-input>
           </el-form-item>
 
-          <el-form-item>
+          <el-form-item class="filter-actions">
             <el-button @click="resetFilters">重置</el-button>
             <el-button type="success" :loading="exporting" @click="handleExport">
               <el-icon><Download /></el-icon>
@@ -80,13 +99,13 @@
                 </div>
               </div>
               <div class="diary-actions">
-                <el-button type="primary" size="small" text @click.stop="openDiary(diary.diaryId)">
+                <el-button class="view-action" type="primary" size="small" text @click.stop="openDiary(diary.diaryId)">
                   <el-icon><View /></el-icon>
-                  查看详情
+                  <span class="action-label">查看详情</span>
                 </el-button>
                 <el-button type="primary" size="small" text @click.stop="handleEdit(diary.diaryId)">
                   <el-icon><Edit /></el-icon>
-                  编辑
+                  <span class="action-label">编辑</span>
                 </el-button>
                 <el-popconfirm
                   title="确定要删除这篇日记吗？"
@@ -104,7 +123,7 @@
                       @click.stop
                     >
                       <el-icon><Delete /></el-icon>
-                      删除
+                      <span class="action-label">删除</span>
                     </el-button>
                   </template>
                 </el-popconfirm>
@@ -208,10 +227,20 @@ let keywordDebounceTimer = null
 
 const currentPage = ref(1)
 const filterForm = reactive({
-  dateRange: null,
+  startDate: '',
+  endDate: '',
   keyword: '',
   tagId: null,
   moodKey: ''
+})
+const desktopDateRange = computed({
+  get: () => filterForm.startDate && filterForm.endDate
+    ? [filterForm.startDate, filterForm.endDate]
+    : null,
+  set: (value) => {
+    filterForm.startDate = value?.[0] || ''
+    filterForm.endDate = value?.[1] || ''
+  }
 })
 
 const updateViewportMode = () => {
@@ -237,10 +266,8 @@ const fetchDiaries = async () => {
     moodKey: filterForm.moodKey || undefined
   }
 
-  if (filterForm.dateRange) {
-    params.startDate = filterForm.dateRange[0]
-    params.endDate = filterForm.dateRange[1]
-  }
+  if (filterForm.startDate) params.startDate = filterForm.startDate
+  if (filterForm.endDate) params.endDate = filterForm.endDate
 
   if (filterForm.keyword.trim()) {
     params.keyword = filterForm.keyword.trim()
@@ -253,7 +280,8 @@ const firstQueryValue = (value) => Array.isArray(value) ? value[0] : value
 
 const syncDateFromRoute = () => {
   const date = firstQueryValue(route.query.date)
-  filterForm.dateRange = date ? [date, date] : null
+  filterForm.startDate = date || ''
+  filterForm.endDate = date || ''
   currentPage.value = 1
 }
 
@@ -261,6 +289,10 @@ const handleFilter = () => {
   if (keywordDebounceTimer) {
     window.clearTimeout(keywordDebounceTimer)
     keywordDebounceTimer = null
+  }
+  if (filterForm.startDate && filterForm.endDate && filterForm.startDate > filterForm.endDate) {
+    ElMessage.warning('开始日期不能晚于结束日期')
+    return
   }
   currentPage.value = 1
   fetchDiaries()
@@ -275,7 +307,8 @@ const scheduleKeywordFilter = () => {
 
 const resetFilters = () => {
   Object.assign(filterForm, {
-    dateRange: null,
+    startDate: '',
+    endDate: '',
     keyword: '',
     tagId: null,
     moodKey: ''
@@ -317,7 +350,7 @@ const handleDelete = async (id) => {
 
 const handleExport = async () => {
   if (exporting.value) return
-  if (!filterForm.dateRange) {
+  if (!filterForm.startDate || !filterForm.endDate) {
     ElMessage.warning('请先选择日期范围')
     return
   }
@@ -325,15 +358,15 @@ const handleExport = async () => {
   exporting.value = true
   try {
     const response = await diaryStore.exportImages(
-      filterForm.dateRange[0],
-      filterForm.dateRange[1]
+      filterForm.startDate,
+      filterForm.endDate
     )
 
     const blob = new Blob([response], { type: 'application/zip' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `diary_images_${filterForm.dateRange[0]}_${filterForm.dateRange[1]}.zip`
+    link.download = `diary_images_${filterForm.startDate}_${filterForm.endDate}.zip`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

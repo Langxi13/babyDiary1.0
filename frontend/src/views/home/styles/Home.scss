@@ -260,18 +260,17 @@
 
 @media (max-width: 768px) {
   .home-content {
-    padding: 0 14px;
+    padding: 0 max(var(--mobile-page-gutter), env(safe-area-inset-right)) 8px max(var(--mobile-page-gutter), env(safe-area-inset-left));
   }
 
   .daily-hero {
     min-height: 0;
-    padding: 20px;
-    border-radius: 22px;
+    padding: 18px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
     color: #302824;
-    background:
-      linear-gradient(135deg, rgba(255, 253, 250, 0.96), rgba(236, 248, 245, 0.92)),
-      linear-gradient(135deg, #fffdfa, #e8f6f3);
-    box-shadow: 0 14px 32px rgba(72, 48, 36, 0.08);
+    background: #eef8f5;
+    box-shadow: 0 8px 22px rgba(72, 48, 36, 0.06);
 
     h1 {
       font-size: 24px;
@@ -309,7 +308,7 @@
 
   .panel {
     padding: 16px;
-    border-radius: 20px;
+    border-radius: 8px;
   }
 
   .section-head {
@@ -328,7 +327,7 @@
     grid-template-columns: minmax(0, 1fr) 92px;
     gap: 12px;
     padding: 12px;
-    border-radius: 16px;
+    border-radius: 8px;
     background: #fff;
 
     h3 {
@@ -348,7 +347,7 @@
     img {
       width: 92px;
       height: 92px;
-      border-radius: 14px;
+      border-radius: 8px;
     }
   }
 
@@ -359,16 +358,20 @@
   .photo-tile {
     height: auto;
     aspect-ratio: 1;
-    border-radius: 16px;
+    border-radius: 8px;
   }
 
   .today-card {
-    background: linear-gradient(135deg, #fffdfa, #ecf8f5);
+    display: none;
 
     .el-icon {
       color: #2f8f83;
       background: #dff3ef;
     }
+  }
+
+  .mini-list button {
+    min-height: 48px;
   }
 }
 
@@ -380,6 +383,11 @@
   }
 
   .recent-item {
-    grid-template-columns: minmax(0, 1fr) 86px;
+    grid-template-columns: minmax(0, 1fr) 78px;
+
+    img {
+      width: 78px;
+      height: 78px;
+    }
   }
 }

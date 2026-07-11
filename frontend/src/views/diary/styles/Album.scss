@@ -278,19 +278,67 @@
   .ai-panel,
   .proposal-panel,
   .album-list {
-    border-radius: 18px;
+    border-radius: 8px;
+  }
+
+  .ai-panel,
+  .proposal-panel {
+    padding: 14px;
   }
 
   .album-group-list {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(148px, 1fr);
+    grid-auto-columns: minmax(128px, 42vw);
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding: 2px 1px 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .group-item {
+    min-height: 64px;
+    padding: 10px 12px;
+    scroll-snap-align: start;
+
+    small {
+      margin-top: 3px;
+      font-size: 11px;
+    }
   }
 
   .album-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .album-card,
+  .proposal-album,
+  .proposal-photo {
+    border-radius: 8px;
+  }
+
+  .album-list {
+    padding: 14px;
+  }
+
+  .proposal-photo button {
+    min-height: 34px;
+    padding: 5px 9px;
+  }
+
+  :deep(.album-editor-dialog .el-dialog__footer) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+
+    .el-button {
+      width: 100%;
+      margin-left: 0;
+    }
   }
 }

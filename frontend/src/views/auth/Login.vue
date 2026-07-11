@@ -1,29 +1,37 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-header">
-        <h1>Baby Diary</h1>
-        <p>记录我们的每一个美好瞬间</p>
-      </div>
+  <div class="auth-page">
+    <main class="auth-card">
+      <header class="auth-header">
+        <img src="/app-icon.png" alt="" class="auth-logo" />
+        <div>
+          <span>私人日记与回忆相册</span>
+          <h1>Baby Diary</h1>
+          <p>欢迎回来，继续记录你们的日常。</p>
+        </div>
+      </header>
       
-      <el-form ref="formRef" :model="form" :rules="rules" class="login-form">
-        <el-form-item prop="username">
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="auth-form login-form">
+        <el-form-item label="用户名" prop="username">
           <el-input
             v-model="form.username"
-            placeholder="请输入用户名"
+            placeholder="用户名"
             size="large"
-            prefix-icon="User"
+            :prefix-icon="User"
+            autocomplete="username"
+            autocapitalize="none"
+            :spellcheck="false"
           />
         </el-form-item>
         
-        <el-form-item prop="password">
+        <el-form-item label="密码" prop="password">
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="密码"
             size="large"
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
             show-password
+            autocomplete="current-password"
             @keyup.enter="handleLogin"
           />
         </el-form-item>
@@ -34,19 +42,19 @@
             size="large"
             :loading="loading"
             :disabled="loading"
-            class="login-btn"
+            class="auth-submit login-btn"
             @click="handleLogin"
           >
             登录
           </el-button>
         </el-form-item>
         
-        <div class="login-footer">
+        <div class="auth-footer login-footer">
           <span>还没有账号？</span>
           <router-link to="/register" class="register-link">立即注册</router-link>
         </div>
       </el-form>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -57,6 +65,7 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
+import { Lock, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
@@ -118,65 +127,4 @@ const handleLogin = async () => {
 }
 </script>
 
-<style scoped lang="scss">
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-}
-
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  background: white;
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.login-header {
-  text-align: center;
-  margin-bottom: 30px;
-  
-  h1 {
-    font-size: 32px;
-    color: #333;
-    margin-bottom: 8px;
-  }
-  
-  p {
-    color: #999;
-    font-size: 14px;
-  }
-}
-
-.login-form {
-  .el-form-item {
-    margin-bottom: 24px;
-  }
-}
-
-.login-btn {
-  width: 100%;
-  height: 44px;
-  font-size: 16px;
-}
-
-.login-footer {
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-  
-  .register-link {
-    color: #409eff;
-    margin-left: 4px;
-    
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-</style>
+<style src="./styles/Auth.scss" scoped lang="scss"></style>

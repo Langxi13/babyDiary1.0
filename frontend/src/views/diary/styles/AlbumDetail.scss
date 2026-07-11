@@ -162,11 +162,32 @@
 
 @media (max-width: 768px) {
   .page-title-row {
-    flex-direction: column;
+    gap: 8px;
+
+    h1 {
+      margin-top: 0;
+      font-size: 22px;
+    }
+
+    p {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+  }
+
+  .album-back-button {
+    display: none;
   }
 
   .detail-stats {
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid #dce8e4;
   }
 
   .album-photo-grid {
@@ -176,12 +197,25 @@
 
   .photo-card {
     height: auto;
-    aspect-ratio: 0.78;
-    border-radius: 18px;
+    aspect-ratio: 1;
+    border-radius: 8px;
   }
 
   .photo {
-    border-radius: 18px;
+    border-radius: 8px;
+  }
+
+  .favorite-btn {
+    top: 8px;
+    right: 8px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .remove-photo-btn {
+    top: 8px;
+    left: 8px;
+    min-height: 40px;
   }
 
   .photo-meta {
@@ -189,6 +223,12 @@
   }
 
   .photo-page-footer {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
+
+    :deep(.el-button) {
+      min-width: 112px;
+    }
   }
 }

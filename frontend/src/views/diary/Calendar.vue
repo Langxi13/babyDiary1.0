@@ -7,6 +7,7 @@
           <p>按日期找到写下的回忆</p>
         </div>
         <el-date-picker
+          class="calendar-month-picker"
           v-model="monthValue"
           type="month"
           format="YYYY年MM月"
@@ -194,22 +195,57 @@ watch(selectedDate, (date) => {
   }
 
   .calendar-panel {
-    border-radius: 20px;
+    border-radius: 8px;
     overflow: hidden;
+  }
+
+  :deep(.calendar-month-picker) {
+    display: none;
   }
 
   :deep(.el-calendar__header) {
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
-    padding: 14px;
+    padding: 12px 10px;
+  }
+
+  :deep(.el-card__body) {
+    padding: 0;
+  }
+
+  :deep(.el-calendar__body) {
+    padding: 8px;
+  }
+
+  :deep(.el-calendar-table thead th) {
+    padding: 8px 0;
+    color: #71807c;
+    font-size: 12px;
+  }
+
+  :deep(.el-calendar-day) {
+    height: 66px;
+    padding: 2px;
   }
 
   :deep(.el-calendar__button-group) {
+    width: 100%;
+  }
+
+  :deep(.el-calendar__button-group .el-button-group) {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+
+    &::before,
+    &::after {
+      display: none;
+    }
 
     .el-button {
+      width: 100%;
+      min-width: 0;
       margin-left: 0;
       padding: 0 8px;
     }
@@ -217,10 +253,11 @@ watch(selectedDate, (date) => {
 
   .day-cell {
     padding: 5px;
-    border-radius: 12px;
+    border-radius: 6px;
   }
 
   .day-note {
+    margin-top: 4px;
     font-size: 10px;
   }
 

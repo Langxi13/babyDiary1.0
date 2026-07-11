@@ -2,12 +2,12 @@
   <div class="page-shell">
     <main class="page-container detail-page" v-loading="loading">
       <div class="page-header">
-        <el-button text @click="router.back()">
+        <el-button class="detail-back-button" text @click="router.back()">
           <el-icon><ArrowLeft /></el-icon>
           返回
         </el-button>
         <div class="actions">
-          <el-button @click="router.push('/diaries')">列表</el-button>
+          <el-button class="detail-list-button" @click="router.push('/diaries')">列表</el-button>
           <el-button type="primary" @click="router.push(`/diaries/${diaryId}/edit`)">
             <el-icon><Edit /></el-icon>
             编辑
@@ -214,25 +214,28 @@ onMounted(loadDiary)
 
 @media (max-width: 768px) {
   .page-header {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    gap: 10px;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
   }
 
   .actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    width: 100%;
 
     :deep(.el-button) {
+      width: 100%;
       margin-left: 0;
     }
   }
 
+  .detail-back-button,
+  .detail-list-button {
+    display: none;
+  }
+
   .detail-panel {
-    padding: 18px;
-    border-radius: 22px;
+    padding: 16px;
+    border-radius: 8px;
   }
 
   .detail-head h1 {
@@ -241,7 +244,7 @@ onMounted(loadDiary)
   }
 
   .content-section {
-    margin-top: 18px;
+    padding: 18px 0 0;
     font-size: 16px;
     line-height: 1.78;
   }
@@ -254,7 +257,7 @@ onMounted(loadDiary)
   .detail-image {
     height: auto;
     aspect-ratio: 1;
-    border-radius: 16px;
+    border-radius: 8px;
   }
 }
 </style>

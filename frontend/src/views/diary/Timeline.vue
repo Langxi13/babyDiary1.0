@@ -6,7 +6,7 @@
           <h1>时间轴</h1>
           <p>按月份回看两个人的日常片段</p>
         </div>
-        <el-button type="primary" @click="router.push('/diaries/create')">
+        <el-button class="timeline-write-button" type="primary" @click="router.push('/diaries/create')">
           <el-icon><Edit /></el-icon>
           写日记
         </el-button>
@@ -14,6 +14,7 @@
 
       <section class="toolbar">
         <el-date-picker
+          class="timeline-month-filter"
           v-model="monthValue"
           type="month"
           placeholder="选择月份"
@@ -22,10 +23,10 @@
           clearable
           @change="fetchTimeline"
         />
-        <el-select v-model="filters.tagId" placeholder="标签" clearable @change="fetchTimeline">
+        <el-select class="timeline-tag-filter" v-model="filters.tagId" placeholder="标签" clearable @change="fetchTimeline">
           <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
         </el-select>
-        <el-select v-model="filters.moodKey" placeholder="心情" clearable @change="fetchTimeline">
+        <el-select class="timeline-mood-filter" v-model="filters.moodKey" placeholder="心情" clearable @change="fetchTimeline">
           <el-option v-for="mood in MOODS" :key="mood.key" :label="mood.label" :value="mood.key" />
         </el-select>
       </section>

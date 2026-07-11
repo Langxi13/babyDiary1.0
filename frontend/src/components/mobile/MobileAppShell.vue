@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'keyboard-open': keyboardOpen }">
     <nav-bar class="desktop-navbar" />
 
     <header class="mobile-topbar">
@@ -15,7 +15,7 @@
         <span>Baby Diary</span>
       </div>
 
-      <button type="button" class="topbar-icon" aria-label="更多" @click="secondarySheetOpen = true">
+      <button type="button" class="topbar-icon" aria-label="更多" :aria-expanded="secondarySheetOpen" @click="secondarySheetOpen = true">
         <el-icon><MoreFilled /></el-icon>
       </button>
     </header>
@@ -33,6 +33,7 @@
         :class="{ active: isMobileTabActive(tab, route.path), primary: tab.primary }"
         @touchstart.passive="preload(tab.path)"
         @click="router.push(tab.path)"
+        :aria-current="isMobileTabActive(tab, route.path) ? 'page' : undefined"
       >
         <el-icon class="tabbar-icon">
           <component :is="iconMap[tab.icon]" />
@@ -43,35 +44,54 @@
 
     <transition name="mobile-sheet">
       <div v-if="secondarySheetOpen" class="mobile-sheet-mask" @click.self="secondarySheetOpen = false">
-        <section class="mobile-sheet" aria-label="更多入口">
+        <section class="mobile-sheet" role="dialog" aria-modal="true" aria-label="更多入口">
           <div class="sheet-grabber" />
-          <div class="sheet-section">
-            <h2>回忆</h2>
-            <button
-              v-for="link in memoryLinks"
-              :key="link.path"
-              type="button"
-              @touchstart.passive="preload(link.path)"
-              @click="openLink(link.path)"
-            >
-              {{ link.label }}
+          <div class="sheet-heading">
+            <h2>更多功能</h2>
+            <button type="button" class="sheet-close" aria-label="关闭" @click="secondarySheetOpen = false">
+              <el-icon><Close /></el-icon>
             </button>
           </div>
           <div class="sheet-section">
-            <h2>我的</h2>
-            <button
-              v-for="link in accountLinks"
-              :key="link.path"
-              type="button"
-              @touchstart.passive="preload(link.path)"
-              @click="openLink(link.path)"
-            >
-              {{ link.label }}
-            </button>
-            <button type="button" @click="openInstall">
-              添加到桌面
-            </button>
-            <button type="button" class="logout-button" @click="authStore.logout()">退出登录</button>
+            <h3>回忆</h3>
+            <div class="sheet-link-list">
+              <button
+                v-for="link in memoryLinks"
+                :key="link.path"
+                type="button"
+                @touchstart.passive="preload(link.path)"
+                @click="openLink(link.path)"
+              >
+                <el-icon class="sheet-link-icon"><component :is="secondaryIconMap[link.icon]" /></el-icon>
+                <span>{{ link.label }}</span>
+                <el-icon class="sheet-link-arrow"><ArrowRight /></el-icon>
+              </button>
+            </div>
+          </div>
+          <div class="sheet-section">
+            <h3>我的</h3>
+            <div class="sheet-link-list">
+              <button
+                v-for="link in accountLinks"
+                :key="link.path"
+                type="button"
+                @touchstart.passive="preload(link.path)"
+                @click="openLink(link.path)"
+              >
+                <el-icon class="sheet-link-icon"><component :is="secondaryIconMap[link.icon]" /></el-icon>
+                <span>{{ link.label }}</span>
+                <el-icon class="sheet-link-arrow"><ArrowRight /></el-icon>
+              </button>
+              <button type="button" @click="openInstall">
+                <el-icon class="sheet-link-icon"><Download /></el-icon>
+                <span>添加到桌面</span>
+                <el-icon class="sheet-link-arrow"><ArrowRight /></el-icon>
+              </button>
+              <button type="button" class="logout-button" @click="authStore.logout()">
+                <el-icon class="sheet-link-icon"><SwitchButton /></el-icon>
+                <span>退出登录</span>
+              </button>
+            </div>
           </div>
         </section>
       </div>
@@ -79,7 +99,7 @@
 
     <transition name="mobile-sheet">
       <div v-if="installSheetOpen" class="mobile-sheet-mask" @click.self="installSheetOpen = false">
-        <section class="mobile-sheet install-sheet" aria-label="添加到桌面">
+        <section class="mobile-sheet install-sheet" role="dialog" aria-modal="true" aria-label="添加到桌面">
           <div class="sheet-grabber" />
           <h2>添加到桌面</h2>
           <p v-if="isIosSafari">
@@ -96,17 +116,26 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import {
   ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Clock,
+  Close,
   Document,
+  Download,
   Edit,
   HomeFilled,
+  MagicStick,
   MoreFilled,
   Notebook,
   Picture,
+  SwitchButton,
+  Tickets,
+  Trophy,
   User
 } from '@element-plus/icons-vue'
 import NavBar from '@/components/common/NavBar.vue'
@@ -127,12 +156,22 @@ const authStore = useAuthStore()
 const secondarySheetOpen = ref(false)
 const installSheetOpen = ref(false)
 const deferredInstallPrompt = ref(null)
+const keyboardOpen = ref(false)
 
 const iconMap = {
   HomeFilled,
   Document,
   Edit,
   Picture,
+  User
+}
+const secondaryIconMap = {
+  Picture,
+  Clock,
+  Calendar,
+  Trophy,
+  MagicStick,
+  Tickets,
   User
 }
 const preload = (path) => preloadRouteComponent(path)
@@ -165,6 +204,20 @@ const handleBeforeInstallPrompt = (event) => {
   deferredInstallPrompt.value = event
 }
 
+const updateKeyboardState = () => {
+  if (!window.visualViewport) {
+    keyboardOpen.value = false
+    return
+  }
+  keyboardOpen.value = window.innerHeight - window.visualViewport.height > 160
+}
+
+const handleKeydown = (event) => {
+  if (event.key !== 'Escape') return
+  secondarySheetOpen.value = false
+  installSheetOpen.value = false
+}
+
 const openInstall = async () => {
   secondarySheetOpen.value = false
   if (deferredInstallPrompt.value) {
@@ -178,10 +231,25 @@ const openInstall = async () => {
 
 onMounted(() => {
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.addEventListener('keydown', handleKeydown)
+  window.visualViewport?.addEventListener('resize', updateKeyboardState)
+  updateKeyboardState()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+  window.removeEventListener('keydown', handleKeydown)
+  window.visualViewport?.removeEventListener('resize', updateKeyboardState)
+  document.body.style.overflow = ''
+})
+
+watch(() => route.fullPath, () => {
+  secondarySheetOpen.value = false
+  installSheetOpen.value = false
+})
+
+watch([secondarySheetOpen, installSheetOpen], ([secondaryOpen, installOpen]) => {
+  document.body.style.overflow = secondaryOpen || installOpen ? 'hidden' : ''
 })
 </script>
 

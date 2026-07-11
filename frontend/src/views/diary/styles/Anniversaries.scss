@@ -349,8 +349,8 @@
     :deep(.el-dialog) {
       width: calc(100vw - 28px) !important;
       max-width: calc(100vw - 28px);
-      margin: 6vh auto;
-      border-radius: 18px;
+      margin: 0 auto;
+      border-radius: 12px;
     }
 
     :deep(.el-dialog__header) {
@@ -375,10 +375,17 @@
 
   .anniversary-cover-panel {
     padding: 14px;
+    order: 2;
+    border-radius: 8px;
   }
 
   .anniversary-fields-panel {
     gap: 14px;
+    order: 1;
+  }
+
+  .fields-heading {
+    border-radius: 8px;
   }
 
   .page-title-row {
@@ -393,20 +400,21 @@
   }
 
   .anniversary-card {
-    border-radius: 22px;
+    border-radius: 8px;
     overflow: hidden;
   }
 
   .cover {
-    height: 150px;
+    height: 138px;
   }
 
   .cover-upload-preview {
-    min-height: 180px;
+    min-height: 160px;
+    border-radius: 8px;
     padding: 16px;
 
     &.has-cover {
-      min-height: 210px;
+      min-height: 180px;
     }
   }
 
@@ -415,7 +423,17 @@
   }
 
   .card-head {
-    gap: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+
+    h2 {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   .actions {
@@ -423,6 +441,9 @@
     gap: 6px;
 
     :deep(.el-button) {
+      min-width: 40px;
+      min-height: 40px;
+      padding-inline: 8px;
       margin-left: 0;
     }
   }

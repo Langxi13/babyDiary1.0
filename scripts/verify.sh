@@ -12,7 +12,9 @@ FRONTEND_TESTS=(
   src/components/mobile/MobileAppShell.test.js
   src/components/common/NavBar.test.js
   src/views/home/Home.test.js
+  src/views/auth/AuthMobile.test.js
   src/views/auth/Profile.test.js
+  src/assets/styles/mobileFoundation.test.js
   src/views/diary/Album.test.js
   src/views/diary/AiReports.test.js
   src/views/diary/Anniversaries.test.js

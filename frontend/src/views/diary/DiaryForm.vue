@@ -1,8 +1,8 @@
 <template>
   <div class="diary-form-container">
     <div class="page-container">
-      <div class="page-header">
-        <el-button text @click="router.back()">
+      <div class="page-header" :class="{ 'has-draft-status': draftStatus }">
+        <el-button class="page-back-button" text @click="router.back()">
           <el-icon><ArrowLeft /></el-icon>
           返回
         </el-button>

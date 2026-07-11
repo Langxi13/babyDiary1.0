@@ -3,19 +3,19 @@ export const MOBILE_BREAKPOINT = 768
 export const MOBILE_PRIMARY_TABS = [
   { label: '首页', path: '/', match: '/', icon: 'HomeFilled' },
   { label: '日记', path: '/diaries', match: '/diaries', icon: 'Document' },
-  { label: '写', path: '/diaries/create', match: '/diaries/create', icon: 'Edit', primary: true },
+  { label: '写日记', path: '/diaries/create', match: '/diaries/create', icon: 'Edit', primary: true },
   { label: '回忆', path: '/album', match: 'memory', icon: 'Picture' },
   { label: '我的', path: '/profile', match: 'account', icon: 'User' }
 ]
 
 export const MOBILE_SECONDARY_LINKS = [
-  { label: '相册', path: '/album', group: 'memory' },
-  { label: '时间轴', path: '/timeline', group: 'memory' },
-  { label: '日历', path: '/calendar', group: 'memory' },
-  { label: '纪念日', path: '/anniversaries', group: 'memory' },
-  { label: 'AI 报告', path: '/ai-reports', group: 'account' },
-  { label: '草稿', path: '/drafts', group: 'account' },
-  { label: '个人信息', path: '/profile', group: 'account' }
+  { label: '相册', path: '/album', group: 'memory', icon: 'Picture' },
+  { label: '时间轴', path: '/timeline', group: 'memory', icon: 'Clock' },
+  { label: '日历', path: '/calendar', group: 'memory', icon: 'Calendar' },
+  { label: '纪念日', path: '/anniversaries', group: 'memory', icon: 'Trophy' },
+  { label: 'AI 报告', path: '/ai-reports', group: 'account', icon: 'MagicStick' },
+  { label: '草稿', path: '/drafts', group: 'account', icon: 'Tickets' },
+  { label: '个人信息', path: '/profile', group: 'account', icon: 'User' }
 ]
 
 const routeTitles = new Map([

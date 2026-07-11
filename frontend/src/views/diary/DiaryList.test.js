@@ -25,7 +25,9 @@ test('mobile diary filters stack labels above controls to avoid overlap', () => 
   assert.match(source, /:deep\(\.el-form-item__label\)\s*\{[\s\S]*?width:\s*100%;/)
   assert.match(source, /:deep\(\.el-form-item__content\)\s*\{[\s\S]*?width:\s*100%;/)
   assert.match(source, /:deep\(\.el-date-editor\),[\s\S]*?:deep\(\.el-date-editor--daterange\),[\s\S]*?\{[\s\S]*?min-width:\s*0;/)
-  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.filter-section\s*\{[\s\S]*?grid-template-columns:\s*1fr;/)
+  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]*?\.filter-section\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/)
+  assert.match(source, /class="mobile-date-fields"/)
+  assert.match(source, /\.mobile-date-fields\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/)
 })
 
 test('mobile pagination uses compact layout and stays inside the viewport', () => {
@@ -47,7 +49,7 @@ test('diary list displays dates with Chinese formatting helpers', () => {
 
 test('web diary cards expose detail navigation while preserving card click entry', () => {
   assert.match(source, /class="diary-card"\s+@click="openDiary\(diary\.diaryId\)"/)
-  assert.match(source, /<el-button\s+type="primary"\s+size="small"\s+text\s+@click\.stop="openDiary\(diary\.diaryId\)"[\s\S]*?查看详情[\s\S]*?<\/el-button>/)
+  assert.match(source, /<el-button\s+class="view-action"\s+type="primary"\s+size="small"\s+text\s+@click\.stop="openDiary\(diary\.diaryId\)"[\s\S]*?查看详情[\s\S]*?<\/el-button>/)
   assert.match(source, /\.diary-actions\s*\{[\s\S]*?display:\s*flex;/)
   assert.match(source, /\.diary-actions\s*\{[\s\S]*?flex-wrap:\s*wrap;/)
 })

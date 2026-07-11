@@ -22,9 +22,9 @@ test('ai reports page uses spacious sections for generate history and config', (
 
 test('ai report controls avoid cramped spacing on mobile', () => {
   assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.generate-shell,\s*[\s\S]*?\.config-form\s*{[\s\S]*?grid-template-columns:\s*1fr;[\s\S]*?gap:\s*16px;/)
-  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.ai-page-hero\s*{[\s\S]*?padding:\s*18px;/)
-  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.markdown-report\s*{[\s\S]*?padding:\s*18px 16px;/)
-  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.history-toolbar,\s*[\s\S]*?\.config-actions\s*{[\s\S]*?grid-template-columns:\s*1fr;/)
+  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.ai-page-hero\s*{[\s\S]*?padding:\s*16px;/)
+  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.markdown-report\s*{[\s\S]*?padding:\s*0;[\s\S]*?border:\s*0;/)
+  assert.match(source, /@media\s*\(max-width:\s*768px\)\s*{[\s\S]*?\.history-toolbar,\s*[\s\S]*?\.config-actions\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,/)
   assert.match(source, /radio-button\/style\/css\.mjs/)
   assert.match(source, /radio-group\/style\/css\.mjs/)
   assert.match(source, /\.history-toolbar :deep\(\.el-radio-group\)\s*{[\s\S]*?grid-template-columns:\s*repeat\(3,/)

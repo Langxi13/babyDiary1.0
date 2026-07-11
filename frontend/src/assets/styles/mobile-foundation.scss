@@ -1,0 +1,259 @@
+:root {
+  --mobile-page-gutter: 14px;
+  --mobile-topbar-height: 58px;
+  --mobile-tabbar-height: 66px;
+  --mobile-card-radius: 8px;
+  --mobile-control-radius: 10px;
+  --mobile-surface: #fffdfa;
+  --mobile-border: rgba(106, 82, 70, 0.14);
+  --mobile-text: #302824;
+  --mobile-muted: #786c65;
+  --mobile-accent: #2f8f83;
+}
+
+@media (max-width: 768px) {
+  html,
+  body,
+  #app {
+    min-width: 320px;
+    min-height: 100%;
+  }
+
+  html {
+    background: #f7f3ef;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: clip;
+    background: #f7f3ef;
+    color: var(--mobile-text);
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
+  }
+
+  .page-container {
+    width: 100%;
+    max-width: none;
+    padding: 0 max(var(--mobile-page-gutter), env(safe-area-inset-right)) 8px max(var(--mobile-page-gutter), env(safe-area-inset-left));
+  }
+
+  .mobile-shell-content {
+    .page-shell,
+    .home-container,
+    .diary-list-container,
+    .diary-form-container {
+      min-height: auto;
+      background: transparent;
+    }
+
+    .page-title-row:not(.ai-page-hero),
+    .page-header {
+      margin-bottom: 14px;
+      padding: 0 2px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .page-title-row h1,
+    .page-header h1 {
+      color: var(--mobile-text);
+      font-size: 21px;
+      line-height: 1.25;
+    }
+
+    .page-title-row p,
+    .page-header p {
+      margin-top: 5px;
+      color: var(--mobile-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .panel,
+    .detail-panel,
+    .filter-section,
+    .form-panel,
+    .profile-panel,
+    .calendar-panel,
+    .draft-card,
+    .anniversary-card,
+    .diary-card {
+      border-color: var(--mobile-border);
+      border-radius: var(--mobile-card-radius);
+      background: var(--mobile-surface);
+      box-shadow: 0 8px 22px rgba(62, 45, 36, 0.06);
+    }
+
+    .el-button {
+      min-height: 42px;
+      border-radius: var(--mobile-control-radius);
+      font-weight: 600;
+    }
+
+    .el-button.is-text {
+      min-height: 40px;
+    }
+
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-textarea__inner,
+    .el-input-number {
+      border-radius: var(--mobile-control-radius);
+    }
+
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-date-editor.el-input,
+    .el-date-editor.el-input__wrapper,
+    .el-input-number {
+      min-height: 44px;
+    }
+
+    .el-input__inner,
+    .el-textarea__inner,
+    .el-select__placeholder,
+    .el-range-input {
+      font-size: 16px;
+    }
+
+    .el-select,
+    .el-date-editor,
+    .el-input,
+    .el-input-number {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .el-form-item__label {
+      color: #554a44;
+      font-weight: 600;
+    }
+
+    .el-upload {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .el-upload__input {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: block !important;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .el-empty {
+      padding-block: 24px;
+    }
+
+    .el-empty__image {
+      width: 92px;
+    }
+  }
+
+  body .el-overlay-dialog {
+    display: flex;
+    align-items: center;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  body .el-dialog {
+    width: min(100%, 560px) !important;
+    max-width: 100%;
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    margin: 0 auto !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+
+  body .el-dialog__header {
+    flex: 0 0 auto;
+    margin-right: 0;
+    padding: 18px 18px 12px;
+  }
+
+  body .el-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 18px 18px;
+    overscroll-behavior: contain;
+  }
+
+  body .el-dialog__footer {
+    flex: 0 0 auto;
+    padding: 12px 18px max(18px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(106, 82, 70, 0.1);
+    background: #fffdfa;
+  }
+
+  body .el-message {
+    width: calc(100vw - 24px);
+    min-width: 0;
+    max-width: 460px;
+    padding: 12px 14px;
+  }
+
+  body .el-message-box {
+    width: calc(100vw - 28px);
+    max-width: 420px;
+    border-radius: 12px;
+  }
+
+  body .el-picker__popper,
+  body .el-select__popper,
+  body .el-popper {
+    max-width: calc(100vw - 16px);
+  }
+
+  body .el-date-picker,
+  body .el-month-table,
+  body .el-year-table {
+    max-width: calc(100vw - 20px);
+  }
+
+  body .el-date-range-picker {
+    width: calc(100vw - 20px);
+    max-width: 560px;
+  }
+
+  body .el-date-range-picker__content {
+    width: 100%;
+    float: none;
+  }
+
+  body .el-date-range-picker__content.is-left {
+    border-right: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  body .el-popconfirm {
+    max-width: calc(100vw - 32px);
+  }
+
+  .app-shell.keyboard-open .form-actions {
+    bottom: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  :root {
+    --mobile-page-gutter: 12px;
+  }
+}

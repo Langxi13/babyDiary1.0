@@ -6,7 +6,7 @@
           <h1>草稿</h1>
           <p>继续未完成的记录，或者清理不需要的草稿</p>
         </div>
-        <el-button type="primary" @click="router.push('/diaries/create')">
+        <el-button class="new-diary-button" type="primary" @click="router.push('/diaries/create')">
           <el-icon><Plus /></el-icon>
           新日记
         </el-button>
@@ -28,9 +28,9 @@
             @confirm="deleteDraft(draft)"
           >
             <template #reference>
-              <el-button type="danger" text :loading="deletingId === draft.draftId" :disabled="!!deletingId">
+              <el-button class="draft-delete-button" type="danger" text :loading="deletingId === draft.draftId" :disabled="!!deletingId" aria-label="删除草稿">
                 <el-icon><Delete /></el-icon>
-                删除
+                <span class="action-label">删除</span>
               </el-button>
             </template>
           </el-popconfirm>
@@ -200,14 +200,12 @@ onMounted(loadDrafts)
 }
 
 @media (max-width: 768px) {
-  .page-title-row,
-  .draft-card {
-    align-items: stretch;
-    grid-template-columns: 1fr;
-  }
-
   .page-title-row {
     gap: 12px;
+
+    .new-diary-button {
+      display: none;
+    }
   }
 
   .draft-list {
@@ -215,9 +213,11 @@ onMounted(loadDrafts)
   }
 
   .draft-card {
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 8px;
     padding: 14px;
-    border-radius: 20px;
+    border-radius: 8px;
   }
 
   .draft-main {
@@ -231,9 +231,26 @@ onMounted(loadDrafts)
     white-space: nowrap;
   }
 
+  .draft-main p {
+    display: -webkit-box;
+    max-height: 44px;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.55;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
   .draft-card > :deep(.el-button) {
-    width: 100%;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
     margin-left: 0;
+  }
+
+  .action-label {
+    display: none;
   }
 }
 </style>

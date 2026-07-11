@@ -28,8 +28,9 @@
           >
             <div class="avatar-upload-trigger" :class="{ uploading: avatarUploading }">
               <el-icon><Upload /></el-icon>
-              <strong>{{ avatarUploading ? '上传中...' : '拖拽图片到这里' }}</strong>
-              <span>点击更换头像</span>
+              <strong>{{ avatarUploading ? '上传中...' : '更换头像' }}</strong>
+              <span class="desktop-upload-copy">拖拽或点击选择图片</span>
+              <span class="mobile-upload-copy">从相册选择图片</span>
             </div>
           </el-upload>
         </div>
@@ -257,6 +258,10 @@ const submitPassword = async () => {
   }
 }
 
+.mobile-upload-copy {
+  display: none;
+}
+
 .profile-copy {
   min-width: 0;
   width: 100%;
@@ -321,13 +326,25 @@ const submitPassword = async () => {
   }
 
   .profile-panel {
-    padding: 18px;
-    border-radius: 20px;
+    padding: 16px;
+    border-radius: 8px;
   }
 
   .avatar-panel {
-    align-items: flex-start;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+
+    :deep(.el-avatar) {
+      width: 72px !important;
+      height: 72px !important;
+      font-size: 24px;
+    }
+
+    .avatar-upload-card {
+      grid-column: 1 / -1;
+    }
   }
 
   .profile-copy {
@@ -341,11 +358,19 @@ const submitPassword = async () => {
       width: 100%;
     }
   }
-}
 
-@media (max-width: 420px) {
-  .profile-panel {
-    padding: 16px;
+  .avatar-upload-trigger {
+    min-height: 82px;
+    padding: 12px;
+  }
+
+  .desktop-upload-copy {
+    display: none;
+  }
+
+  .mobile-upload-copy {
+    display: block;
   }
 }
+
 </style>

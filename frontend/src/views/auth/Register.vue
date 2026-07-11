@@ -1,49 +1,61 @@
 <template>
-  <div class="register-container">
-    <div class="register-card">
-      <div class="register-header">
-        <h1>注册账号</h1>
-        <p>加入 Baby Diary，记录两个人的美好时光</p>
-      </div>
+  <div class="auth-page">
+    <main class="auth-card">
+      <header class="auth-header">
+        <img src="/app-icon.png" alt="" class="auth-logo" />
+        <div>
+          <span>创建你们的私人空间</span>
+          <h1>注册 Baby Diary</h1>
+          <p>用邀请码建立账号，开始整理共同回忆。</p>
+        </div>
+      </header>
       
-      <el-form ref="formRef" :model="form" :rules="rules" class="register-form">
-        <el-form-item prop="username">
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="auth-form register-form">
+        <el-form-item label="用户名" prop="username">
           <el-input
             v-model="form.username"
-            placeholder="请输入用户名"
+            placeholder="用户名"
             size="large"
-            prefix-icon="User"
+            :prefix-icon="User"
+            autocomplete="username"
+            autocapitalize="none"
+            :spellcheck="false"
           />
         </el-form-item>
         
-        <el-form-item prop="password">
+        <el-form-item label="密码" prop="password">
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="至少 6 位"
             size="large"
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
             show-password
+            autocomplete="new-password"
           />
         </el-form-item>
         
-        <el-form-item prop="confirmPassword">
+        <el-form-item label="确认密码" prop="confirmPassword">
           <el-input
             v-model="form.confirmPassword"
             type="password"
-            placeholder="请确认密码"
+            placeholder="再次输入密码"
             size="large"
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
             show-password
+            autocomplete="new-password"
           />
         </el-form-item>
         
-        <el-form-item prop="invitationCode">
+        <el-form-item label="邀请码" prop="invitationCode">
           <el-input
             v-model="form.invitationCode"
-            placeholder="请输入邀请码"
+            placeholder="邀请码"
             size="large"
-            prefix-icon="Key"
+            :prefix-icon="Key"
+            autocomplete="off"
+            autocapitalize="none"
+            :spellcheck="false"
           />
         </el-form-item>
         
@@ -53,19 +65,19 @@
             size="large"
             :loading="loading"
             :disabled="loading"
-            class="register-btn"
+            class="auth-submit register-btn"
             @click="handleRegister"
           >
             注册
           </el-button>
         </el-form-item>
         
-        <div class="register-footer">
+        <div class="auth-footer register-footer">
           <span>已有账号？</span>
           <router-link to="/login" class="login-link">立即登录</router-link>
         </div>
       </el-form>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -76,6 +88,7 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
+import { Key, Lock, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
@@ -149,65 +162,4 @@ const handleRegister = async () => {
 }
 </script>
 
-<style scoped lang="scss">
-.register-container {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
-}
-
-.register-card {
-  width: 100%;
-  max-width: 400px;
-  background: white;
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.register-header {
-  text-align: center;
-  margin-bottom: 30px;
-  
-  h1 {
-    font-size: 28px;
-    color: #333;
-    margin-bottom: 8px;
-  }
-  
-  p {
-    color: #999;
-    font-size: 14px;
-  }
-}
-
-.register-form {
-  .el-form-item {
-    margin-bottom: 20px;
-  }
-}
-
-.register-btn {
-  width: 100%;
-  height: 44px;
-  font-size: 16px;
-}
-
-.register-footer {
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-  
-  .login-link {
-    color: #409eff;
-    margin-left: 4px;
-    
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-</style>
+<style src="./styles/Auth.scss" scoped lang="scss"></style>
