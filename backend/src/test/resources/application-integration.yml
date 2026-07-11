@@ -1,0 +1,42 @@
+spring:
+  cache:
+    type: simple
+  task:
+    scheduling:
+      enabled: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+
+diaryFilePath: ${java.io.tmpdir}/baby-diary-integration/images/
+invitationCode: integration-invite-code
+
+jwt:
+  secret: integration-jwt-secret-that-is-longer-than-thirty-two-characters
+  expiration: 2592000000
+  access-expiration: 900000
+
+app:
+  auth:
+    refresh-days: 30
+    secure-cookie: false
+    step-up-minutes: 10
+  mail:
+    enabled: false
+  storage:
+    provider: local
+    local-root: ${java.io.tmpdir}/baby-diary-integration/objects/
+  media:
+    processing-enabled: false
+  reminders:
+    delivery-delay-ms: 3600000
+
+ai:
+  config:
+    encryption-key: test-only-key-00000000000000000000000000000000
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: false

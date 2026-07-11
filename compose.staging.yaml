@@ -1,0 +1,98 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_DATABASE: baby-diary
+      MYSQL_USER: ${DB_USERNAME:?set DB_USERNAME in the staging env file}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the staging env file}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the staging env file}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - staging-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+    cpus: 0.75
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - staging-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 192m
+    cpus: 0.25
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_ADDRESS: 0.0.0.0
+      DB_URL: jdbc:mysql://mysql:3306/baby-diary?connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME:?set DB_USERNAME in the staging env file}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the staging env file}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_PREFIX: "baby-diary:staging:"
+      INVITATION_CODE: ${INVITATION_CODE:?set INVITATION_CODE in the staging env file}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in the staging env file}
+      JWT_ACCESS_EXPIRATION: 900000
+      JWT_EXPIRATION: 2592000000
+      AUTH_REFRESH_DAYS: 30
+      AUTH_SECURE_COOKIE: "false"
+      AI_CONFIG_ENCRYPTION_KEY: ${AI_CONFIG_ENCRYPTION_KEY:?set AI_CONFIG_ENCRYPTION_KEY in the staging env file}
+      DIARY_FILE_PATH: /data/images/
+      DIARY_OBJECT_PATH: /data/objects/
+      OBJECT_STORAGE_PROVIDER: local
+      MEDIA_PROCESSING_ENABLED: "false"
+      MAIL_ENABLED: "false"
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:4173}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://127.0.0.1:4173}
+      SPRINGDOC_ENABLED: "true"
+      SLOW_REQUEST_THRESHOLD_MS: 800
+    ports:
+      - "127.0.0.1:${STAGING_API_PORT:-11002}:10002"
+    volumes:
+      - staging-media-data:/data
+    mem_limit: 1536m
+    cpus: 0.8
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${STAGING_WEB_PORT:-4173}:8080"
+    mem_limit: 128m
+    cpus: 0.2
+
+volumes:
+  staging-mysql-data:
+  staging-redis-data:
+  staging-media-data:

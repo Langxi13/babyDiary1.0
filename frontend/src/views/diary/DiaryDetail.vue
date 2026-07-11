@@ -155,7 +155,7 @@ onMounted(loadDiary)
 }
 
 .meta-row {
-  color: #8a817b;
+  color: #6f6661;
   font-size: 14px;
 }
 
@@ -208,7 +208,7 @@ onMounted(loadDiary)
   margin-top: 22px;
   padding-top: 14px;
   border-top: 1px solid #eee4e1;
-  color: #8a817b;
+  color: #6f6661;
   font-size: 13px;
 }
 

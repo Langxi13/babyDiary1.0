@@ -35,11 +35,16 @@ cat > "$CURL_FAKE" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 format=""
+output_file=""
 url=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -w)
       format="$2"
+      shift 2
+      ;;
+    -o)
+      output_file="$2"
       shift 2
       ;;
     http://*|https://*)
@@ -61,24 +66,39 @@ case "$path" in
   /|/album|/diaries)
     code=200
     content_type="text/html"
+    body='<html></html>'
     ;;
   /actuator/health)
     code=200
     content_type="application/vnd.spring-boot.actuator.v3+json"
+    if [ -n "${ACTUATOR_HEALTH_BODY+x}" ]; then
+      body="$ACTUATOR_HEALTH_BODY"
+    else
+      body='{"status":"UP"}'
+    fi
     ;;
   /api/auth/info)
     code="${AUTH_INFO_CODE:-401}"
     content_type="application/json"
+    body='{"code":401}'
     ;;
   /manifest.webmanifest)
     code=200
     content_type="application/manifest+json"
+    body='{"name":"Baby Diary"}'
     ;;
   *)
     code=404
     content_type="text/plain"
+    body='not found'
     ;;
 esac
+
+if [ -z "$output_file" ]; then
+  printf '%s' "$body"
+elif [ "$output_file" != "/dev/null" ]; then
+  printf '%s' "$body" > "$output_file"
+fi
 
 output="${format//\%\{http_code\}/$code}"
 output="${output//\%\{content_type\}/$content_type}"
@@ -99,7 +119,8 @@ grep -q "service nginx active" <<<"$OUTPUT"
 grep -q "GET / 200" <<<"$OUTPUT"
 grep -q "GET /album 200" <<<"$OUTPUT"
 grep -q "GET /diaries 200" <<<"$OUTPUT"
-grep -q "GET /actuator/health 200" <<<"$OUTPUT"
+grep -q "GET /actuator/health 200 application/vnd.spring-boot.actuator.v3+json" <<<"$OUTPUT"
+grep -q "actuator status UP" <<<"$OUTPUT"
 grep -q "GET /api/auth/info 401" <<<"$OUTPUT"
 grep -q "GET /manifest.webmanifest 200 application/manifest+json" <<<"$OUTPUT"
 
@@ -120,3 +141,21 @@ if [ "$FAIL_STATUS" -eq 0 ]; then
 fi
 
 grep -q "expected /api/auth/info to return 401, got 502" <<<"$FAIL_OUTPUT"
+
+set +e
+DOWN_OUTPUT="$(
+  SYSTEMCTL_BIN="$SYSTEMCTL_FAKE" \
+  CURL_BIN="$CURL_FAKE" \
+  BACKEND_ENV_FILE="$ENV_FILE" \
+  ACTUATOR_HEALTH_BODY='{"status":"DOWN"}' \
+  "$ROOT/scripts/health-check.sh" 2>&1
+)"
+DOWN_STATUS=$?
+set -e
+
+if [ "$DOWN_STATUS" -eq 0 ]; then
+  echo "expected health check to fail when Actuator reports DOWN" >&2
+  exit 1
+fi
+
+grep -q "expected /actuator/health top-level status to be UP" <<<"$DOWN_OUTPUT"

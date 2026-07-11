@@ -3,7 +3,13 @@ frontend/node_modules/
 
 # Build outputs
 frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e/.auth/
 backend/target/
+artifacts/
+.env.staging
 deploy/frontend/
 deploy/backend/*.jar
 

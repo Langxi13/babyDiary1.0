@@ -1,5 +1,27 @@
 @use './mobile-foundation';
 
+:root {
+  --el-color-primary: #9b3653;
+  --el-color-primary-light-3: #b87185;
+  --el-color-primary-light-5: #cfa0ad;
+  --el-color-primary-light-7: #e5c7cf;
+  --el-color-primary-light-8: #eddae0;
+  --el-color-primary-light-9: #f6ecef;
+  --el-color-primary-dark-2: #7c2b42;
+  --el-color-success: #26734d;
+  --el-color-success-dark-2: #1f5c3e;
+  --el-color-warning: #8a4d08;
+  --el-color-warning-dark-2: #6e3e06;
+  --el-color-danger: #b4233f;
+  --el-color-danger-dark-2: #901c32;
+  --el-color-error: #b4233f;
+  --el-color-error-dark-2: #901c32;
+  --el-color-info: #555d66;
+  --el-color-info-dark-2: #444a52;
+  --el-text-color-secondary: #67615d;
+  --el-text-color-placeholder: #696d73;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -13,6 +35,11 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f7fa;
+}
+
+.el-text--secondary,
+.el-empty__description p {
+  color: var(--el-text-color-secondary);
 }
 
 a {

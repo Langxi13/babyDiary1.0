@@ -28,3 +28,9 @@ if "$ROOT/scripts/verify-backup.sh" "$BACKUP_DIR" >/dev/null 2>&1; then
   echo "verify-backup should fail when the SQL dump is missing" >&2
   exit 1
 fi
+
+grep -q 'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump' "$ROOT/scripts/backup.sh"
+if grep -q -- '-p"$MYSQL_PASSWORD"' "$ROOT/scripts/backup.sh"; then
+  echo "backup should not expose the database password in process arguments" >&2
+  exit 1
+fi

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { DESKTOP_MORE_NAVIGATION, DESKTOP_PRIMARY_NAVIGATION } from '../../config/navigation.js'
 
 const source = readFileSync(new URL('./NavBar.vue', import.meta.url), 'utf8')
 
@@ -24,9 +25,13 @@ test('desktop user area includes the active workspace switcher', () => {
   assert.match(source, /import SpaceSwitcher from '@\/components\/common\/SpaceSwitcher\.vue'/)
 })
 
-test('menu stays inside the navigation column at desktop widths', () => {
-  assert.match(source, /\.navbar-menu\s*\{[\s\S]*?overflow:\s*hidden;/)
-  assert.match(source, /:deep\(\.el-menu-item\)\s*\{[\s\S]*?padding:\s*0 12px;/)
+test('desktop navigation keeps core routes visible and groups secondary routes under more', () => {
+  assert.deepEqual(DESKTOP_PRIMARY_NAVIGATION.map(item => item.path), ['/', '/diaries', '/spaces', '/album', '/diaries/create'])
+  assert.deepEqual(DESKTOP_MORE_NAVIGATION.map(item => item.path), ['/timeline', '/calendar', '/anniversaries', '/ai-reports', '/drafts'])
+  assert.match(source, /v-for="item in desktopPrimaryNavigation"/)
+  assert.match(source, /<el-sub-menu index="desktop-more"/)
+  assert.match(source, /v-for="item in desktopMoreNavigation"/)
+  assert.match(source, /\.navbar-menu\s*\{[\s\S]*?overflow:\s*visible;/)
 })
 
 test('desktop navigation switches to compact menu before it can squeeze the brand', () => {

@@ -45,3 +45,19 @@ OBJECT_FILE_MODE="$(stat -c '%a' "$OBJECT_DIR/private.bin")"
 [ "$FILE_GROUP" = "$NGINX_GROUP" ]
 [ "$OBJECT_MODE" = "700" ]
 [ "$OBJECT_FILE_MODE" = "600" ]
+
+HOST_TMP_MODE="$(stat -c '%a' /tmp)"
+UNSAFE_IMAGE_DIR="/tmp/baby-diary-unsafe-${TMP_DIR##*/}"
+if PROJECT_ROOT="$TMP_DIR" \
+  IMAGE_DIR="$UNSAFE_IMAGE_DIR" \
+  OBJECT_DIR="$OBJECT_DIR" \
+  SERVICE_USER="$SERVICE_USER" \
+  SERVICE_GROUP="$SERVICE_GROUP" \
+  NGINX_GROUP="$NGINX_GROUP" \
+  "$ROOT/scripts/ensure-image-permissions.sh" >/dev/null 2>&1; then
+  echo "permission setup should reject /tmp as the managed data directory" >&2
+  exit 1
+fi
+
+[ "$(stat -c '%a' /tmp)" = "$HOST_TMP_MODE" ]
+[ ! -e "$UNSAFE_IMAGE_DIR" ]

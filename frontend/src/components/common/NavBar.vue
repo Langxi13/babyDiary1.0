@@ -2,7 +2,7 @@
   <div class="navbar">
     <div class="navbar-content">
       <div class="navbar-brand" @click="router.push('/')">
-        <el-icon :size="28" color="#409eff"><Notebook /></el-icon>
+        <el-icon :size="28" color="var(--el-color-primary)"><Notebook /></el-icon>
         <span class="brand-text">Baby Diary</span>
       </div>
       
@@ -13,46 +13,32 @@
           :ellipsis="false"
           @select="handleMenuSelect"
         >
-          <el-menu-item index="/" @mouseenter="preload('/')">
-            <el-icon><HomeFilled /></el-icon>
-            首页
+          <el-menu-item
+            v-for="item in desktopPrimaryNavigation"
+            :key="item.id"
+            :index="item.path"
+            class="desktop-primary-item"
+            @mouseenter="preload(item.path)"
+          >
+            <el-icon><component :is="navigationIcons[item.icon]" /></el-icon>
+            {{ item.label }}
           </el-menu-item>
-          <el-menu-item index="/diaries" @mouseenter="preload('/diaries')">
-            <el-icon><Document /></el-icon>
-            日记
-          </el-menu-item>
-          <el-menu-item index="/spaces" @mouseenter="preload('/spaces')">
-            <el-icon><Connection /></el-icon>
-            空间
-          </el-menu-item>
-          <el-menu-item index="/timeline" @mouseenter="preload('/timeline')">
-            <el-icon><Clock /></el-icon>
-            时间轴
-          </el-menu-item>
-          <el-menu-item index="/calendar" @mouseenter="preload('/calendar')">
-            <el-icon><Calendar /></el-icon>
-            日历
-          </el-menu-item>
-          <el-menu-item index="/anniversaries" @mouseenter="preload('/anniversaries')">
-            <el-icon><Star /></el-icon>
-            纪念日
-          </el-menu-item>
-          <el-menu-item index="/album" @mouseenter="preload('/album')">
-            <el-icon><Picture /></el-icon>
-            相册
-          </el-menu-item>
-          <el-menu-item index="/ai-reports" @mouseenter="preload('/ai-reports')">
-            <el-icon><MagicStick /></el-icon>
-            AI 报告
-          </el-menu-item>
-          <el-menu-item index="/drafts" @mouseenter="preload('/drafts')">
-            <el-icon><Tickets /></el-icon>
-            草稿
-          </el-menu-item>
-          <el-menu-item index="/diaries/create" @mouseenter="preload('/diaries/create')">
-            <el-icon><Edit /></el-icon>
-            写日记
-          </el-menu-item>
+          <el-sub-menu index="desktop-more" :class="['desktop-more-menu', { 'is-route-active': moreMenuActive }]">
+            <template #title>
+              <el-icon><MoreFilled /></el-icon>
+              更多
+            </template>
+            <el-menu-item
+              v-for="item in desktopMoreNavigation"
+              :key="item.id"
+              :index="item.path"
+              class="desktop-more-item"
+              @mouseenter="preload(item.path)"
+            >
+              <el-icon><component :is="navigationIcons[item.icon]" /></el-icon>
+              {{ item.label }}
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </div>
       
@@ -88,16 +74,13 @@
           <el-button :icon="Menu" circle />
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="/">首页</el-dropdown-item>
-              <el-dropdown-item command="/diaries">日记</el-dropdown-item>
-              <el-dropdown-item command="/spaces">共同空间</el-dropdown-item>
-              <el-dropdown-item command="/timeline">时间轴</el-dropdown-item>
-              <el-dropdown-item command="/calendar">日历</el-dropdown-item>
-              <el-dropdown-item command="/anniversaries">纪念日</el-dropdown-item>
-              <el-dropdown-item command="/album">相册</el-dropdown-item>
-              <el-dropdown-item command="/ai-reports">AI 报告</el-dropdown-item>
-              <el-dropdown-item command="/drafts">草稿</el-dropdown-item>
-              <el-dropdown-item command="/diaries/create">写日记</el-dropdown-item>
+              <el-dropdown-item
+                v-for="item in compactNavigation"
+                :key="item.id"
+                :command="item.path"
+              >
+                {{ item.label }}
+              </el-dropdown-item>
               <el-dropdown-item class="profile-dropdown-item">
                 <router-link class="dropdown-route-link" to="/profile">个人信息</router-link>
               </el-dropdown-item>
@@ -117,11 +100,12 @@ import { ElAvatar } from 'element-plus/es/components/avatar/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus/es/components/dropdown/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
-import { ElMenu, ElMenuItem } from 'element-plus/es/components/menu/index.mjs'
-import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection } from '@element-plus/icons-vue'
+import { ElMenu, ElMenuItem, ElSubMenu } from 'element-plus/es/components/menu/index.mjs'
+import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection, MoreFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { preloadRouteComponent } from '@/router'
 import { originalImageUrl } from '@/utils/imageUrl'
+import { DESKTOP_COMPACT_NAVIGATION, DESKTOP_MORE_NAVIGATION, DESKTOP_PRIMARY_NAVIGATION } from '@/config/navigation'
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -132,6 +116,10 @@ import 'element-plus/es/components/menu/style/css.mjs'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const desktopPrimaryNavigation = DESKTOP_PRIMARY_NAVIGATION
+const desktopMoreNavigation = DESKTOP_MORE_NAVIGATION
+const compactNavigation = DESKTOP_COMPACT_NAVIGATION
+const navigationIcons = { HomeFilled, Document, Edit, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection }
 
 const activeMenu = computed(() => {
   if (route.path === '/diaries/create') return '/diaries/create'
@@ -144,6 +132,7 @@ const activeMenu = computed(() => {
 })
 const username = computed(() => authStore.username)
 const avatarUrl = computed(() => originalImageUrl(authStore.userInfo?.avatarPath))
+const moreMenuActive = computed(() => desktopMoreNavigation.some(item => item.path === activeMenu.value))
 const preload = (path) => preloadRouteComponent(path)
 
 const handleMenuSelect = (index) => {
@@ -200,7 +189,7 @@ const handleCommand = (command) => {
   min-width: 0;
   width: 100%;
   justify-self: center;
-  overflow: hidden;
+  overflow: visible;
 
   :deep(.el-menu) {
     justify-content: center;
@@ -211,7 +200,18 @@ const handleCommand = (command) => {
   :deep(.el-menu-item) {
     height: 60px;
     line-height: 60px;
-    padding: 0 12px;
+    padding: 0 14px;
+  }
+
+  :deep(.el-sub-menu__title) {
+    height: 60px;
+    line-height: 60px;
+    padding: 0 14px;
+  }
+
+  :deep(.el-sub-menu.is-route-active > .el-sub-menu__title) {
+    color: var(--el-menu-active-color);
+    border-bottom: 2px solid var(--el-menu-active-color);
   }
 }
 

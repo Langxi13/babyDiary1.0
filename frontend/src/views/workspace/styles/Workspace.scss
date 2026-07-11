@@ -27,7 +27,7 @@
 .diary-card-date strong { color: #276f65; font-size: 23px; line-height: 1; }
 .diary-card-date span { margin-top: 5px; color: #6c817b; font-size: 11px; }
 .diary-card-main { min-width: 0; }
-.diary-card-meta { min-height: 22px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #8b817b; font-size: 12px; }
+.diary-card-meta { min-height: 22px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #6f6661; font-size: 12px; }
 .diary-card-meta > span:not(.mood-mark) + span:before { content: '·'; margin-right: 8px; color: #c6bbb5; }
 .mood-mark { font-size: 18px; }
 .diary-card-main h2 { margin: 5px 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; line-height: 1.3; }

@@ -1,0 +1,59 @@
+name: Staging performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      steady_duration:
+        description: Sustained peak duration
+        required: false
+        default: 3m
+  schedule:
+    - cron: "20 18 * * 6"
+
+concurrency:
+  group: staging-performance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create synthetic staging configuration
+        run: |
+          {
+            echo 'DB_USERNAME=baby_diary_load'
+            echo "DB_PASSWORD=$(openssl rand -hex 24)"
+            echo "MYSQL_ROOT_PASSWORD=$(openssl rand -hex 24)"
+            echo "INVITATION_CODE=$(openssl rand -hex 18)"
+            echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+            echo "AI_CONFIG_ENCRYPTION_KEY=$(openssl rand -base64 48 | tr -d '\n')"
+            echo 'PUBLIC_URL=http://127.0.0.1:4173'
+            echo 'CORS_ALLOWED_ORIGINS=http://127.0.0.1:4173'
+            echo 'STAGING_WEB_PORT=4173'
+            echo 'STAGING_API_PORT=11002'
+          } > .env.staging
+      - run: STAGING_PROJECT_NAME=baby-diary-performance scripts/start-staging.sh
+      - name: Run 50-user, 10-concurrent-user load
+        env:
+          K6_USER_COUNT: "50"
+          K6_PEAK_VUS: "10"
+          K6_STEADY: ${{ inputs.steady_duration || '3m' }}
+        run: scripts/run-k6.sh
+      - name: Capture staging logs
+        if: always()
+        run: mkdir -p artifacts && docker compose --env-file .env.staging -p baby-diary-performance -f compose.staging.yaml logs --no-color > artifacts/performance-staging.log
+      - name: Stop staging
+        if: always()
+        run: STAGING_PROJECT_NAME=baby-diary-performance scripts/stop-staging.sh
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: artifacts
+          if-no-files-found: warn

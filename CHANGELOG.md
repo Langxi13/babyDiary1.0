@@ -1,7 +1,18 @@
 # Changelog
 
+## 2026-07-12
+
+- Replaced the SPA fallback health false-positive with an exact Nginx proxy to the loopback Actuator endpoint, and made release checks require a top-level `status=UP` JSON response.
+- Added a systemd `PrivateTmp` deployment drop-in, host `/tmp` permission governance, and shared-system-directory guards so media permission setup cannot alter `/tmp` or other top-level runtime directories.
+- Moved Nginx validation ahead of backend shutdown and added script regressions for deployment ordering, Actuator `DOWN`, private temporary directories, and unsafe media roots.
+
 ## 2026-07-11
 
+- Fixed the production album-group query failure caused by incompatible collations on legacy image paths, with a V13 normalization migration and real MySQL 8.4 upgrade tests.
+- Reorganized desktop navigation into five primary destinations plus a complete "More" menu, and added an inline retry state for album loading failures.
+- Added layered CI for script governance, backend and frontend coverage, Chromium/Firefox/WebKit E2E, synthetic AI tests, supply-chain scanning, packaged ZAP checks, and scheduled k6 performance tests.
+- Added a resource-bounded staging stack, non-root Nginx frontend image, security headers, privacy-safe test fixtures, and a complete release acceptance and rollback guide.
+- Corrected Spring Boot 3 Redis configuration to use `spring.data.redis`, preventing packaged deployments from connecting to container-local Redis by mistake.
 - Added personal/shared diary spaces with invitations, roles, private entries, password step-up locks, revisions, trash, comments, Emoji reactions, notifications, and Web Push.
 - Added rotating 30-day refresh sessions, 15-minute access tokens, device management, verified email recovery, one-time recovery codes, and login-page recovery flows.
 - Made email-verification and password-reset tokens transactionally single-use under concurrent requests, and tightened private-share expiration validation.
@@ -9,7 +20,7 @@
 - Added space-scoped AI weekly, monthly, and annual reports with schedules while excluding locked diary content from prompts and derived data.
 - Added private local or S3-compatible rich-media storage, signed media URLs, quota tracking, processing jobs, and image/audio/video metadata.
 - Added expiring password-protected shares, ZIP v2 import/export with media, PDF/EPUB diary books, extraction limits, and deterministic import IDs.
-- Added Flyway migrations V9-V12 for spaces, sessions, collaboration, sync, search, media, sharing, templates, and reminder delivery guards.
+- Added Flyway migrations V9-V13 for spaces, sessions, collaboration, sync, search, media, sharing, templates, reminder delivery guards, and legacy media-path collation normalization.
 - Serialized shared-space role changes and member removal so concurrent requests cannot remove the final owner.
 - Hardened locked-diary redaction across V2 and legacy lists, keyword filters, drafts, albums, photos, exports, notifications, search, sync, insights, AI, and media import/upload; V2 missing resources now return HTTP 404.
 - Kept legacy in-memory image uploads capped at 10 MB while allowing larger V2 streamed media, preventing oversized images from exhausting the JVM heap.

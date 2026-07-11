@@ -1,3 +1,5 @@
+import { navigationItems } from '../../config/navigation.js'
+
 export const MOBILE_BREAKPOINT = 768
 
 export const MOBILE_PRIMARY_TABS = [
@@ -8,16 +10,12 @@ export const MOBILE_PRIMARY_TABS = [
   { label: '我的', path: '/profile', match: 'account', icon: 'User' }
 ]
 
+const memoryLinks = navigationItems('spaces', 'album', 'timeline', 'calendar', 'anniversaries')
+const accountLinks = navigationItems('aiReports', 'drafts', 'profile', 'notifications')
+
 export const MOBILE_SECONDARY_LINKS = [
-  { label: '共同空间', path: '/spaces', group: 'memory', icon: 'Connection' },
-  { label: '相册', path: '/album', group: 'memory', icon: 'Picture' },
-  { label: '时间轴', path: '/timeline', group: 'memory', icon: 'Clock' },
-  { label: '日历', path: '/calendar', group: 'memory', icon: 'Calendar' },
-  { label: '纪念日', path: '/anniversaries', group: 'memory', icon: 'Trophy' },
-  { label: 'AI 报告', path: '/ai-reports', group: 'account', icon: 'MagicStick' },
-  { label: '草稿', path: '/drafts', group: 'account', icon: 'Tickets' },
-  { label: '个人信息', path: '/profile', group: 'account', icon: 'User' },
-  { label: '通知', path: '/notifications', group: 'account', icon: 'Bell' }
+  ...memoryLinks.map(item => ({ ...item, label: item.id === 'spaces' ? '共同空间' : item.label, group: 'memory', icon: item.id === 'anniversaries' ? 'Trophy' : item.icon })),
+  ...accountLinks.map(item => ({ ...item, group: 'account' }))
 ]
 
 const routeTitles = new Map([

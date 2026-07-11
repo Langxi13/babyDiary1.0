@@ -21,6 +21,13 @@ test('album page renders album groups and album cards without embedding the phot
   assert.doesNotMatch(source, /class="album-photo-grid"/)
 })
 
+test('album page exposes an inline retry state when group loading fails', () => {
+  assert.match(source, /groupsError && !loadingGroups/)
+  assert.match(source, /class="album-load-error"/)
+  assert.match(source, /@click="loadGroups">重新加载/)
+  assert.match(source, /catch\s*\{[\s\S]*?groupsError\.value\s*=/)
+})
+
 test('album cards use photo covers instead of text initials', () => {
   assert.match(source, /coverImagePath/)
   assert.match(source, /class="\{ empty: !album\.coverImagePath \}"/)

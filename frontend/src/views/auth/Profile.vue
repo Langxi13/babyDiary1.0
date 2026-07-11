@@ -57,7 +57,7 @@
         <div class="profile-panel account-security-panel">
           <div class="security-heading">
             <div><h2>账户安全</h2><p>邮箱验证、恢复码与登录设备</p></div>
-            <el-tag :type="authStore.userInfo?.emailVerified ? 'success' : 'info'">
+            <el-tag :class="['security-status', { verified: authStore.userInfo?.emailVerified }]">
               {{ authStore.userInfo?.emailVerified ? '邮箱已验证' : '邮箱未验证' }}
             </el-tag>
           </div>
@@ -70,7 +70,7 @@
             <article v-for="session in sessions" :key="session.publicId">
               <el-icon><Monitor /></el-icon>
               <div><strong>{{ session.deviceName }}</strong><span>{{ session.ipAddress }} · 最近使用 {{ formatChineseDateTime(session.lastSeenAt) }}</span></div>
-              <el-tag v-if="session.current" type="success" size="small">当前设备</el-tag>
+              <el-tag v-if="session.current" class="current-session-tag" size="small">当前设备</el-tag>
               <el-button v-else text type="danger" @click="revokeSession(session)">退出</el-button>
             </article>
           </div>

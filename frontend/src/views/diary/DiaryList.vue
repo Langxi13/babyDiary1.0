@@ -68,7 +68,7 @@
               @keyup.enter="handleFilter"
             >
               <template #append>
-                <el-button :icon="Search" @click="handleFilter" />
+                <el-button :icon="Search" aria-label="搜索日记" title="搜索日记" @click="handleFilter" />
               </template>
             </el-input>
           </el-form-item>

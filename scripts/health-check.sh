@@ -28,8 +28,8 @@ fi
 PATH_CHECKS="${PATH_CHECKS:-/ 200
 /album 200
 /diaries 200
-/actuator/health 200
 /api/auth/info 401}"
+ACTUATOR_HEALTH_PATH="${ACTUATOR_HEALTH_PATH:-/actuator/health}"
 
 check_service() {
   local service="$1"
@@ -88,6 +88,49 @@ check_http_content_type() {
   fi
 }
 
+check_actuator_health() {
+  local result
+  local response_meta
+  local body
+  local code
+  local content_type
+  local compact_body
+  local curl_args=(--noproxy '*' -sS -w $'\n%{http_code} %{content_type}' --max-time 10)
+
+  if [[ "$BASE_URL" == https://* ]] && [ -n "$RESOLVE_HOST" ]; then
+    curl_args+=(--resolve "$RESOLVE_HOST")
+  fi
+
+  if ! result="$("$CURL_BIN" "${curl_args[@]}" "${BASE_URL}${ACTUATOR_HEALTH_PATH}")"; then
+    echo "failed to request $ACTUATOR_HEALTH_PATH" >&2
+    return 1
+  fi
+
+  response_meta="${result##*$'\n'}"
+  body="${result%$'\n'*}"
+  code="${response_meta%% *}"
+  content_type="${response_meta#* }"
+  compact_body="$(tr -d '[:space:]' <<<"$body")"
+
+  echo "GET $ACTUATOR_HEALTH_PATH $code $content_type"
+  if [ "$code" != "200" ]; then
+    echo "expected $ACTUATOR_HEALTH_PATH to return 200, got $code" >&2
+    return 1
+  fi
+
+  if [[ "$content_type" != application/*json* ]]; then
+    echo "expected $ACTUATOR_HEALTH_PATH to return JSON, got $content_type" >&2
+    return 1
+  fi
+
+  if [[ ! "$compact_body" =~ ^\{\"status\":\"UP\"([,\}]) ]]; then
+    echo "expected $ACTUATOR_HEALTH_PATH top-level status to be UP" >&2
+    return 1
+  fi
+
+  echo "actuator status UP"
+}
+
 run_checks() {
   local failed=0
 
@@ -99,6 +142,7 @@ run_checks() {
     check_http_path "$path" "$expected" || failed=1
   done <<< "$PATH_CHECKS"
 
+  check_actuator_health || failed=1
   check_http_content_type "$PWA_MANIFEST_PATH" "$PWA_MANIFEST_CONTENT_TYPE" || failed=1
 
   return "$failed"

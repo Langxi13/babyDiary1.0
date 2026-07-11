@@ -1,0 +1,17 @@
+.git
+.github
+.private
+.env
+*.env
+backups
+data
+deploy
+logs
+artifacts
+backend/target
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
+frontend/e2e/.auth

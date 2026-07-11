@@ -7,11 +7,15 @@ SERVICE_USER="${SERVICE_USER:-baby-diary}"
 SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 DB_APP_USER="${DB_APP_USER:-baby_diary_app}"
 SYSTEMD_SERVICE_FILE="${SYSTEMD_SERVICE_FILE:-/etc/systemd/system/diary-backend.service}"
+SYSTEMD_HARDENING_FILE="${SYSTEMD_HARDENING_FILE:-/etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
 IMAGE_DIR_OVERRIDE="${IMAGE_DIR:-}"
 OBJECT_DIR_OVERRIDE="${OBJECT_DIR:-}"
 NGINX_USER="${NGINX_USER:-www-data}"
 NGINX_GROUP="${NGINX_GROUP:-www-data}"
+NGINX_SITE_FILE="${NGINX_SITE_FILE:-/etc/nginx/sites-available/diary}"
+NGINX_HEALTH_SNIPPET_FILE="${NGINX_HEALTH_SNIPPET_FILE:-/etc/nginx/snippets/baby-diary-backend-health.conf}"
+TMP_ROOT="${TMP_ROOT:-/tmp}"
 CHECK_OS_USER="${CHECK_OS_USER:-true}"
 
 require_file() {
@@ -23,6 +27,7 @@ require_file() {
 }
 
 require_file "$SYSTEMD_SERVICE_FILE"
+require_file "$SYSTEMD_HARDENING_FILE"
 require_file "$BACKEND_ENV_FILE"
 
 grep -q "^User=$SERVICE_USER$" "$SYSTEMD_SERVICE_FILE"
@@ -33,6 +38,19 @@ if grep -q '^ExecStop=/bin/kill ' "$SYSTEMD_SERVICE_FILE"; then
 fi
 echo "service user $SERVICE_USER"
 echo "service stop uses systemd default"
+
+grep -q '^PrivateTmp=true$' "$SYSTEMD_HARDENING_FILE" || {
+  echo "systemd hardening must enable PrivateTmp=true" >&2
+  exit 1
+}
+echo "service private tmp enabled"
+
+tmp_mode="$(stat -c '%a' "$TMP_ROOT")"
+if [ "$tmp_mode" != "1777" ]; then
+  echo "$TMP_ROOT mode should be 1777, got $tmp_mode" >&2
+  exit 1
+fi
+echo "host tmp mode 1777"
 
 env_mode="$(stat -c '%a' "$BACKEND_ENV_FILE")"
 if [ "$env_mode" != "600" ]; then
@@ -108,12 +126,48 @@ if tr ',' '\n' <<<"$CORS_ALLOWED_ORIGINS" | grep -Eq '^[[:space:]]*\*[[:space:]]
 fi
 echo "security environment configured"
 
+if [ "${SERVER_ADDRESS:-127.0.0.1}" != "127.0.0.1" ]; then
+  echo "SERVER_ADDRESS must remain 127.0.0.1 behind the production reverse proxy" >&2
+  exit 1
+fi
+echo "backend bound to loopback"
+
+if [ -f "$NGINX_SITE_FILE" ]; then
+  grep -q 'include /etc/nginx/snippets/baby-diary-security-headers.conf;' "$NGINX_SITE_FILE" || {
+    echo "nginx site must include the Baby Diary security header snippet" >&2
+    exit 1
+  }
+  echo "nginx security headers included"
+
+  grep -q 'include /etc/nginx/snippets/baby-diary-backend-health.conf;' "$NGINX_SITE_FILE" || {
+    echo "nginx site must include the Baby Diary backend health snippet" >&2
+    exit 1
+  }
+  require_file "$NGINX_HEALTH_SNIPPET_FILE"
+  grep -q 'location = /actuator/health' "$NGINX_HEALTH_SNIPPET_FILE" || {
+    echo "nginx backend health location must use an exact match" >&2
+    exit 1
+  }
+  grep -q 'proxy_pass http://127.0.0.1:10002/actuator/health;' "$NGINX_HEALTH_SNIPPET_FILE" || {
+    echo "nginx backend health location must proxy to the loopback backend" >&2
+    exit 1
+  }
+  echo "nginx backend health proxy included"
+fi
+
 if [ ! -d "$IMAGE_DIR" ]; then
   echo "missing image directory $IMAGE_DIR" >&2
   exit 1
 fi
 
 DATA_DIR="$(dirname "$IMAGE_DIR")"
+data_path="$(readlink -m "$DATA_DIR")"
+case "$data_path" in
+  /|/tmp|/var|/home|/usr|/usr/local)
+    echo "image data directory must not be a shared system directory: $data_path" >&2
+    exit 1
+    ;;
+esac
 image_group="$(stat -c '%G' "$IMAGE_DIR")"
 image_mode="$(stat -c '%a' "$IMAGE_DIR")"
 data_group="$(stat -c '%G' "$DATA_DIR")"
@@ -155,6 +209,7 @@ fi
 if [ "$CHECK_OS_USER" = "true" ]; then
   id "$SERVICE_USER" >/dev/null
   if command -v runuser >/dev/null 2>&1; then
+    runuser -u "$SERVICE_USER" -- test -w "$TMP_ROOT"
     runuser -u "$SERVICE_USER" -- test -w "$IMAGE_DIR"
     id "$NGINX_USER" >/dev/null
     runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"

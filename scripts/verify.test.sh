@@ -26,8 +26,11 @@ SH
 
 chmod +x "$TMP_DIR/mvn" "$TMP_DIR/node" "$TMP_DIR/npm"
 
-PATH="$TMP_DIR:$PATH" "$ROOT/scripts/verify.sh"
+PATH="$TMP_DIR:$PATH" "$ROOT/scripts/verify-backend.sh"
+PATH="$TMP_DIR:$PATH" "$ROOT/scripts/verify-frontend.sh"
 
-grep -q '^mvn -q clean test$' "$CALL_LOG"
-grep -q '^node --test public/pwaMetadata.test.js src/App.test.js src/assets/styles/mobileUpload.test.js src/components/mobile/mobileNavigation.test.js src/components/mobile/MobileAppShell.test.js src/components/common/NavBar.test.js src/views/auth/Profile.test.js src/views/diary/Album.test.js src/views/diary/AiReports.test.js src/views/diary/Anniversaries.test.js src/views/diary/Calendar.test.js src/views/diary/Timeline.test.js src/views/diary/DiaryForm.test.js src/views/diary/DiaryList.test.js src/stores/auth.test.js src/utils/dateDisplay.test.js src/utils/imageUrl.test.js src/utils/imageUrlUsage.test.js src/utils/apiCache.test.js src/utils/diaryFormState.test.js src/utils/timelineGroups.test.js src/utils/shareTargetFiles.test.js src/utils/aiReportPeriod.test.js src/utils/markdownReport.test.js$' "$CALL_LOG"
+grep -q '^mvn -B clean verify$' "$CALL_LOG"
+grep -q '^node --test ' "$CALL_LOG"
+grep -q 'src/views/home/Home.test.js' "$CALL_LOG"
+grep -q '^npm run test:unit:coverage$' "$CALL_LOG"
 grep -q '^npm run build$' "$CALL_LOG"

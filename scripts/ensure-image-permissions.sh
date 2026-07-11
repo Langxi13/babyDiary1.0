@@ -34,6 +34,13 @@ fi
 
 image_path="$(readlink -m "$IMAGE_DIR")"
 object_path="$(readlink -m "$OBJECT_DIR")"
+data_path="$(readlink -m "$DATA_DIR")"
+case "$data_path" in
+  /|/tmp|/var|/home|/usr|/usr/local)
+    echo "refusing to change permissions on shared system directory $data_path" >&2
+    exit 1
+    ;;
+esac
 case "$object_path/" in
   "$image_path/"*)
     echo "private object directory must not be inside the public image directory" >&2

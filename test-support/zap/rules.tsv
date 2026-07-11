@@ -1,0 +1,7 @@
+10020	FAIL	(X-Frame-Options Header Scanner)
+10021	FAIL	(X-Content-Type-Options Header Missing)
+10023	FAIL	(Information Disclosure - Debug Error Messages)
+10038	FAIL	(Content Security Policy Header Not Set)
+10040	FAIL	(Secure Pages Include Mixed Content)
+10098	FAIL	(Cross-Domain Misconfiguration)
+90022	FAIL	(Application Error Disclosure)

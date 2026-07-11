@@ -33,7 +33,7 @@ tar \
   -czf "$TARGET/project.tgz" \
   -C "$(dirname "$PROJECT_ROOT")" "$PROJECT_NAME"
 
-mysqldump --single-transaction --no-tablespaces -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" > "$TARGET/$MYSQL_DATABASE.sql"
+MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --single-transaction --no-tablespaces -u"$MYSQL_USER" "$MYSQL_DATABASE" > "$TARGET/$MYSQL_DATABASE.sql"
 
 if [ -f /etc/nginx/sites-available/diary ]; then
   cp /etc/nginx/sites-available/diary "$TARGET/nginx-diary.conf"

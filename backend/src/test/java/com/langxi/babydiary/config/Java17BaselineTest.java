@@ -25,11 +25,11 @@ class Java17BaselineTest {
 
     @Test
     void verificationAndDeploymentScriptsUseJava17HomeByDefault() throws Exception {
-        String verifyScript = read("../scripts/verify.sh");
+        String verifyScript = read("../scripts/verify-backend.sh");
         String deployScript = read("../scripts/deploy.sh");
 
-        assertThat(verifyScript).contains("scripts/java-env.sh");
-        assertThat(verifyScript).contains("mvn -q clean test");
+        assertThat(verifyScript).contains("java-env.sh");
+        assertThat(verifyScript).contains("mvn -B clean verify");
         assertThat(deployScript).contains("scripts/java-env.sh");
         assertThat(deployScript).contains("mvn -q -DskipTests clean package -f backend/pom.xml");
         assertThat(read("../scripts/java-env.sh")).contains("JAVA_HOME_DEFAULT=\"/usr/lib/jvm/java-17-openjdk-amd64\"");

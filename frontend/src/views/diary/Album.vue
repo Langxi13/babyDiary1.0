@@ -90,7 +90,16 @@
       </section>
 
       <section v-loading="loadingGroups" class="album-browser">
-        <aside class="album-group-list">
+        <div v-if="groupsError && !loadingGroups" class="album-load-error" role="alert">
+          <el-icon><WarningFilled /></el-icon>
+          <div>
+            <strong>相册暂时无法加载</strong>
+            <p>{{ groupsError }}</p>
+          </div>
+          <el-button type="primary" @click="loadGroups">重新加载</el-button>
+        </div>
+
+        <aside v-else class="album-group-list">
           <button
             v-for="group in albumGroups"
             :key="groupKey(group)"
@@ -104,7 +113,7 @@
           </button>
         </aside>
 
-        <section class="album-list">
+        <section v-if="!groupsError" class="album-list">
           <div class="section-head">
             <div>
               <h2>{{ selectedGroup?.name || '相册组' }}</h2>
@@ -186,7 +195,7 @@ import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
-import { FolderAdd, MagicStick, Picture, Plus } from '@element-plus/icons-vue'
+import { FolderAdd, MagicStick, Picture, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
 import { formatLocalDate } from '@/utils/aiReportPeriod'
 import { formatChineseDateRange, formatChineseMonth } from '@/utils/dateDisplay'
@@ -203,6 +212,7 @@ import 'element-plus/es/components/tag/style/css.mjs'
 
 const router = useRouter()
 const loadingGroups = ref(false)
+const groupsError = ref('')
 const generatingProposal = ref(false)
 const confirmingProposal = ref(false)
 const showAiPanel = ref(false)
@@ -235,6 +245,7 @@ const formatSystemAlbumTitle = (album) => {
 
 const loadGroups = async () => {
   loadingGroups.value = true
+  groupsError.value = ''
   try {
     const response = await albumApi.getGroups({ force: true })
     albumGroups.value = response.data || []
@@ -244,6 +255,8 @@ const loadGroups = async () => {
       const freshGroup = albumGroups.value.find(item => groupKey(item) === groupKey(selectedGroup.value))
       selectGroup(freshGroup || albumGroups.value[0])
     }
+  } catch {
+    groupsError.value = '请检查网络后重试；如果问题持续出现，请联系管理员。'
   } finally {
     loadingGroups.value = false
   }

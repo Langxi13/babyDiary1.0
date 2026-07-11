@@ -5,34 +5,162 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  verify:
+  scripts:
+    name: Script governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: scripts/verify-scripts.sh
+
+  backend:
+    name: Backend and MySQL integration
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
           cache-dependency-path: backend/pom.xml
+      - run: scripts/verify-backend.sh
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco
+          path: backend/target/site/jacoco
+          if-no-files-found: warn
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+  frontend:
+    name: Frontend unit, coverage, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: scripts/verify-frontend.sh
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: warn
 
-      - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+  e2e:
+    name: Chromium, Firefox, and WebKit
+    needs: [scripts, backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: frontend
+      - run: scripts/verify-e2e.sh
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: warn
 
-      - name: Verify backend, frontend, and scripts
-        run: scripts/verify.sh
+  supply-chain:
+    name: Dependencies and credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --prefix frontend
+      - run: npm audit --prefix frontend --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+      - name: Trivy source and dependency scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Gitleaks history scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dast:
+    name: Packaged staging and ZAP baseline
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create synthetic staging configuration
+        run: |
+          {
+            echo 'DB_USERNAME=baby_diary_ci'
+            echo "DB_PASSWORD=$(openssl rand -hex 24)"
+            echo "MYSQL_ROOT_PASSWORD=$(openssl rand -hex 24)"
+            echo "INVITATION_CODE=$(openssl rand -hex 18)"
+            echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
+            echo "AI_CONFIG_ENCRYPTION_KEY=$(openssl rand -base64 48 | tr -d '\n')"
+            echo 'PUBLIC_URL=http://127.0.0.1:4173'
+            echo 'CORS_ALLOWED_ORIGINS=http://127.0.0.1:4173'
+            echo 'STAGING_WEB_PORT=4173'
+            echo 'STAGING_API_PORT=11002'
+          } > .env.staging
+      - run: STAGING_PROJECT_NAME=baby-diary-dast scripts/start-staging.sh
+      - run: scripts/run-zap-baseline.sh
+      - name: Capture staging logs
+        if: always()
+        run: mkdir -p artifacts && docker compose --env-file .env.staging -p baby-diary-dast -f compose.staging.yaml logs --no-color > artifacts/staging.log
+      - name: Stop staging
+        if: always()
+        run: STAGING_PROJECT_NAME=baby-diary-dast scripts/stop-staging.sh
+      - name: Upload DAST evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-and-staging
+          path: artifacts
+          if-no-files-found: warn

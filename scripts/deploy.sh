@@ -27,14 +27,20 @@ scripts/generate-thumbnails.sh
 
 scripts/ensure-image-permissions.sh
 
+install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
+install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
+install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf
+
+systemctl daemon-reload
+
 scripts/runtime-governance-check.sh
+nginx -t
 
 systemctl stop "$SERVICE_NAME"
 cp "backend/target/$JAR_NAME" "deploy/backend/$JAR_NAME"
 rsync -a --delete frontend/dist/ deploy/frontend/
 systemctl start "$SERVICE_NAME"
 
-nginx -t
 systemctl reload nginx
 HEALTH_CHECK_ATTEMPTS="${HEALTH_CHECK_ATTEMPTS:-12}" \
 HEALTH_CHECK_DELAY_SECONDS="${HEALTH_CHECK_DELAY_SECONDS:-2}" \

@@ -6,7 +6,7 @@ const source = [
   readFileSync(new URL('./AiReports.vue', import.meta.url), 'utf8'),
   readFileSync(new URL('./styles/AiReports.scss', import.meta.url), 'utf8')
 ].join('\n')
-const verifyScript = readFileSync(new URL('../../../../scripts/verify.sh', import.meta.url), 'utf8')
+const verifyScript = readFileSync(new URL('../../../../scripts/verify-frontend.sh', import.meta.url), 'utf8')
 const apiSource = readFileSync(new URL('../../api/ai.js', import.meta.url), 'utf8')
 
 test('ai reports page uses spacious sections for generate history and config', () => {
@@ -31,7 +31,8 @@ test('ai report controls avoid cramped spacing on mobile', () => {
 })
 
 test('project verification includes ai reports page tests', () => {
-  assert.match(verifyScript, /src\/views\/diary\/AiReports\.test\.js/)
+  assert.match(verifyScript, /find public src -type f -name '\*\.test\.js'/)
+  assert.match(verifyScript, /node --test "\$\{FRONTEND_TESTS\[@\]\}"/)
 })
 
 test('ai generation shows elapsed progress and respects configured request timeout', () => {

@@ -138,7 +138,7 @@ onMounted(loadDrafts)
 
   p {
     margin-top: 6px;
-    color: #77706a;
+    color: #6f6661;
   }
 }
 
@@ -195,7 +195,7 @@ onMounted(loadDrafts)
 
 .draft-time {
   margin-top: 8px;
-  color: #8a817b;
+  color: #6f6661;
   font-size: 12px;
 }
 

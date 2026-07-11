@@ -27,4 +27,19 @@ class SecurityConfigBaselineTest {
         assertThat(source).contains("\"/v3/api-docs/**\"");
         assertThat(source).contains(".anyRequest().authenticated()");
     }
+
+    @Test
+    void productionBackendBindsLoopbackWhileStagingUsesContainerNetworking() throws Exception {
+        String productionConfig = Files.readString(
+                Paths.get("../config/application-prod.yml"),
+                StandardCharsets.UTF_8
+        );
+        String stagingCompose = Files.readString(
+                Paths.get("../compose.staging.yaml"),
+                StandardCharsets.UTF_8
+        );
+
+        assertThat(productionConfig).contains("address: ${SERVER_ADDRESS:127.0.0.1}");
+        assertThat(stagingCompose).contains("SERVER_ADDRESS: 0.0.0.0");
+    }
 }

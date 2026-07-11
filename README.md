@@ -14,9 +14,9 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
 - 设备会话、短期访问令牌、30 天刷新会话、邮箱验证、密码找回和恢复码
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
-- Redis 缓存、Flyway V1-V12 迁移、Actuator 健康检查和部署前治理脚本
+- Redis 缓存、Flyway V1-V13 迁移、真实 Actuator 健康检查和部署前治理脚本
 
-完整功能与接口说明见 [document/系统功能文档.md](document/系统功能文档.md) 和 [document/API接口文档.md](document/API接口文档.md)。
+完整功能、接口与质量门禁见 [document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
 
 ## 技术要求
 
@@ -68,15 +68,18 @@ npm --prefix frontend ci
 scripts/verify.sh
 ```
 
-验证脚本会运行 Shell 脚本自测、后端测试、前端测试和生产构建。部署前还建议执行：
+验证脚本会运行 Shell 脚本自测、MySQL 8.4 后端集成测试、覆盖率门禁、前端测试和生产构建。发布候选还必须执行三浏览器 E2E 和供应链扫描：
 
 ```bash
-npm --prefix frontend audit --audit-level=moderate
+scripts/verify-e2e.sh
+scripts/security-scan.sh
 ```
+
+打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。
 
 ## 生产部署
 
-生产配置模板位于 `config/application-prod.yml`，所有数据库密码、邀请码、JWT 密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产配置模板位于 `config/application-prod.yml`，所有数据库密码、邀请码、JWT 密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署脚本会安装 Nginx 安全头与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须读取 Actuator JSON 且确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
 `DIARY_FILE_PATH` 只保存旧版兼容图片，`DIARY_OBJECT_PATH` 保存 V2 富媒体，两者必须是不同目录。V2 富媒体通过短时签名 URL 访问；旧版 `/images/**` 为兼容现有客户端仍可公开读取，因此文件名不可视为访问控制，建议新功能统一使用 V2 媒体接口。
 
