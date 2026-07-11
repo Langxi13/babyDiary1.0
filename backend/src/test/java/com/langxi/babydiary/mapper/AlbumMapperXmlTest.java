@@ -11,15 +11,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AlbumMapperXmlTest {
 
     @Test
-    void albumQueriesUseExistingAlbumPhotosAsFallbackCover() throws Exception {
+    void albumQueriesOnlyUseVisiblePhotosForCoversAndCounts() throws Exception {
         String xml = new String(
                 Files.readAllBytes(Paths.get("src/main/resources/mapper/AlbumMapper.xml")),
                 StandardCharsets.UTF_8
         );
 
-        assertThat(xml).contains("COALESCE(a.cover_image_path");
+        assertThat(xml).contains("WHERE i_explicit.image_path = a.cover_image_path");
+        assertThat(xml).contains("d_explicit.deleted_at IS NULL");
+        assertThat(xml).contains("d_explicit.locked = 0");
         assertThat(xml).contains("FROM album_photo ap_cover");
+        assertThat(xml).contains("d_cover.deleted_at IS NULL");
+        assertThat(xml).contains("d_cover.locked = 0");
         assertThat(xml).contains("ORDER BY ap_cover.sort ASC, i.image_id ASC");
+        assertThat(xml).contains("d_count.deleted_at IS NULL");
+        assertThat(xml).contains("d_count.locked = 0");
         assertThat(xml).contains("ORDER BY ap.sort ASC, ap.image_id ASC");
         assertThat(xml).contains("<select id=\"findAlbumPhotoPage\"");
         assertThat(xml).contains("<select id=\"countAlbumPhotos\"");

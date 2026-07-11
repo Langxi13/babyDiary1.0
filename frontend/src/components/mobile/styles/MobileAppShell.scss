@@ -63,8 +63,9 @@
     text-align: center;
 
     strong,
-    span {
+    .topbar-space {
       display: block;
+      width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -76,10 +77,15 @@
       line-height: 1.2;
     }
 
-    span {
+    .topbar-space {
       margin-top: 2px;
+      padding: 0;
+      border: 0;
+      background: transparent;
       color: #9b8d85;
       font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
     }
   }
 

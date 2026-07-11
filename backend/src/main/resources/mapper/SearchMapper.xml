@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.SearchMapper">
+    <insert id="upsertDiary">
+        INSERT INTO search_document(space_id,entity_type,entity_public_id,owner_user_id,visibility,title,body,document_date,source_updated_at)
+        SELECT space_id,'DIARY',public_id,user_id,visibility,title,content,date,updated_at
+        FROM diary WHERE diary_id=#{diaryId} AND deleted_at IS NULL AND locked=0
+        ON DUPLICATE KEY UPDATE
+          space_id=VALUES(space_id), owner_user_id=VALUES(owner_user_id), visibility=VALUES(visibility),
+          title=VALUES(title), body=VALUES(body), document_date=VALUES(document_date),
+          source_updated_at=VALUES(source_updated_at)
+    </insert>
+
+    <delete id="deleteDiaryById">
+        DELETE s FROM search_document s
+        INNER JOIN diary d ON d.public_id COLLATE utf8mb4_unicode_ci=s.entity_public_id
+        WHERE s.entity_type='DIARY' AND d.diary_id=#{diaryId}
+    </delete>
+
+    <delete id="deleteDiary">
+        DELETE FROM search_document WHERE entity_type='DIARY' AND entity_public_id=#{publicId}
+    </delete>
+
+    <insert id="refreshDiaryDocuments">
+        INSERT INTO search_document(space_id,entity_type,entity_public_id,owner_user_id,visibility,title,body,document_date,source_updated_at)
+        SELECT d.space_id,'DIARY',d.public_id,d.user_id,d.visibility,d.title,d.content,d.date,d.updated_at
+        FROM diary d
+        LEFT JOIN search_document s ON s.entity_type='DIARY'
+          AND s.entity_public_id=d.public_id COLLATE utf8mb4_unicode_ci
+        WHERE d.deleted_at IS NULL AND d.locked=0
+          AND (s.document_id IS NULL OR s.source_updated_at&lt;d.updated_at)
+        ON DUPLICATE KEY UPDATE
+          space_id=VALUES(space_id), owner_user_id=VALUES(owner_user_id), visibility=VALUES(visibility),
+          title=VALUES(title), body=VALUES(body), document_date=VALUES(document_date),
+          source_updated_at=VALUES(source_updated_at)
+    </insert>
+
+    <delete id="removeStaleDiaryDocuments">
+        DELETE s FROM search_document s
+        LEFT JOIN diary d ON d.public_id COLLATE utf8mb4_unicode_ci=s.entity_public_id
+          AND s.entity_type='DIARY' AND d.deleted_at IS NULL AND d.locked=0
+        WHERE s.entity_type='DIARY' AND d.diary_id IS NULL
+    </delete>
+
+    <select id="searchFullText" resultType="com.langxi.babydiary.dto.SearchResultVO">
+        SELECT s.entity_type AS entityType,
+               s.entity_public_id AS entityId,
+               s.title,
+               LEFT(s.body, 600) AS snippet,
+               s.document_date AS date,
+               MATCH(s.title,s.body) AGAINST(#{query} IN NATURAL LANGUAGE MODE) AS score
+        FROM search_document s
+        INNER JOIN diary d ON d.public_id COLLATE utf8mb4_unicode_ci=s.entity_public_id
+          AND s.entity_type='DIARY'
+        WHERE s.space_id=#{spaceId}
+          AND d.deleted_at IS NULL AND d.locked=0
+          AND (s.visibility='SHARED' OR s.owner_user_id=#{userId})
+          AND MATCH(s.title,s.body) AGAINST(#{query} IN NATURAL LANGUAGE MODE)
+        ORDER BY score DESC, s.document_date DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="searchLike" resultType="com.langxi.babydiary.dto.SearchResultVO">
+        SELECT s.entity_type AS entityType,
+               s.entity_public_id AS entityId,
+               s.title,
+               LEFT(s.body, 600) AS snippet,
+               s.document_date AS date,
+               0.1 AS score
+        FROM search_document s
+        INNER JOIN diary d ON d.public_id COLLATE utf8mb4_unicode_ci=s.entity_public_id
+          AND s.entity_type='DIARY'
+        WHERE s.space_id=#{spaceId}
+          AND d.deleted_at IS NULL AND d.locked=0
+          AND (s.visibility='SHARED' OR s.owner_user_id=#{userId})
+          AND (s.title LIKE CONCAT('%',#{query},'%') OR s.body LIKE CONCAT('%',#{query},'%'))
+        ORDER BY s.document_date DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

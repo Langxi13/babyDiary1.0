@@ -6,6 +6,8 @@
     <resultMap id="aiReportResultMap" type="AiReport">
         <id property="reportId" column="report_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
+        <result property="scope" column="scope"/>
         <result property="type" column="type"/>
         <result property="period" column="period"/>
         <result property="periodStart" column="period_start"/>
@@ -18,8 +20,11 @@
     </resultMap>
 
     <insert id="insert" parameterType="AiReport" useGeneratedKeys="true" keyProperty="reportId">
-        INSERT INTO ai_report (user_id, type, period, period_start, period_end, title, content_markdown, diary_count, model)
-        VALUES (#{userId}, #{type}, #{period}, #{periodStart}, #{periodEnd}, #{title}, #{contentMarkdown}, #{diaryCount}, #{model})
+        INSERT INTO ai_report (user_id, space_id, scope, type, period, period_start, period_end, title, content_markdown, diary_count, model)
+        VALUES (#{userId},
+                <choose><when test="spaceId != null">#{spaceId}</when><otherwise>(SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId})</otherwise></choose>,
+                <choose><when test="scope != null">#{scope}</when><otherwise>'PERSONAL'</otherwise></choose>,
+                #{type}, #{period}, #{periodStart}, #{periodEnd}, #{title}, #{contentMarkdown}, #{diaryCount}, #{model})
     </insert>
 
     <select id="findById" resultMap="aiReportResultMap">
@@ -47,4 +52,23 @@
     <delete id="delete">
         DELETE FROM ai_report WHERE user_id = #{userId} AND report_id = #{reportId}
     </delete>
+
+    <select id="findSpacePage" resultMap="aiReportResultMap">
+        SELECT * FROM ai_report WHERE space_id=#{spaceId} AND scope='SPACE'
+        <if test="type != null and type != ''">AND type=#{type}</if>
+        ORDER BY created_at DESC,report_id DESC LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countSpace" resultType="int">
+        SELECT COUNT(*) FROM ai_report WHERE space_id=#{spaceId} AND scope='SPACE'
+        <if test="type != null and type != ''">AND type=#{type}</if>
+    </select>
+
+    <select id="findSpaceReport" resultMap="aiReportResultMap">
+        SELECT * FROM ai_report WHERE space_id=#{spaceId} AND report_id=#{reportId} AND scope='SPACE'
+    </select>
+
+    <select id="existsSpacePeriod" resultType="int">
+        SELECT COUNT(*) FROM ai_report WHERE space_id=#{spaceId} AND scope='SPACE' AND type=#{type} AND period=#{period}
+    </select>
 </mapper>

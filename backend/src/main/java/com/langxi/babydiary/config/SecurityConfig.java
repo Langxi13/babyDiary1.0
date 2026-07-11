@@ -40,6 +40,15 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register",
+                                "/api/v2/auth/login",
+                                "/api/v2/auth/refresh",
+                                "/api/v2/auth/logout",
+                                "/api/v2/auth/email/confirm",
+                                "/api/v2/auth/password/reset-request",
+                                "/api/v2/auth/password/reset",
+                                "/api/v2/auth/password/recover",
+                                "/api/v2/public/shares/**",
+                                "/api/v2/media/public/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
@@ -50,7 +59,7 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.deny()));
 
         return http.build();
     }

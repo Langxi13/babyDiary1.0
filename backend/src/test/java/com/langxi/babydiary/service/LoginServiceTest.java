@@ -4,6 +4,7 @@ import com.langxi.babydiary.common.ErrorCode;
 import com.langxi.babydiary.entity.User;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.UserMapper;
+import com.langxi.babydiary.mapper.AccountSecurityMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class LoginServiceTest {
@@ -36,6 +38,12 @@ class LoginServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private SpaceService spaceService;
+
+    @Mock
+    private AccountSecurityMapper accountSecurityMapper;
 
     @Spy
     private ImageStorageService imageStorageService = new ImageStorageService();
@@ -75,11 +83,18 @@ class LoginServiceTest {
     void registerUserTrimsUsernameBeforeSaving() {
         when(userMapper.findByUsername("new-user")).thenReturn(null);
         when(passwordEncoder.encode("password")).thenReturn("encoded");
+        doAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            user.setUserId(42);
+            return null;
+        }).when(userMapper).insertUser(org.mockito.ArgumentMatchers.any(User.class));
+        when(userMapper.countUsers()).thenReturn(2);
 
         loginService.registerUser(" new-user ", "password", "invite");
 
         verify(userMapper).insertUser(org.mockito.ArgumentMatchers.argThat(user ->
                 "new-user".equals(user.getUsername()) && "encoded".equals(user.getPassword())));
+        verify(spaceService).ensurePersonalSpace(42, "new-user");
     }
 
     @Test
@@ -107,6 +122,8 @@ class LoginServiceTest {
         loginService.changePassword(8, "oldpass", "newpass1", "newpass1");
 
         verify(userMapper).updatePasswordAndIncrementTokenVersion(8, "encoded-new");
+        verify(accountSecurityMapper).revokeAllSessions(8);
+        verify(accountSecurityMapper).deleteAccountTokens(8, "STEP_UP");
     }
 
     @Test

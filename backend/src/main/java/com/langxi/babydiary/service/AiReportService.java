@@ -73,6 +73,35 @@ public class AiReportService {
         return report;
     }
 
+    @Transactional
+    public AiReport generateForSpace(Integer userId, Long spaceId, boolean personalSpace, AiReportGenerateDTO dto) {
+        AiRuntimeConfig config = aiConfigService.getRuntimeConfig();
+        AiReportPeriod period = aiPeriodResolver.resolve(dto.getType(), dto.getPeriod());
+        List<Diary> diaries = diaryMapper.findDiariesForSpaceReport(
+                spaceId, userId, personalSpace, period.getStartDate(), period.getEndDate());
+        if (diaries.isEmpty()) {
+            throw new BusinessException(ErrorCode.AI_CONFIG_INVALID, "该周期没有可用于报告的日记");
+        }
+        enrichTags(diaries);
+        String markdown = aiClient.generate(config, Arrays.asList(
+                new AiChatMessage("system", systemPrompt()),
+                new AiChatMessage("user", userPrompt(period, diaries))));
+        AiReport report = new AiReport();
+        report.setUserId(userId);
+        report.setSpaceId(spaceId);
+        report.setScope("SPACE");
+        report.setType(period.getType());
+        report.setPeriod(period.getLabel());
+        report.setPeriodStart(period.getStartDate());
+        report.setPeriodEnd(period.getEndDate());
+        report.setTitle(reportTitle(period));
+        report.setContentMarkdown(markdown);
+        report.setDiaryCount(diaries.size());
+        report.setModel(config.getModel());
+        aiReportMapper.insert(report);
+        return report;
+    }
+
     public PageResult<AiReport> findReports(Integer userId, String type, int page, int size) {
         int normalizedPage = Pagination.normalizePage(page);
         int normalizedSize = Pagination.normalizeSize(size);
@@ -108,7 +137,12 @@ public class AiReportService {
 
     private String userPrompt(AiReportPeriod period, List<Diary> diaries) {
         StringBuilder builder = new StringBuilder();
-        builder.append("请生成一份").append("WEEKLY".equals(period.getType()) ? "周报" : "月报")
+        String reportName = switch (period.getType()) {
+            case "WEEKLY" -> "周报";
+            case "MONTHLY" -> "月报";
+            default -> "年报";
+        };
+        builder.append("请生成一份").append(reportName)
                 .append("，周期：").append(period.getStartDate()).append(" 至 ").append(period.getEndDate()).append("。\n\n")
                 .append("写作口吻：以旁观整理者身份、第二人称口吻总结，允许使用“你/你们”，例如“在这个月中，你们一起走过了...”、“你完成了...”。不要使用“我”或“我们”代入日记主人。\n\n")
                 .append("要求结构：# 标题、## 本期回顾、## 重要瞬间、## 情绪与陪伴、## 温柔总结。\n\n")
@@ -138,7 +172,12 @@ public class AiReportService {
     }
 
     private String reportTitle(AiReportPeriod period) {
-        return period.getLabel() + ("WEEKLY".equals(period.getType()) ? " 周报" : " 月报");
+        String suffix = switch (period.getType()) {
+            case "WEEKLY" -> " 周报";
+            case "MONTHLY" -> " 月报";
+            default -> " 年度回忆";
+        };
+        return period.getLabel() + suffix;
     }
 
     private String truncate(String value, int limit) {
@@ -161,8 +200,8 @@ public class AiReportService {
             return null;
         }
         String normalized = type.trim().toUpperCase();
-        if (!"WEEKLY".equals(normalized) && !"MONTHLY".equals(normalized)) {
-            throw new IllegalArgumentException("报告类型仅支持 WEEKLY 或 MONTHLY");
+        if (!"WEEKLY".equals(normalized) && !"MONTHLY".equals(normalized) && !"ANNUAL".equals(normalized)) {
+            throw new IllegalArgumentException("报告类型仅支持 WEEKLY、MONTHLY 或 ANNUAL");
         }
         return normalized;
     }

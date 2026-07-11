@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 @Data
 public class AiReportGenerateDTO {
     @NotBlank(message = "报告类型不能为空")
-    @Pattern(regexp = "WEEKLY|MONTHLY", message = "报告类型仅支持WEEKLY或MONTHLY")
+    @Pattern(regexp = "WEEKLY|MONTHLY|ANNUAL", message = "报告类型仅支持WEEKLY、MONTHLY或ANNUAL")
     private String type;
 
     @NotBlank(message = "报告周期不能为空")

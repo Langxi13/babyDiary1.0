@@ -25,5 +25,11 @@ public interface DiaryMapper {
 
     List<Diary> findDiariesForReport(@Param("userId") Integer userId, @Param("startDate") java.sql.Date startDate, @Param("endDate") java.sql.Date endDate);
 
+    List<Diary> findDiariesForSpaceReport(@Param("spaceId") Long spaceId,
+                                          @Param("userId") Integer userId,
+                                          @Param("personalSpace") boolean personalSpace,
+                                          @Param("startDate") java.sql.Date startDate,
+                                          @Param("endDate") java.sql.Date endDate);
+
     List<com.langxi.babydiary.dto.CalendarDayVO> findCalendarDays(@Param("userId") Integer userId, @Param("startDate") String startDate, @Param("endDate") String endDate);
 }

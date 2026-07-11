@@ -6,10 +6,14 @@
     <resultMap id="userResultMap" type="User">
         <id property="userId" column="user_id"/>
         <result property="username" column="username"/>
+        <result property="email" column="email"/>
+        <result property="emailVerified" column="email_verified"/>
         <result property="password" column="password"/>
         <result property="createdAt" column="created_at"/>
         <result property="avatarPath" column="avatar_path"/>
         <result property="tokenVersion" column="token_version"/>
+        <result property="systemRole" column="system_role"/>
+        <result property="timezone" column="timezone"/>
     </resultMap>
 
     <select id="findById" parameterType="Integer" resultMap="userResultMap">
@@ -20,7 +24,11 @@
         SELECT * FROM user WHERE username = #{username}
     </select>
 
-    <insert id="insertUser" parameterType="User">
+    <select id="findByEmail" parameterType="String" resultMap="userResultMap">
+        SELECT * FROM user WHERE email = #{email}
+    </select>
+
+    <insert id="insertUser" parameterType="User" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO user (username, password) VALUES (#{username}, #{password})
     </insert>
 
@@ -34,5 +42,25 @@
         SET password = #{password},
             token_version = token_version + 1
         WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateEmail">
+        UPDATE user SET email = #{email}, email_verified = #{verified} WHERE user_id = #{userId}
+    </update>
+
+    <update id="markEmailVerified">
+        UPDATE user SET email_verified = 1 WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateTimezone">
+        UPDATE user SET timezone = #{timezone} WHERE user_id = #{userId}
+    </update>
+
+    <select id="countUsers" resultType="int">
+        SELECT COUNT(*) FROM user
+    </select>
+
+    <update id="updateSystemRole">
+        UPDATE user SET system_role=#{systemRole} WHERE user_id=#{userId}
     </update>
 </mapper>

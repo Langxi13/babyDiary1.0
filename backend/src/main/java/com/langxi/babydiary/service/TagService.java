@@ -33,6 +33,10 @@ public class TagService {
         return tagMapper.findTagsByDiaryId(diaryId);
     }
 
+    public List<Tag> findTagsBySpaceId(Long spaceId) {
+        return tagMapper.findTagsBySpaceId(spaceId);
+    }
+
     public Map<Integer, List<Tag>> findTagsByDiaryIds(List<Integer> diaryIds) {
         if (diaryIds == null || diaryIds.isEmpty()) {
             return Collections.emptyMap();
@@ -51,6 +55,11 @@ public class TagService {
 
     @CacheEvict(cacheNames = {CacheNames.TAGS, CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE}, allEntries = true)
     public Tag createTag(Integer userId, String name, String color) {
+        return createTag(userId, null, name, color);
+    }
+
+    @CacheEvict(cacheNames = {CacheNames.TAGS, CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE}, allEntries = true)
+    public Tag createTag(Integer userId, Long spaceId, String name, String color) {
         String normalizedName = name == null ? "" : name.trim();
         if (normalizedName.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "标签名不能为空");
@@ -58,12 +67,15 @@ public class TagService {
         if (normalizedName.length() > 32) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "标签名不能超过32个字符");
         }
-        Tag existing = tagMapper.findTagByName(userId, normalizedName);
+        Tag existing = spaceId == null
+                ? tagMapper.findTagByName(userId, normalizedName)
+                : tagMapper.findTagBySpaceAndName(spaceId, normalizedName);
         if (existing != null) {
             return existing;
         }
         Tag tag = new Tag();
         tag.setUserId(userId);
+        tag.setSpaceId(spaceId);
         tag.setName(normalizedName);
         tag.setColor(normalizeColor(color));
         tagMapper.insertTag(tag);
@@ -72,6 +84,11 @@ public class TagService {
 
     @CacheEvict(cacheNames = {CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE}, allEntries = true)
     public void replaceDiaryTags(Integer userId, Integer diaryId, List<Integer> tagIds) {
+        replaceDiaryTags(userId, null, diaryId, tagIds);
+    }
+
+    @CacheEvict(cacheNames = {CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE}, allEntries = true)
+    public void replaceDiaryTags(Integer userId, Long spaceId, Integer diaryId, List<Integer> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
             tagMapper.deleteDiaryTagsByDiaryId(diaryId);
             return;
@@ -83,7 +100,10 @@ public class TagService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "单篇日记最多选择50个标签");
         }
         for (Integer tagId : uniqueTagIds) {
-            if (tagMapper.findTagById(userId, tagId) == null) {
+            Tag tag = spaceId == null
+                    ? tagMapper.findTagById(userId, tagId)
+                    : tagMapper.findTagBySpaceAndId(spaceId, tagId);
+            if (tag == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "标签不存在: " + tagId);
             }
         }

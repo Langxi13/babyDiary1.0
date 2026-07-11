@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.CollaborationMapper">
+    <resultMap id="diaryResultMap" type="Diary">
+        <id property="diaryId" column="diary_id"/>
+        <result property="publicId" column="public_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="authorName" column="author_name"/>
+        <result property="spaceId" column="space_id"/>
+        <result property="title" column="title"/>
+        <result property="date" column="date"/>
+        <result property="content" column="content"/>
+        <result property="moodKey" column="mood_key"/>
+        <result property="contentFormat" column="content_format"/>
+        <result property="visibility" column="visibility"/>
+        <result property="locked" column="locked"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <resultMap id="revisionResultMap" type="DiaryRevision">
+        <id property="revisionId" column="revision_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="version" column="version"/>
+        <result property="editorUserId" column="editor_user_id"/>
+        <result property="editorName" column="editor_name"/>
+        <result property="snapshotJson" column="snapshot_json"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <resultMap id="commentResultMap" type="DiaryComment">
+        <id property="commentId" column="comment_id"/>
+        <result property="publicId" column="public_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="avatarPath" column="avatar_path"/>
+        <result property="content" column="content"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <resultMap id="reactionResultMap" type="DiaryReaction">
+        <result property="diaryId" column="diary_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="emoji" column="emoji"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <sql id="diaryColumns">
+        d.diary_id, d.public_id, d.user_id, u.username AS author_name, d.space_id,
+        d.title, d.date, d.content, d.mood_key, d.content_format, d.visibility,
+        d.locked, d.version, d.created_at, d.updated_at, d.deleted_at
+    </sql>
+
+    <insert id="insertDiary" parameterType="Diary" useGeneratedKeys="true" keyProperty="diaryId">
+        INSERT INTO diary (public_id, user_id, space_id, title, date, content, mood_key,
+                           content_format, visibility, locked, version, created_at)
+        VALUES (#{publicId}, #{userId}, #{spaceId}, #{title}, #{date}, #{content}, #{moodKey},
+                #{contentFormat}, #{visibility}, #{locked}, 1, NOW())
+    </insert>
+
+    <select id="findDiary" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.space_id = #{spaceId} AND d.public_id = #{publicId}
+    </select>
+
+    <select id="findDiaryByPublicId" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.public_id = #{publicId}
+    </select>
+
+    <select id="findDiaryForUpdate" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.space_id = #{spaceId} AND d.public_id = #{publicId}
+        FOR UPDATE
+    </select>
+
+    <select id="findDiaryByIdForShare" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.diary_id = #{diaryId}
+    </select>
+
+    <sql id="visibleDiaryFilters">
+        d.space_id = #{spaceId}
+        AND (d.visibility = 'SHARED' OR d.user_id = #{userId})
+        <choose>
+            <when test="trash">AND d.deleted_at IS NOT NULL</when>
+            <otherwise>AND d.deleted_at IS NULL</otherwise>
+        </choose>
+        <if test="startDate != null and startDate != ''">AND d.date &gt;= #{startDate}</if>
+        <if test="endDate != null and endDate != ''">AND d.date &lt;= #{endDate}</if>
+        <if test="keyword != null and keyword != ''">
+            AND d.locked = 0
+            AND (d.title LIKE CONCAT('%', #{keyword}, '%') OR d.content LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </sql>
+
+    <select id="findDiaryPage" resultMap="diaryResultMap">
+        SELECT d.diary_id,d.public_id,d.user_id,u.username AS author_name,d.space_id,
+               d.title,d.date,LEFT(d.content,1200) AS content,d.mood_key,d.content_format,
+               d.visibility,d.locked,d.version,d.created_at,d.updated_at,d.deleted_at
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE <include refid="visibleDiaryFilters"/>
+        ORDER BY <choose><when test="trash">d.deleted_at DESC</when><otherwise>d.date DESC, d.created_at DESC</otherwise></choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countDiaries" resultType="int">
+        SELECT COUNT(*)
+        FROM diary d
+        WHERE <include refid="visibleDiaryFilters"/>
+    </select>
+
+    <select id="findExportDiaries" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.space_id = #{spaceId}
+          AND (d.visibility = 'SHARED' OR d.user_id = #{userId})
+          AND d.deleted_at IS NULL
+        ORDER BY d.date ASC, d.created_at ASC
+    </select>
+
+    <update id="updateDiary">
+        UPDATE diary
+        SET title = #{diary.title}, date = #{diary.date}, content = #{diary.content},
+            mood_key = #{diary.moodKey}, content_format = #{diary.contentFormat},
+            visibility = #{diary.visibility}, locked = #{diary.locked}, version = version + 1
+        WHERE diary_id = #{diary.diaryId} AND version = #{expectedVersion} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE diary SET deleted_at = NOW(), version = version + 1
+        WHERE diary_id = #{diaryId} AND version = #{expectedVersion} AND deleted_at IS NULL
+    </update>
+
+    <update id="restore">
+        UPDATE diary SET deleted_at = NULL, version = version + 1
+        WHERE diary_id = #{diaryId} AND version = #{expectedVersion} AND deleted_at IS NOT NULL
+    </update>
+
+    <update id="restoreSnapshot">
+        UPDATE diary
+        SET title = #{diary.title}, date = #{diary.date}, content = #{diary.content},
+            mood_key = #{diary.moodKey}, content_format = #{diary.contentFormat},
+            visibility = #{diary.visibility}, locked = #{diary.locked}, version = version + 1
+        WHERE diary_id = #{diary.diaryId} AND version = #{expectedVersion}
+    </update>
+
+    <select id="findExpiredTrash" resultMap="diaryResultMap">
+        SELECT <include refid="diaryColumns"/>
+        FROM diary d
+        INNER JOIN user u ON u.user_id = d.user_id
+        WHERE d.deleted_at IS NOT NULL AND d.deleted_at &lt; #{cutoff}
+        ORDER BY d.deleted_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <delete id="hardDelete">DELETE FROM diary WHERE diary_id = #{diaryId}</delete>
+
+    <insert id="insertRevision" parameterType="DiaryRevision" useGeneratedKeys="true" keyProperty="revisionId">
+        INSERT INTO diary_revision (diary_id, version, editor_user_id, snapshot_json)
+        VALUES (#{diaryId}, #{version}, #{editorUserId}, #{snapshotJson})
+    </insert>
+
+    <select id="findRevisions" resultMap="revisionResultMap">
+        SELECT r.*, u.username AS editor_name
+        FROM diary_revision r
+        INNER JOIN user u ON u.user_id = r.editor_user_id
+        WHERE r.diary_id = #{diaryId}
+        ORDER BY r.version DESC
+    </select>
+
+    <select id="findRevision" resultMap="revisionResultMap">
+        SELECT r.*, u.username AS editor_name
+        FROM diary_revision r
+        INNER JOIN user u ON u.user_id = r.editor_user_id
+        WHERE r.diary_id = #{diaryId} AND r.revision_id = #{revisionId}
+    </select>
+
+    <insert id="insertComment" parameterType="DiaryComment" useGeneratedKeys="true" keyProperty="commentId">
+        INSERT INTO diary_comment (public_id, diary_id, user_id, content)
+        VALUES (#{publicId}, #{diaryId}, #{userId}, #{content})
+    </insert>
+
+    <select id="findComments" resultMap="commentResultMap">
+        SELECT c.*, u.username, u.avatar_path
+        FROM diary_comment c
+        INNER JOIN user u ON u.user_id = c.user_id
+        WHERE c.diary_id = #{diaryId} AND c.deleted_at IS NULL
+        ORDER BY c.created_at ASC
+    </select>
+
+    <select id="findComment" resultMap="commentResultMap">
+        SELECT c.*, u.username, u.avatar_path
+        FROM diary_comment c
+        INNER JOIN user u ON u.user_id = c.user_id
+        WHERE c.diary_id = #{diaryId} AND c.public_id = #{publicId} AND c.deleted_at IS NULL
+    </select>
+
+    <update id="updateComment">
+        UPDATE diary_comment SET content = #{content}
+        WHERE comment_id = #{commentId} AND user_id = #{userId} AND deleted_at IS NULL
+    </update>
+
+    <update id="deleteComment">
+        UPDATE diary_comment SET deleted_at = NOW()
+        WHERE comment_id = #{commentId} AND user_id = #{userId} AND deleted_at IS NULL
+    </update>
+
+    <insert id="addReaction">
+        INSERT IGNORE INTO diary_reaction (diary_id, user_id, emoji) VALUES (#{diaryId}, #{userId}, #{emoji})
+    </insert>
+
+    <delete id="removeReaction">
+        DELETE FROM diary_reaction WHERE diary_id = #{diaryId} AND user_id = #{userId} AND emoji = #{emoji}
+    </delete>
+
+    <select id="findReactions" resultMap="reactionResultMap">
+        SELECT r.*, u.username
+        FROM diary_reaction r
+        INNER JOIN user u ON u.user_id = r.user_id
+        WHERE r.diary_id = #{diaryId}
+        ORDER BY r.created_at ASC
+    </select>
+</mapper>

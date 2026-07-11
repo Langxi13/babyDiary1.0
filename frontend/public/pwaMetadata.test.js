@@ -21,7 +21,7 @@ test('manifest has installable app shell metadata', () => {
 })
 
 test('service worker cache version is bumped when the app shell metadata changes', () => {
-  assert.match(serviceWorker, /baby-diary-shell-v10/)
+  assert.match(serviceWorker, /baby-diary-shell-v11/)
   assert.match(serviceWorker, /\/app-icon\.png/)
 })
 

@@ -15,10 +15,22 @@ const routeComponents = {
   AlbumDetail: () => import('@/views/diary/AlbumDetail.vue'),
   AiReports: () => import('@/views/diary/AiReports.vue'),
   DiaryForm: () => import('@/views/diary/DiaryForm.vue'),
-  DiaryDetail: () => import('@/views/diary/DiaryDetail.vue')
+  DiaryDetail: () => import('@/views/diary/DiaryDetail.vue'),
+  Workspace: () => import('@/views/workspace/Workspace.vue'),
+  SpaceSettings: () => import('@/views/workspace/SpaceSettings.vue'),
+  SpaceDiaryDetail: () => import('@/views/workspace/SpaceDiaryDetail.vue'),
+  Notifications: () => import('@/views/workspace/Notifications.vue'),
+  SharedDiary: () => import('@/views/workspace/SharedDiary.vue'),
+  AcceptInvitation: () => import('@/views/workspace/AcceptInvitation.vue')
 }
 
 const routes = [
+  {
+    path: '/shared/:token',
+    name: 'SharedDiary',
+    component: routeComponents.SharedDiary,
+    meta: { requiresAuth: false }
+  },
   {
     path: '/login',
     name: 'Login',
@@ -36,6 +48,36 @@ const routes = [
     name: 'Home',
     component: routeComponents.Home,
     meta: { requiresAuth: true, mobileTitle: '首页', mobileTab: 'home' }
+  },
+  {
+    path: '/spaces',
+    name: 'Workspace',
+    component: routeComponents.Workspace,
+    meta: { requiresAuth: true, mobileTitle: '共同空间', mobileTab: 'memory' }
+  },
+  {
+    path: '/spaces/settings',
+    name: 'SpaceSettings',
+    component: routeComponents.SpaceSettings,
+    meta: { requiresAuth: true, mobileTitle: '空间设置', mobileTab: 'account' }
+  },
+  {
+    path: '/spaces/invitations/:token',
+    name: 'AcceptInvitation',
+    component: routeComponents.AcceptInvitation,
+    meta: { requiresAuth: true, mobileTitle: '加入空间', mobileTab: 'memory' }
+  },
+  {
+    path: '/spaces/:spaceId/diaries/:diaryId',
+    name: 'SpaceDiaryDetail',
+    component: routeComponents.SpaceDiaryDetail,
+    meta: { requiresAuth: true, mobileTitle: '共同日记', mobileTab: 'memory' }
+  },
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: routeComponents.Notifications,
+    meta: { requiresAuth: true, mobileTitle: '通知', mobileTab: 'account' }
   },
   {
     path: '/profile',
@@ -137,6 +179,8 @@ export function preloadRouteComponent(path) {
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   const hasToken = !!localStorage.getItem('token')
+  const hashParams = new URLSearchParams((to.hash || '').replace(/^#/, ''))
+  const isPasswordReset = to.path === '/login' && (!!to.query.resetToken || hashParams.has('resetToken'))
 
   if (authStore.isLoggedIn && !hasToken) {
     authStore.clearAuth()
@@ -144,7 +188,7 @@ router.beforeEach((to, from, next) => {
   
   if (to.meta.requiresAuth && !hasToken) {
     next({ path: '/login', query: { redirect: to.fullPath } })
-  } else if ((to.path === '/login' || to.path === '/register') && hasToken) {
+  } else if ((to.path === '/login' || to.path === '/register') && hasToken && !isPasswordReset) {
     next('/')
   } else {
     next()

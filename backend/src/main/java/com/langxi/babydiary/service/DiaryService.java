@@ -187,10 +187,6 @@ public class DiaryService {
     @Transactional
     @CacheEvict(cacheNames = {CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE, CacheNames.DIARY_CALENDAR, CacheNames.PHOTOS}, allEntries = true)
     public void deleteDiary(Integer diaryId) {
-        List<String> imagePathList = diaryImageMapper.findImagePathsByDiaryId(diaryId);
-        for (String imagePath : imagePathList) {
-            imageStorageService.deleteAfterCommit(imagePath);
-        }
         diaryMapper.deleteDiary(diaryId);
     }
 

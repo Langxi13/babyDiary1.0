@@ -10,7 +10,7 @@ test('app provides Chinese locale for Element Plus date components', () => {
 })
 
 test('app refreshes authenticated user info on startup and foreground resume', () => {
-  assert.match(source, /import\s*\{\s*onBeforeUnmount,\s*onMounted\s*\}\s*from 'vue'/)
+  assert.match(source, /import\s*\{\s*onBeforeUnmount,\s*onMounted,\s*watch\s*\}\s*from 'vue'/)
   assert.match(source, /import\s*\{\s*useAuthStore\s*\}\s*from '@\/stores\/auth'/)
   assert.match(source, /const authStore = useAuthStore\(\)/)
   assert.match(source, /const refreshUserInfo = \(\) => \{[\s\S]*?authStore\.getUserInfo\(\)/)

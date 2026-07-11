@@ -6,6 +6,7 @@
     <resultMap id="tagResultMap" type="Tag">
         <id property="tagId" column="tag_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
         <result property="name" column="name"/>
         <result property="color" column="color"/>
         <result property="createdAt" column="created_at"/>
@@ -47,8 +48,26 @@
         SELECT * FROM tag WHERE user_id = #{userId} AND tag_id = #{tagId}
     </select>
 
+    <select id="findTagsBySpaceId" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE space_id = #{spaceId} ORDER BY name ASC
+    </select>
+
+    <select id="findTagBySpaceAndName" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE space_id = #{spaceId} AND name = #{name}
+    </select>
+
+    <select id="findTagBySpaceAndId" resultMap="tagResultMap">
+        SELECT * FROM tag WHERE space_id = #{spaceId} AND tag_id = #{tagId}
+    </select>
+
     <insert id="insertTag" parameterType="Tag" useGeneratedKeys="true" keyProperty="tagId">
-        INSERT INTO tag (user_id, name, color) VALUES (#{userId}, #{name}, #{color})
+        INSERT INTO tag (user_id, space_id, name, color)
+        VALUES (#{userId},
+                <choose>
+                    <when test="spaceId != null">#{spaceId}</when>
+                    <otherwise>(SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId})</otherwise>
+                </choose>,
+                #{name}, #{color})
     </insert>
 
     <delete id="deleteDiaryTagsByDiaryId">

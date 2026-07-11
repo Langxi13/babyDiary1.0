@@ -22,6 +22,7 @@ FRONTEND_TESTS=(
   src/views/diary/Timeline.test.js
   src/views/diary/DiaryForm.test.js
   src/views/diary/DiaryList.test.js
+  src/views/workspace/SpaceDiaryDetail.test.js
   src/stores/auth.test.js
   src/utils/dateDisplay.test.js
   src/utils/imageUrl.test.js
@@ -32,6 +33,7 @@ FRONTEND_TESTS=(
   src/utils/shareTargetFiles.test.js
   src/utils/aiReportPeriod.test.js
   src/utils/markdownReport.test.js
+  src/utils/offlineQueue.test.js
 )
 
 cd "$PROJECT_ROOT"

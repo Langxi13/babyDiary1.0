@@ -13,6 +13,10 @@ import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.security.CurrentUser;
 import com.langxi.babydiary.security.JwtTokenProvider;
 import com.langxi.babydiary.service.LoginService;
+import com.langxi.babydiary.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.time.Duration;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,9 +49,14 @@ public class AuthController {
     @Autowired
     private CurrentUser currentUser;
 
+    @Autowired
+    private RateLimitService rateLimitService;
+
     @PostMapping("/login")
     @Operation(summary = "用户登录", description = "通过用户名和密码登录，返回JWT Token")
-    public Result<LoginVO> login(@Valid @RequestBody LoginDTO loginDTO) {
+    public Result<LoginVO> login(@Valid @RequestBody LoginDTO loginDTO, HttpServletRequest request) {
+        rateLimitService.require("legacy-login",
+                rateLimitService.clientAddress(request) + ":" + loginDTO.getUsername(), 10, Duration.ofMinutes(15));
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword())
         );

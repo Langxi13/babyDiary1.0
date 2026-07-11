@@ -21,8 +21,8 @@ spring:
     password: ${DB_PASSWORD}
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 100MB
+      max-file-size: 256MB
+      max-request-size: 300MB
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -35,11 +35,42 @@ invitationCode: ${INVITATION_CODE}
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:2592000000}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 app:
+  auth:
+    refresh-days: ${AUTH_REFRESH_DAYS:30}
+    secure-cookie: ${AUTH_SECURE_COOKIE:true}
+    step-up-minutes: ${AUTH_STEP_UP_MINUTES:10}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:}
+    public-url: ${PUBLIC_URL:}
+  push:
+    vapid-public-key: ${VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:admin@example.com}
+  storage:
+    provider: ${OBJECT_STORAGE_PROVIDER:local}
+    local-root: ${DIARY_OBJECT_PATH:${user.dir}/data/objects/}
+    s3:
+      endpoint: ${S3_ENDPOINT:}
+      region: ${S3_REGION:us-east-1}
+      bucket: ${S3_BUCKET:baby-diary}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+  media:
+    processing-enabled: ${MEDIA_PROCESSING_ENABLED:true}
+    ffmpeg: ${FFMPEG_BIN:ffmpeg}
+    ffprobe: ${FFPROBE_BIN:ffprobe}
+    tesseract: ${TESSERACT_BIN:tesseract}
+  reminders:
+    delivery-delay-ms: ${REMINDER_DELIVERY_DELAY_MS:60000}
+  export:
+    pdf-font-path: ${PDF_FONT_PATH:/usr/share/fonts/truetype/unifont/unifont.ttf}
   cache:
     prefix: ${CACHE_PREFIX:baby-diary:prod:}
   http:
@@ -52,9 +83,10 @@ ai:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: ${SPRINGDOC_ENABLED:false}
   swagger-ui:
     path: /swagger-ui.html
-    enabled: true
+    enabled: ${SPRINGDOC_ENABLED:false}
 
 management:
   endpoints:

@@ -3,6 +3,7 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
+      TZ: Asia/Shanghai
       MYSQL_DATABASE: baby-diary
       MYSQL_USER: ${DB_USERNAME:-baby_diary}
       MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
@@ -10,6 +11,7 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
     ports:
       - "127.0.0.1:3306:3306"
     volumes:

@@ -1,17 +1,20 @@
 # Baby Diary
 
-Baby Diary 是一个面向伴侣和家庭的私有日记应用，提供富文本日记、图片、时间轴、日历、纪念日、相册、草稿以及 AI 周报/月报等功能。项目采用 Vue 3 + Vite 前端和 Spring Boot + MyBatis 后端，并支持安装为 PWA。
+Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目采用 Vue 3 + Vite 前端和 Spring Boot + MyBatis 后端，支持响应式 Web 与可安装 PWA，并围绕长期记录、共同回忆、隐私保护和数据可迁移性设计。
 
 ## 功能概览
 
-- 邀请码注册、JWT 登录和个人资料管理
-- 富文本日记、心情、标签、草稿和多图排序
-- 日记列表、详情、搜索、时间轴和日历
-- 纪念日封面、系统相册、自建相册和收藏相册
-- OpenAI 兼容接口配置、模型列表、AI 周报和月报
-- 图片压缩、缩略图、分页加载和 ZIP 导出
-- 桌面端与移动端响应式界面、PWA 安装和安卓分享目标
-- Redis 缓存、Flyway 迁移、Actuator 健康检查
+- 个人空间和共同空间、邀请加入、成员角色与空间设置
+- 日记创建、详情、版本历史、回收站、可见范围、日记锁和乐观锁冲突处理
+- 评论、Emoji 回应、站内通知、Web Push 和日记提醒
+- 富文本、心情、标签、草稿、模板、全文搜索、时间轴、日历和年度洞察
+- 纪念日、系统相册、自建相册、收藏相册和 AI 智能相册
+- OpenAI 兼容接口、模型列表、AI 周报/月报/年报和定时生成
+- 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
+- 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
+- 设备会话、短期访问令牌、30 天刷新会话、邮箱验证、密码找回和恢复码
+- 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
+- Redis 缓存、Flyway V1-V12 迁移、Actuator 健康检查和部署前治理脚本
 
 完整功能与接口说明见 [document/系统功能文档.md](document/系统功能文档.md) 和 [document/API接口文档.md](document/API接口文档.md)。
 
@@ -20,7 +23,7 @@ Baby Diary 是一个面向伴侣和家庭的私有日记应用，提供富文本
 - JDK 17
 - Maven 3.9+
 - Node.js 22 LTS 和 npm
-- MySQL 8.0+
+- MySQL 8.0+，Compose 默认使用 MySQL 8.4 LTS
 - Redis 7+
 - Docker Compose，可选但推荐用于本地基础设施
 
@@ -32,7 +35,7 @@ Baby Diary 是一个面向伴侣和家庭的私有日记应用，提供富文本
 cp .env.example .env
 ```
 
-编辑 `.env`，至少替换 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`INVITATION_CODE`、`JWT_SECRET` 和 `AI_CONFIG_ENCRYPTION_KEY`。可使用 `openssl rand -base64 48` 生成随机密钥。
+编辑 `.env`，至少替换 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`INVITATION_CODE`、`JWT_SECRET` 和 `AI_CONFIG_ENCRYPTION_KEY`。可使用 `openssl rand -base64 48` 生成随机密钥。邮件、Web Push、S3 和媒体处理工具均为可选配置，变量说明已写在模板中。
 
 2. 启动 MySQL 和 Redis：
 
@@ -56,7 +59,7 @@ npm --prefix frontend ci
 npm --prefix frontend run dev
 ```
 
-访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，Flyway 会自动创建和升级数据库结构。
+访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，Flyway 会自动创建和升级数据库结构。JDBC URL 必须保留 `connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true`，以固定 MySQL 会话为东八区并避免依赖命名时区表。
 
 ## 验证
 
@@ -73,7 +76,9 @@ npm --prefix frontend audit --audit-level=moderate
 
 ## 生产部署
 
-生产配置模板位于 `config/application-prod.yml`，所有数据库密码、邀请码、JWT 密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产配置模板位于 `config/application-prod.yml`，所有数据库密码、邀请码、JWT 密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署示例见 [document/部署文档.md](document/部署文档.md)。
+
+`DIARY_FILE_PATH` 只保存旧版兼容图片，`DIARY_OBJECT_PATH` 保存 V2 富媒体，两者必须是不同目录。V2 富媒体通过短时签名 URL 访问；旧版 `/images/**` 为兼容现有客户端仍可公开读取，因此文件名不可视为访问控制，建议新功能统一使用 V2 媒体接口。
 
 项目不会跟踪以下私有内容：
 

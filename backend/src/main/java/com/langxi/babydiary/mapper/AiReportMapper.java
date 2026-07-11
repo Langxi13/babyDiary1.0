@@ -17,4 +17,13 @@ public interface AiReportMapper {
     int count(@Param("userId") Integer userId, @Param("type") String type);
 
     void delete(@Param("userId") Integer userId, @Param("reportId") Integer reportId);
+
+    List<AiReport> findSpacePage(@Param("spaceId") Long spaceId, @Param("type") String type,
+                                 @Param("limit") int limit, @Param("offset") long offset);
+
+    int countSpace(@Param("spaceId") Long spaceId, @Param("type") String type);
+
+    AiReport findSpaceReport(@Param("spaceId") Long spaceId, @Param("reportId") Integer reportId);
+
+    int existsSpacePeriod(@Param("spaceId") Long spaceId, @Param("type") String type, @Param("period") String period);
 }

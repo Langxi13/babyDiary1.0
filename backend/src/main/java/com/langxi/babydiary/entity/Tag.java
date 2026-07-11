@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 public class Tag {
     private Integer tagId;
     private Integer userId;
+    private Long spaceId;
     private String name;
     private String color;
     private Timestamp createdAt;

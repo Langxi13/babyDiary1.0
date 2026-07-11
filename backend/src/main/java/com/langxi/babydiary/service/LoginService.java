@@ -4,6 +4,7 @@ import com.langxi.babydiary.details.CustomUserDetails;
 import com.langxi.babydiary.common.ErrorCode;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.UserMapper;
+import com.langxi.babydiary.mapper.AccountSecurityMapper;
 import com.langxi.babydiary.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 
 @Service
 public class LoginService implements UserDetailsService {
@@ -35,6 +36,12 @@ public class LoginService implements UserDetailsService {
     private ImageStorageService imageStorageService;
 
     @Autowired
+    private SpaceService spaceService;
+
+    @Autowired
+    private AccountSecurityMapper accountSecurityMapper;
+
+    @Autowired
     public void setPasswordEncoder(@Lazy PasswordEncoder passwordEncoder) {
         this.passwordEncoder = passwordEncoder;
     }
@@ -45,15 +52,20 @@ public class LoginService implements UserDetailsService {
         if (user == null) {
             throw new UsernameNotFoundException("User not found");
         }
+        String role = user.getSystemRole() == null ? "USER" : user.getSystemRole();
+        List<SimpleGrantedAuthority> authorities = "ADMIN".equals(role)
+                ? List.of(new SimpleGrantedAuthority("ROLE_USER"), new SimpleGrantedAuthority("ROLE_ADMIN"))
+                : List.of(new SimpleGrantedAuthority("ROLE_USER"));
         return new CustomUserDetails(
                 user.getUserId(),
                 user.getUsername(),
                 user.getPassword(),
                 user.getTokenVersion(),
-                Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"))
+                authorities
         );
     }
 
+    @Transactional
     public void registerUser(String username, String password, String invitationCode) {
         String normalizedUsername = username == null ? "" : username.trim();
         User existingUser = userMapper.findByUsername(normalizedUsername);
@@ -68,6 +80,10 @@ public class LoginService implements UserDetailsService {
         user.setUsername(normalizedUsername);
         user.setPassword(passwordEncoder.encode(password));
         userMapper.insertUser(user);
+        if (userMapper.countUsers() == 1) {
+            userMapper.updateSystemRole(user.getUserId(), "ADMIN");
+        }
+        spaceService.ensurePersonalSpace(user.getUserId(), normalizedUsername);
     }
 
     public User findByUsername(String username) {
@@ -93,6 +109,8 @@ public class LoginService implements UserDetailsService {
         }
 
         userMapper.updatePasswordAndIncrementTokenVersion(userId, passwordEncoder.encode(newPassword));
+        accountSecurityMapper.revokeAllSessions(userId);
+        accountSecurityMapper.deleteAccountTokens(userId, "STEP_UP");
     }
 
     @Transactional

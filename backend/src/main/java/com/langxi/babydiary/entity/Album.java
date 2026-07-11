@@ -9,6 +9,7 @@ public class Album {
     private Integer albumId;
     private Integer groupId;
     private Integer userId;
+    private Long spaceId;
     private String name;
     private String description;
     private String type;

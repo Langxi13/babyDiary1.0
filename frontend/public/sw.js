@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-diary-shell-v10'
+const CACHE_NAME = 'baby-diary-shell-v11'
 const SHELL_ASSETS = ['/', '/index.html', '/favicon.svg', '/app-icon.png', '/manifest.webmanifest']
 const SHARE_TARGET_PATH = '/share-target'
 const SHARE_TARGET_CACHE = 'baby-diary-share-target-v1'
@@ -122,4 +122,35 @@ self.addEventListener('fetch', event => {
         return Response.error()
       })
   )
+})
+
+self.addEventListener('push', event => {
+  let payload = { title: 'Baby Diary', body: '你有一条新通知', targetPath: '/notifications' }
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() }
+  } catch {
+    if (event.data) payload.body = event.data.text()
+  }
+  event.waitUntil(self.registration.showNotification(payload.title, {
+    body: payload.body,
+    icon: '/app-icon.png',
+    badge: '/app-icon.png',
+    tag: payload.targetPath || 'baby-diary-notification',
+    data: { targetPath: payload.targetPath || '/notifications' }
+  }))
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const targetPath = event.notification.data?.targetPath || '/notifications'
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const existing = windows.find(client => new URL(client.url).origin === self.location.origin)
+    if (existing) {
+      await existing.focus()
+      existing.navigate(targetPath)
+      return
+    }
+    await self.clients.openWindow(targetPath)
+  })())
 })

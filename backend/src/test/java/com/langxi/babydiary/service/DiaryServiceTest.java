@@ -192,12 +192,10 @@ class DiaryServiceTest {
     }
 
     @Test
-    void deleteDiaryContinuesWhenImageCleanupFails() {
-        when(diaryImageMapper.findImagePathsByDiaryId(12))
-                .thenReturn(Collections.singletonList("../escape.jpg"));
-
+    void deleteDiaryMovesEntryToTrashWithoutDeletingImages() {
         assertThatCode(() -> diaryService.deleteDiary(12)).doesNotThrowAnyException();
 
+        verify(diaryImageMapper, never()).findImagePathsByDiaryId(12);
         verify(diaryImageMapper, never()).deleteDiaryImageByDiaryId(12);
         verify(diaryMapper).deleteDiary(12);
     }

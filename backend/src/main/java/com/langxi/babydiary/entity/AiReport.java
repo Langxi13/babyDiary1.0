@@ -9,6 +9,8 @@ import java.sql.Timestamp;
 public class AiReport {
     private Integer reportId;
     private Integer userId;
+    private Long spaceId;
+    private String scope;
     private String type;
     private String period;
     private Date periodStart;

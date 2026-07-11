@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 public class AiReportVO {
     private Integer reportId;
     private Integer userId;
+    private String scope;
     private String type;
     private String period;
     private String periodStart;
@@ -23,6 +24,7 @@ public class AiReportVO {
         AiReportVO vo = new AiReportVO();
         vo.setReportId(report.getReportId());
         vo.setUserId(report.getUserId());
+        vo.setScope(report.getScope());
         vo.setType(report.getType());
         vo.setPeriod(report.getPeriod());
         vo.setPeriodStart(report.getPeriodStart() == null ? null : report.getPeriodStart().toString());

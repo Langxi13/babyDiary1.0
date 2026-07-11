@@ -20,18 +20,19 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         
-        if ("*".equals(allowedOrigins)) {
-            config.addAllowedOriginPattern("*");
-        } else {
-            Arrays.stream(allowedOrigins.split(","))
-                    .forEach(config::addAllowedOrigin);
+        if (Arrays.stream(allowedOrigins.split(",")).map(String::trim).anyMatch("*"::equals)) {
+            throw new IllegalStateException("cors.allowed-origins must list explicit origins when credentials are enabled");
         }
+        Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .forEach(config::addAllowedOrigin);
         
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
-        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition"));
+        config.setExposedHeaders(Arrays.asList("Authorization", "Content-Disposition", "ETag"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

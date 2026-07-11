@@ -53,6 +53,28 @@
             </el-button>
           </el-form>
         </div>
+
+        <div class="profile-panel account-security-panel">
+          <div class="security-heading">
+            <div><h2>账户安全</h2><p>邮箱验证、恢复码与登录设备</p></div>
+            <el-tag :type="authStore.userInfo?.emailVerified ? 'success' : 'info'">
+              {{ authStore.userInfo?.emailVerified ? '邮箱已验证' : '邮箱未验证' }}
+            </el-tag>
+          </div>
+          <div class="email-row">
+            <el-input v-model="email" type="email" placeholder="name@example.com" />
+            <el-button :loading="emailSaving" @click="saveEmail">保存邮箱</el-button>
+            <el-button @click="generateRecoveryCodes">生成恢复码</el-button>
+          </div>
+          <div class="session-list">
+            <article v-for="session in sessions" :key="session.publicId">
+              <el-icon><Monitor /></el-icon>
+              <div><strong>{{ session.deviceName }}</strong><span>{{ session.ipAddress }} · 最近使用 {{ formatChineseDateTime(session.lastSeenAt) }}</span></div>
+              <el-tag v-if="session.current" type="success" size="small">当前设备</el-tag>
+              <el-button v-else text type="danger" @click="revokeSession(session)">退出</el-button>
+            </article>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -60,6 +82,7 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElAvatar } from 'element-plus/es/components/avatar/index.mjs'
@@ -67,16 +90,19 @@ import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
+import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
-import { Lock, Upload } from '@element-plus/icons-vue'
+import { Lock, Monitor, Upload } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatChineseDate } from '@/utils/dateDisplay'
+import { formatChineseDateTime } from '@/utils/dateDisplay'
 import { originalImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
 import 'element-plus/es/components/input/style/css.mjs'
+import 'element-plus/es/components/tag/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
 import 'element-plus/es/components/upload/style/css.mjs'
 
@@ -85,6 +111,9 @@ const router = useRouter()
 const avatarUploading = ref(false)
 const passwordSaving = ref(false)
 const passwordFormRef = ref(null)
+const email = ref(authStore.userInfo?.email || '')
+const emailSaving = ref(false)
+const sessions = ref([])
 
 const passwordForm = reactive({
   oldPassword: '',
@@ -151,226 +180,55 @@ const submitPassword = async () => {
     passwordSaving.value = false
   }
 }
+
+const loadSessions = async () => {
+  const { authApi } = await import('@/api/auth')
+  const response = await authApi.getSessions()
+  sessions.value = response.data || []
+}
+
+const saveEmail = async () => {
+  if (!email.value.trim()) return
+  emailSaving.value = true
+  try {
+    const { authApi } = await import('@/api/auth')
+    const response = await authApi.updateEmail({ email: email.value.trim() })
+    ElMessage.success(response.message)
+    await authStore.getUserInfo({ force: true })
+  } finally { emailSaving.value = false }
+}
+
+const generateRecoveryCodes = async () => {
+  const { value } = await import('element-plus/es/components/message-box/index.mjs').then(({ ElMessageBox }) => ElMessageBox.prompt(
+    '恢复码只显示一次，请妥善保存。', '生成恢复码', { inputType: 'password', inputPlaceholder: '当前密码', confirmButtonText: '生成', cancelButtonText: '取消' }
+  ))
+  const { authApi } = await import('@/api/auth')
+  const response = await authApi.recoveryCodes(value)
+  await import('element-plus/es/components/message-box/index.mjs').then(({ ElMessageBox }) => ElMessageBox.alert(
+    response.data.join('\n'), '账户恢复码', { confirmButtonText: '我已保存', customClass: 'recovery-code-dialog' }
+  ))
+}
+
+const revokeSession = async session => {
+  const { authApi } = await import('@/api/auth')
+  await authApi.revokeSession(session.publicId)
+  await loadSessions()
+}
+
+onMounted(async () => {
+  const currentRoute = router.currentRoute.value
+  const hashToken = new URLSearchParams((currentRoute.hash || '').replace(/^#/, '')).get('verifyEmail')
+  const token = currentRoute.query.verifyEmail || hashToken
+  if (token) {
+    const { authApi } = await import('@/api/auth')
+    await authApi.confirmEmail(token)
+    ElMessage.success('邮箱验证成功')
+    await authStore.getUserInfo({ force: true })
+    router.replace('/profile')
+  }
+  email.value = authStore.userInfo?.email || ''
+  await loadSessions()
+})
 </script>
 
-<style scoped lang="scss">
-.page-shell {
-  min-height: 100vh;
-  background: #f6f3f0;
-}
-
-.profile-page {
-  max-width: 980px;
-}
-
-.page-title-row {
-  margin-bottom: 18px;
-
-  h1 {
-    line-height: 1.25;
-    font-size: 26px;
-    color: #2f2b28;
-  }
-
-  p {
-    margin-top: 6px;
-    line-height: 1.45;
-    color: #77706a;
-  }
-}
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.profile-panel {
-  min-width: 0;
-  background: #fff;
-  border: 1px solid #eadeda;
-  border-radius: 8px;
-  padding: 22px;
-
-  h2 {
-    margin-bottom: 18px;
-    color: #2f2b28;
-    font-size: 20px;
-    line-height: 1.3;
-  }
-}
-
-.avatar-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-
-  :deep(.el-upload) {
-    width: 100%;
-    max-width: 100%;
-  }
-}
-
-.avatar-upload-card {
-  width: 100%;
-
-  :deep(.el-upload-dragger) {
-    width: 100%;
-    padding: 0;
-    border: 1px dashed #d7b5aa;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #fff8f4;
-  }
-}
-
-.avatar-upload-trigger {
-  min-height: 108px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: #8a6259;
-  text-align: center;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-
-  .el-icon {
-    color: #b76d61;
-    font-size: 26px;
-  }
-
-  strong {
-    color: #5a4039;
-    font-size: 14px;
-  }
-
-  span {
-    font-size: 13px;
-  }
-
-  &.uploading {
-    opacity: 0.72;
-  }
-}
-
-.mobile-upload-copy {
-  display: none;
-}
-
-.profile-copy {
-  min-width: 0;
-  width: 100%;
-  overflow-wrap: anywhere;
-
-  h2 {
-    margin-bottom: 4px;
-    line-height: 1.25;
-  }
-
-  span {
-    color: #8a817b;
-    font-size: 13px;
-    line-height: 1.45;
-  }
-}
-
-.password-form {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
-
-  :deep(.el-form-item) {
-    margin-bottom: 0;
-  }
-
-  :deep(.el-form-item__label) {
-    min-height: auto;
-    padding-bottom: 8px;
-    line-height: 1.35;
-  }
-
-  :deep(.el-input) {
-    width: 100%;
-    min-width: 0;
-  }
-
-  :deep(.el-button) {
-    width: fit-content;
-    max-width: 100%;
-    white-space: normal;
-  }
-}
-
-@media (max-width: 900px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-title-row {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .profile-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-
-  .profile-panel {
-    padding: 16px;
-    border-radius: 8px;
-  }
-
-  .avatar-panel {
-    display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-
-    :deep(.el-avatar) {
-      width: 72px !important;
-      height: 72px !important;
-      font-size: 24px;
-    }
-
-    .avatar-upload-card {
-      grid-column: 1 / -1;
-    }
-  }
-
-  .profile-copy {
-    width: 100%;
-  }
-
-  .password-form {
-    gap: 16px;
-
-    :deep(.el-button) {
-      width: 100%;
-    }
-  }
-
-  .avatar-upload-trigger {
-    min-height: 82px;
-    padding: 12px;
-  }
-
-  .desktop-upload-copy {
-    display: none;
-  }
-
-  .mobile-upload-copy {
-    display: block;
-  }
-}
-
-</style>
+<style src="./styles/Profile.scss" scoped lang="scss"></style>

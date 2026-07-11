@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -44,21 +45,25 @@ public class AiController {
     private CurrentUser currentUser;
 
     @GetMapping("/config")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<AiConfigVO> getConfig() {
         return Result.success(aiConfigService.getConfig());
     }
 
     @PutMapping("/config")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<AiConfigVO> saveConfig(@Valid @RequestBody AiConfigDTO dto) {
         return Result.success("AI配置已保存", aiConfigService.saveConfig(dto));
     }
 
     @PostMapping("/config/test")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<String> testConfig() {
         return Result.success("连接成功", aiConfigService.testConnection());
     }
 
     @GetMapping("/models")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<List<String>> listModels() {
         return Result.success(aiConfigService.listModels());
     }

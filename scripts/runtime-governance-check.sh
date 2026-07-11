@@ -8,7 +8,8 @@ SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 DB_APP_USER="${DB_APP_USER:-baby_diary_app}"
 SYSTEMD_SERVICE_FILE="${SYSTEMD_SERVICE_FILE:-/etc/systemd/system/diary-backend.service}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
-IMAGE_DIR="${IMAGE_DIR:-$PROJECT_ROOT/data/images}"
+IMAGE_DIR_OVERRIDE="${IMAGE_DIR:-}"
+OBJECT_DIR_OVERRIDE="${OBJECT_DIR:-}"
 NGINX_USER="${NGINX_USER:-www-data}"
 NGINX_GROUP="${NGINX_GROUP:-www-data}"
 CHECK_OS_USER="${CHECK_OS_USER:-true}"
@@ -43,6 +44,9 @@ echo "backend.env mode 600"
 set -a
 . "$BACKEND_ENV_FILE"
 set +a
+
+IMAGE_DIR="${IMAGE_DIR_OVERRIDE:-${DIARY_FILE_PATH:-$PROJECT_ROOT/data/images}}"
+OBJECT_DIR="${OBJECT_DIR_OVERRIDE:-${DIARY_OBJECT_PATH:-$PROJECT_ROOT/data/objects}}"
 
 if [ "${DB_USERNAME:-}" != "$DB_APP_USER" ]; then
   echo "DB_USERNAME should be $DB_APP_USER, got ${DB_USERNAME:-<empty>}" >&2
@@ -83,6 +87,13 @@ reject_placeholder_value JWT_SECRET
 reject_placeholder_value INVITATION_CODE
 reject_placeholder_value AI_CONFIG_ENCRYPTION_KEY
 
+if [[ "$DB_URL" != *"connectionTimeZone=%2B08:00"* ]] \
+  || [[ "$DB_URL" != *"forceConnectionTimeZoneToSession=true"* ]]; then
+  echo "DB_URL must force the MySQL session timezone to the encoded +08:00 offset" >&2
+  exit 1
+fi
+echo "database timezone configured"
+
 if [ "${#JWT_SECRET}" -lt 32 ]; then
   echo "JWT_SECRET should contain at least 32 characters" >&2
   exit 1
@@ -91,7 +102,7 @@ if [ "${#AI_CONFIG_ENCRYPTION_KEY}" -lt 32 ]; then
   echo "AI_CONFIG_ENCRYPTION_KEY should contain at least 32 characters" >&2
   exit 1
 fi
-if [ "$CORS_ALLOWED_ORIGINS" = "*" ]; then
+if tr ',' '\n' <<<"$CORS_ALLOWED_ORIGINS" | grep -Eq '^[[:space:]]*\*[[:space:]]*$'; then
   echo "CORS_ALLOWED_ORIGINS must not be '*' in production" >&2
   exit 1
 fi
@@ -119,6 +130,28 @@ if [ "$image_mode" != "2750" ] || [ "$data_mode" != "2750" ]; then
 fi
 echo "image directory readable by nginx group"
 
+if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
+  require_env_value DIARY_OBJECT_PATH
+  if [ ! -d "$OBJECT_DIR" ]; then
+    echo "missing private object directory $OBJECT_DIR" >&2
+    exit 1
+  fi
+  image_path="$(readlink -m "$IMAGE_DIR")"
+  object_path="$(readlink -m "$OBJECT_DIR")"
+  case "$object_path/" in
+    "$image_path/"*)
+      echo "DIARY_OBJECT_PATH must not be inside DIARY_FILE_PATH" >&2
+      exit 1
+      ;;
+  esac
+  object_mode="$(stat -c '%a' "$OBJECT_DIR")"
+  if [ "$object_mode" != "700" ]; then
+    echo "private object directory mode should be 700, got $object_mode" >&2
+    exit 1
+  fi
+  echo "private object directory isolated"
+fi
+
 if [ "$CHECK_OS_USER" = "true" ]; then
   id "$SERVICE_USER" >/dev/null
   if command -v runuser >/dev/null 2>&1; then
@@ -126,6 +159,13 @@ if [ "$CHECK_OS_USER" = "true" ]; then
     id "$NGINX_USER" >/dev/null
     runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"
     runuser -u "$NGINX_USER" -- test -x "$IMAGE_DIR"
+    if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
+      runuser -u "$SERVICE_USER" -- test -w "$OBJECT_DIR"
+      if runuser -u "$NGINX_USER" -- test -r "$OBJECT_DIR"; then
+        echo "nginx user must not read the private object directory" >&2
+        exit 1
+      fi
+    fi
     first_image="$(find "$IMAGE_DIR" -maxdepth 1 -type f | head -n 1 || true)"
     if [ -n "$first_image" ]; then
       runuser -u "$NGINX_USER" -- test -r "$first_image"

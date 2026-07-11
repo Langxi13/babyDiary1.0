@@ -5,6 +5,8 @@ import test from 'node:test'
 const loginSource = readFileSync(new URL('./Login.vue', import.meta.url), 'utf8')
 const registerSource = readFileSync(new URL('./Register.vue', import.meta.url), 'utf8')
 const styleSource = readFileSync(new URL('./styles/Auth.scss', import.meta.url), 'utf8')
+const authApiSource = readFileSync(new URL('../../api/auth.js', import.meta.url), 'utf8')
+const routerSource = readFileSync(new URL('../../router/index.js', import.meta.url), 'utf8')
 
 test('login and registration share the same compact mobile authentication layout', () => {
   assert.match(loginSource, /styles\/Auth\.scss/)
@@ -26,4 +28,15 @@ test('authentication pages use the app icon without decorative gradient backgrou
   assert.match(loginSource, /src="\/app-icon\.png"/)
   assert.match(registerSource, /src="\/app-icon\.png"/)
   assert.doesNotMatch(styleSource, /linear-gradient/)
+})
+
+test('login exposes email and recovery-code password reset flows', () => {
+  assert.match(loginSource, /忘记密码或使用恢复码/)
+  assert.match(loginSource, /resetToken/)
+  assert.match(loginSource, /route\.hash/)
+  assert.match(loginSource, /requestPasswordReset/)
+  assert.match(loginSource, /recoverPassword/)
+  assert.match(authApiSource, /\/api\/v2\/auth\/password\/reset-request/)
+  assert.match(authApiSource, /\/api\/v2\/auth\/password\/recover/)
+  assert.match(routerSource, /isPasswordReset/)
 })

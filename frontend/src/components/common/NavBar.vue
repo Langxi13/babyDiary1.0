@@ -21,6 +21,10 @@
             <el-icon><Document /></el-icon>
             日记
           </el-menu-item>
+          <el-menu-item index="/spaces" @mouseenter="preload('/spaces')">
+            <el-icon><Connection /></el-icon>
+            空间
+          </el-menu-item>
           <el-menu-item index="/timeline" @mouseenter="preload('/timeline')">
             <el-icon><Clock /></el-icon>
             时间轴
@@ -53,6 +57,7 @@
       </div>
       
       <div class="navbar-user">
+        <space-switcher compact />
         <el-dropdown trigger="click" @command="handleCommand">
           <div class="user-info">
             <el-avatar :size="36" :src="avatarUrl">
@@ -85,6 +90,7 @@
             <el-dropdown-menu>
               <el-dropdown-item command="/">首页</el-dropdown-item>
               <el-dropdown-item command="/diaries">日记</el-dropdown-item>
+              <el-dropdown-item command="/spaces">共同空间</el-dropdown-item>
               <el-dropdown-item command="/timeline">时间轴</el-dropdown-item>
               <el-dropdown-item command="/calendar">日历</el-dropdown-item>
               <el-dropdown-item command="/anniversaries">纪念日</el-dropdown-item>
@@ -112,10 +118,11 @@ import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus/es/components/dropdown/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElMenu, ElMenuItem } from 'element-plus/es/components/menu/index.mjs'
-import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick } from '@element-plus/icons-vue'
+import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { preloadRouteComponent } from '@/router'
 import { originalImageUrl } from '@/utils/imageUrl'
+import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/dropdown/style/css.mjs'
@@ -132,6 +139,7 @@ const activeMenu = computed(() => {
   if (route.path === '/ai-reports') return '/ai-reports'
   if (route.path.startsWith('/diaries')) return '/diaries'
   if (route.path.startsWith('/album')) return '/album'
+  if (route.path.startsWith('/spaces')) return '/spaces'
   return route.path
 })
 const username = computed(() => authStore.username)
@@ -166,7 +174,7 @@ const handleCommand = (command) => {
   padding: 0 clamp(20px, 3vw, 36px);
   height: 60px;
   display: grid;
-  grid-template-columns: minmax(160px, 180px) minmax(0, 1fr) minmax(160px, 180px);
+  grid-template-columns: minmax(160px, 180px) minmax(0, 1fr) minmax(300px, 360px);
   align-items: center;
   column-gap: 28px;
 }
@@ -210,6 +218,9 @@ const handleCommand = (command) => {
 .navbar-user {
   flex-shrink: 0;
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 
   .user-info {
     display: flex;

@@ -61,6 +61,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    try {
+      const { authApi } = await import('@/api/auth')
+      await authApi.logout()
+    } catch {
+      // Local logout still proceeds when the server cannot be reached.
+    }
     clearAuth()
     router.push('/login')
   }
@@ -120,6 +126,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   if (typeof window !== 'undefined') {
     window.addEventListener('auth:expired', clearAuth)
+    window.addEventListener('auth:refreshed', event => {
+      token.value = event.detail?.token || localStorage.getItem('token') || ''
+      userInfo.value = event.detail?.userInfo || readUserInfo()
+      lastUserInfoFetchAt = Date.now()
+    })
   }
 
   return {

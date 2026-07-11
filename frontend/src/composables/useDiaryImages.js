@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { originalImageUrl } from '@/utils/imageUrl'
 import { consumeSharedImageFiles, isShareTargetEntryRoute, toSharedUploadItem } from '@/utils/shareTargetFiles'
+import { copyText } from '@/utils/copyText'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
@@ -34,14 +35,7 @@ export function useDiaryImages({ route, router, isEdit }) {
 
   const copyBrowserUploadUrl = async () => {
     try {
-      let copied = false
-      if (selectAndroidUploadUrl()) {
-        copied = document.execCommand('copy')
-      }
-      if (!copied && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(browserUploadUrl.value)
-        copied = true
-      }
+      const copied = await copyText(browserUploadUrl.value, selectAndroidUploadUrl())
       if (!copied) throw new Error('copy command returned false')
       ElMessage.success('链接已复制')
     } catch {

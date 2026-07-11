@@ -5,21 +5,29 @@
 <mapper namespace="com.langxi.babydiary.mapper.DiaryMapper">
     <resultMap id="diaryResultMap" type="Diary">
         <id property="diaryId" column="diary_id"/>
+        <result property="publicId" column="public_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
         <result property="title" column="title"/>
         <result property="date" column="date"/>
         <result property="content" column="content"/>
         <result property="moodKey" column="mood_key"/>
         <result property="contentFormat" column="content_format"/>
+        <result property="visibility" column="visibility"/>
+        <result property="locked" column="locked"/>
+        <result property="version" column="version"/>
         <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
     </resultMap>
 
     <insert id="insertDiary" parameterType="Diary" useGeneratedKeys="true" keyProperty="diaryId">
-        INSERT INTO diary (user_id, title, date, content, mood_key, content_format, created_at)
-        VALUES (#{userId}, #{title}, #{date}, #{content}, #{moodKey}, #{contentFormat}, NOW())
+        INSERT INTO diary (public_id, user_id, space_id, title, date, content, mood_key, content_format, visibility, locked, version, created_at)
+        VALUES (UUID(), #{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
+                #{title}, #{date}, #{content}, #{moodKey}, #{contentFormat}, 'PRIVATE', 0, 1, NOW())
     </insert>
     <select id="findDiaryById" resultMap="diaryResultMap">
-        SELECT * FROM diary WHERE diary_id = #{diaryId}
+        SELECT * FROM diary WHERE diary_id = #{diaryId} AND deleted_at IS NULL AND locked = 0
     </select>
     <update id="updateDiary" parameterType="Diary">
         UPDATE diary
@@ -27,16 +35,20 @@
             date = #{date},
             content = #{content},
             mood_key = #{moodKey},
-            content_format = #{contentFormat}
-        WHERE diary_id = #{diaryId}
+            content_format = #{contentFormat},
+            version = version + 1
+        WHERE diary_id = #{diaryId} AND deleted_at IS NULL AND locked = 0
     </update>
     <delete id="deleteDiary" parameterType="int">
-        DELETE FROM diary WHERE diary_id = #{diaryId}
+        UPDATE diary SET deleted_at = NOW(), version = version + 1
+        WHERE diary_id = #{diaryId} AND deleted_at IS NULL AND locked = 0
     </delete>
 
     <select id="findDiariesPageByDateRange" resultMap="diaryResultMap">
         SELECT * FROM diary
         WHERE user_id = #{userId}
+        AND deleted_at IS NULL
+        AND locked = 0
         AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
         <if test="moodKey != null and moodKey != ''">
             AND mood_key = #{moodKey}
@@ -59,6 +71,8 @@
                created_at
         FROM diary
         WHERE user_id = #{userId}
+        AND deleted_at IS NULL
+        AND locked = 0
         AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
         <if test="moodKey != null and moodKey != ''">
             AND mood_key = #{moodKey}
@@ -73,6 +87,8 @@
     <select id="countDiariesByDateRange" resultType="int">
         SELECT COUNT(*) FROM diary
         WHERE user_id = #{userId}
+        AND deleted_at IS NULL
+        AND locked = 0
         AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d')
         <if test="moodKey != null and moodKey != ''">
             AND mood_key = #{moodKey}
@@ -85,6 +101,8 @@
     <select id="findDiariesPageByDateRangeAndKeyword" resultMap="diaryResultMap">
         SELECT * FROM diary
         WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND locked = 0
           AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
           (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
         <if test="moodKey != null and moodKey != ''">
@@ -108,6 +126,8 @@
                created_at
         FROM diary
         WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND locked = 0
           AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
           (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
         <if test="moodKey != null and moodKey != ''">
@@ -123,6 +143,8 @@
     <select id="countDiariesByDateRangeAndKeyword" resultType="int">
         SELECT COUNT(*) FROM diary
         WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND locked = 0
           AND date BETWEEN STR_TO_DATE(#{startDate},'%Y-%m-%d') AND STR_TO_DATE(#{endDate},'%Y-%m-%d') and
           (title LIKE CONCAT('%', #{searchKeyword}, '%') OR content LIKE CONCAT('%', #{searchKeyword}, '%'))
         <if test="moodKey != null and moodKey != ''">
@@ -144,6 +166,8 @@
                created_at
         FROM diary
         WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND locked = 0
         <if test="startDate != null and startDate != ''">
             AND date &gt;= #{startDate}
         </if>
@@ -162,7 +186,19 @@
     <select id="findDiariesForReport" resultMap="diaryResultMap">
         SELECT * FROM diary
         WHERE user_id = #{userId}
+          AND deleted_at IS NULL
+          AND locked = 0
           AND date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY date ASC, created_at ASC
+    </select>
+
+    <select id="findDiariesForSpaceReport" resultMap="diaryResultMap">
+        SELECT * FROM diary
+        WHERE space_id = #{spaceId}
+          AND deleted_at IS NULL
+          AND locked = 0
+          AND date BETWEEN #{startDate} AND #{endDate}
+          AND (visibility = 'SHARED' OR (#{personalSpace} = true AND user_id = #{userId}))
         ORDER BY date ASC, created_at ASC
     </select>
 
@@ -173,6 +209,8 @@
                SUBSTRING_INDEX(GROUP_CONCAT(d.title ORDER BY d.created_at ASC SEPARATOR '||'), '||', 1) AS firstTitle
         FROM diary d
         WHERE d.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
           AND d.date &gt;= #{startDate}
           AND d.date &lt;= #{endDate}
         GROUP BY d.date

@@ -12,7 +12,9 @@
 
       <div class="topbar-title">
         <strong>{{ title }}</strong>
-        <span>Baby Diary</span>
+        <button type="button" class="topbar-space" @click="router.push('/spaces')">
+          {{ workspaceStore.activeSpace?.name || 'Baby Diary' }}
+        </button>
       </div>
 
       <button type="button" class="topbar-icon" aria-label="更多" :aria-expanded="secondarySheetOpen" @click="secondarySheetOpen = true">
@@ -123,7 +125,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Calendar,
+  Bell,
   Clock,
+  Connection,
   Close,
   Document,
   Download,
@@ -141,6 +145,7 @@ import {
 import NavBar from '@/components/common/NavBar.vue'
 import { preloadRouteComponent } from '@/router'
 import { useAuthStore } from '@/stores/auth'
+import { useWorkspaceStore } from '@/stores/workspace'
 import {
   MOBILE_PRIMARY_TABS,
   MOBILE_SECONDARY_LINKS,
@@ -153,6 +158,7 @@ import 'element-plus/es/components/icon/style/css.mjs'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
 const secondarySheetOpen = ref(false)
 const installSheetOpen = ref(false)
 const deferredInstallPrompt = ref(null)
@@ -166,6 +172,8 @@ const iconMap = {
   User
 }
 const secondaryIconMap = {
+  Connection,
+  Bell,
   Picture,
   Clock,
   Calendar,
@@ -230,6 +238,7 @@ const openInstall = async () => {
 }
 
 onMounted(() => {
+  workspaceStore.initialize()
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('keydown', handleKeydown)
   window.visualViewport?.addEventListener('resize', updateKeyboardState)

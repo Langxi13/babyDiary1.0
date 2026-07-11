@@ -6,6 +6,7 @@
     <resultMap id="draftResultMap" type="DiaryDraft">
         <id property="draftId" column="draft_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
         <result property="draftKey" column="draft_key"/>
         <result property="diaryId" column="diary_id"/>
         <result property="title" column="title"/>
@@ -18,29 +19,37 @@
     </resultMap>
 
     <select id="findDraftsByUserId" resultMap="draftResultMap">
-        SELECT draft_id,
-               user_id,
-               draft_key,
-               diary_id,
-               title,
-               date,
-               LEFT(content, 512) AS content,
-               content_format,
-               mood_key,
-               tag_ids,
-               updated_at
-        FROM diary_draft
-        WHERE user_id = #{userId}
-        ORDER BY updated_at DESC
+        SELECT dd.draft_id,
+               dd.user_id,
+               dd.space_id,
+               dd.draft_key,
+               dd.diary_id,
+               dd.title,
+               dd.date,
+               LEFT(dd.content, 512) AS content,
+               dd.content_format,
+               dd.mood_key,
+               dd.tag_ids,
+               dd.updated_at
+        FROM diary_draft dd
+        LEFT JOIN diary d ON d.diary_id = dd.diary_id
+        WHERE dd.user_id = #{userId}
+          AND (dd.diary_id IS NULL OR (d.deleted_at IS NULL AND d.locked = 0))
+        ORDER BY dd.updated_at DESC
     </select>
 
     <select id="findByDraftKey" resultMap="draftResultMap">
-        SELECT * FROM diary_draft WHERE user_id = #{userId} AND draft_key = #{draftKey}
+        SELECT dd.*
+        FROM diary_draft dd
+        LEFT JOIN diary d ON d.diary_id = dd.diary_id
+        WHERE dd.user_id = #{userId} AND dd.draft_key = #{draftKey}
+          AND (dd.diary_id IS NULL OR (d.deleted_at IS NULL AND d.locked = 0))
     </select>
 
     <insert id="upsertDraft" parameterType="DiaryDraft">
-        INSERT INTO diary_draft (user_id, draft_key, diary_id, title, date, content, content_format, mood_key, tag_ids)
-        VALUES (#{userId}, #{draftKey}, #{diaryId}, #{title}, #{date}, #{content}, #{contentFormat}, #{moodKey}, #{tagIds})
+        INSERT INTO diary_draft (user_id, space_id, draft_key, diary_id, title, date, content, content_format, mood_key, tag_ids)
+        VALUES (#{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
+                #{draftKey}, #{diaryId}, #{title}, #{date}, #{content}, #{contentFormat}, #{moodKey}, #{tagIds})
         ON DUPLICATE KEY UPDATE
           diary_id = VALUES(diary_id),
           title = VALUES(title),

@@ -34,6 +34,8 @@
         INNER JOIN diary d ON d.diary_id = i.diary_id
         LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
         WHERE d.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
         <if test="startDate != null and startDate != ''">
             AND d.date &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
         </if>
@@ -74,6 +76,8 @@
         FROM diary_image i
         INNER JOIN diary d ON d.diary_id = i.diary_id
         WHERE d.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
         ORDER BY YEAR(d.date) DESC
     </select>
 
@@ -83,6 +87,8 @@
         INNER JOIN diary d ON d.diary_id = i.diary_id
         LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
         WHERE d.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
         <if test="startDate != null and startDate != ''">
             AND d.date &gt;= STR_TO_DATE(#{startDate}, '%Y-%m-%d')
         </if>
@@ -111,6 +117,8 @@
         INNER JOIN diary d ON d.diary_id = i.diary_id
         LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
         WHERE d.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
         <choose>
             <when test="imageIds != null and imageIds.size() > 0">
                 AND i.image_id IN
@@ -140,6 +148,8 @@
         INNER JOIN diary d ON d.diary_id = i.diary_id
         LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
         WHERE d.user_id = #{userId} AND i.image_id = #{imageId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
     </select>
 
     <insert id="insertFavorite">

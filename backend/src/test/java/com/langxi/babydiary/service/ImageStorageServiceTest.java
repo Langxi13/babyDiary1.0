@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -17,6 +18,10 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class ImageStorageServiceTest {
 
@@ -51,6 +56,21 @@ class ImageStorageServiceTest {
         assertThatThrownBy(() -> service.storeImage(forged, "diary_3_", true))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getCode()).isEqualTo(ErrorCode.FILE_TYPE_NOT_ALLOWED.getCode()));
+    }
+
+    @Test
+    void rejectsOversizedLegacyImagesBeforeReadingThemIntoMemory() throws Exception {
+        ImageStorageService service = new ImageStorageService(uploadDir.toString());
+        MultipartFile oversized = mock(MultipartFile.class);
+        when(oversized.isEmpty()).thenReturn(false);
+        when(oversized.getContentType()).thenReturn("image/jpeg");
+        when(oversized.getSize()).thenReturn(10L * 1024 * 1024 + 1);
+
+        assertThatThrownBy(() -> service.storeImage(oversized, "diary_3_", true))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.FILE_SIZE_EXCEEDED.getCode()));
+
+        verify(oversized, never()).getBytes();
     }
 
     @Test

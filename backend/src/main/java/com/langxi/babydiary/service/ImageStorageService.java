@@ -25,6 +25,8 @@ import java.util.UUID;
 @Service
 public class ImageStorageService {
 
+    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+
     private static final Map<String, String> EXTENSIONS_BY_CONTENT_TYPE = Map.of(
             "image/jpeg", ".jpg",
             "image/jpg", ".jpg",
@@ -63,6 +65,30 @@ public class ImageStorageService {
             throw e;
         }
 
+        registerRollbackCleanup(fileName);
+        return fileName;
+    }
+
+    public String storeImageBytes(byte[] bytes, String contentType, String prefix, boolean createThumbnail) throws IOException {
+        String normalizedType = normalizeContentType(contentType);
+        if (bytes != null && bytes.length > MAX_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED, "单张图片不能超过10MB");
+        }
+        if (!EXTENSIONS_BY_CONTENT_TYPE.containsKey(normalizedType)
+                || bytes == null || !hasExpectedSignature(bytes, normalizedType)) {
+            throw new BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "导入文件不是受支持的图片");
+        }
+        String fileName = safePrefix(prefix) + UUID.randomUUID().toString().replace("-", "")
+                + extensionFor(normalizedType);
+        Path path = resolveImagePath(fileName);
+        try {
+            Files.createDirectories(path.getParent());
+            Files.write(path, bytes, StandardOpenOption.CREATE_NEW);
+            if (createThumbnail) ThumbnailGenerator.createThumbnail(uploadRoot(), fileName);
+        } catch (IOException | RuntimeException exception) {
+            deleteQuietly(fileName);
+            throw exception;
+        }
         registerRollbackCleanup(fileName);
         return fileName;
     }
@@ -113,6 +139,9 @@ public class ImageStorageService {
         String contentType = normalizeContentType(file.getContentType());
         if (!EXTENSIONS_BY_CONTENT_TYPE.containsKey(contentType)) {
             throw new BusinessException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "仅支持 JPEG、PNG、GIF 和 WebP 图片");
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED, "单张图片不能超过10MB");
         }
         byte[] bytes = file.getBytes();
         if (!hasExpectedSignature(bytes, contentType)) {

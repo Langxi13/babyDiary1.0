@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 public class AiAlbumProposal {
     private Integer proposalId;
     private Integer userId;
+    private Long spaceId;
     private String status;
     private Date startDate;
     private Date endDate;

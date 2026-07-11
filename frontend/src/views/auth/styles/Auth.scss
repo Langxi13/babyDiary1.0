@@ -87,6 +87,71 @@
   font-weight: 700;
 }
 
+.auth-help-row {
+  margin-top: -7px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-link-button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #247d73;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.recovery-panel {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+}
+
+.recovery-copy {
+  margin: 0;
+  color: #6f7a76;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.recovery-field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+
+  > span {
+    color: #4d5854;
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+
+  :deep(.el-input) {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.recovery-tabs {
+  :deep(.el-tabs__header) {
+    margin-bottom: 18px;
+  }
+}
+
+.recovery-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+
+  :deep(.el-button + .el-button) {
+    margin-left: 0;
+  }
+}
+
 .auth-footer {
   color: #7d8783;
   font-size: 14px;
@@ -139,6 +204,16 @@
 
     :deep(.el-input__inner) {
       font-size: 16px;
+    }
+  }
+
+  .recovery-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    :deep(.el-button) {
+      width: 100%;
+      margin: 0;
     }
   }
 }

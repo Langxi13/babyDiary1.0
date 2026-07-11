@@ -162,7 +162,7 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="AI 配置" name="config">
+        <el-tab-pane v-if="isAdmin" label="AI 配置" name="config">
           <section class="config-shell">
             <el-form label-position="top" class="config-form">
               <div class="panel config-card">
@@ -228,6 +228,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDatePicker } from 'element-plus/es/components/date-picker/index.mjs'
@@ -246,6 +247,7 @@ import { aiApi } from '@/api/ai'
 import { formatLocalDate, formatMonthlyPeriod, formatWeeklyPeriod } from '@/utils/aiReportPeriod'
 import { formatChineseDateRange, formatChineseDateTime, formatChineseReportPeriod } from '@/utils/dateDisplay'
 import { renderMarkdownReport } from '@/utils/markdownReport'
+import { copyText } from '@/utils/copyText'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
@@ -263,6 +265,8 @@ import 'element-plus/es/components/switch/style/css.mjs'
 import 'element-plus/es/components/tabs/style/css.mjs'
 
 const activeTab = ref('generate')
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.userInfo?.systemRole === 'ADMIN')
 const generating = ref(false)
 const savingConfig = ref(false)
 const testingConfig = ref(false)
@@ -463,12 +467,12 @@ const deleteReport = async (reportId) => {
 }
 
 const copyReport = async (content) => {
-  await navigator.clipboard.writeText(content || '')
-  ElMessage.success('已复制')
+  if (await copyText(content || '')) ElMessage.success('已复制')
+  else ElMessage.warning('复制失败，请手动选择内容')
 }
 
 onMounted(async () => {
-  await Promise.allSettled([loadConfig(), resetReports()])
+  await Promise.allSettled([isAdmin.value ? loadConfig() : Promise.resolve(), resetReports()])
 })
 
 onBeforeUnmount(stopGenerationTimer)

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const source = readFileSync(new URL('./Profile.vue', import.meta.url), 'utf8')
+const source = [
+  readFileSync(new URL('./Profile.vue', import.meta.url), 'utf8'),
+  readFileSync(new URL('./styles/Profile.scss', import.meta.url), 'utf8')
+].join('\n')
 
 test('profile joined date uses Chinese date display helper', () => {
   assert.match(source, /import\s*\{\s*formatChineseDate\s*\}/)

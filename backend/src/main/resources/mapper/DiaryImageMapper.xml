@@ -63,6 +63,8 @@
                  INNER JOIN user as u
                             ON d.user_id = u.user_id AND i.diary_id = d.diary_id
         WHERE u.user_id = #{userId}
+          AND d.deleted_at IS NULL
+          AND d.locked = 0
           AND d.date BETWEEN STR_TO_DATE(#{startDate}, '%Y-%m-%d') AND STR_TO_DATE(#{endDate}, '%Y-%m-%d');
     </select>
 

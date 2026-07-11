@@ -19,6 +19,12 @@ public interface TagMapper {
 
     Tag findTagById(@Param("userId") Integer userId, @Param("tagId") Integer tagId);
 
+    List<Tag> findTagsBySpaceId(@Param("spaceId") Long spaceId);
+
+    Tag findTagBySpaceAndName(@Param("spaceId") Long spaceId, @Param("name") String name);
+
+    Tag findTagBySpaceAndId(@Param("spaceId") Long spaceId, @Param("tagId") Integer tagId);
+
     void insertTag(Tag tag);
 
     void deleteDiaryTagsByDiaryId(@Param("diaryId") Integer diaryId);

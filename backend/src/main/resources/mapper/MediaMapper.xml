@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.MediaMapper">
+    <resultMap id="mediaResultMap" type="MediaAsset">
+        <id property="assetId" column="asset_id"/>
+        <result property="diaryId" column="diary_id"/>
+        <result property="publicId" column="public_id"/>
+        <result property="spaceId" column="space_id"/>
+        <result property="ownerUserId" column="owner_user_id"/>
+        <result property="mediaType" column="media_type"/>
+        <result property="originalFilename" column="original_filename"/>
+        <result property="storageProvider" column="storage_provider"/>
+        <result property="storageKey" column="storage_key"/>
+        <result property="thumbnailKey" column="thumbnail_key"/>
+        <result property="posterKey" column="poster_key"/>
+        <result property="waveformKey" column="waveform_key"/>
+        <result property="transcodedKey" column="transcoded_key"/>
+        <result property="contentType" column="content_type"/>
+        <result property="sizeBytes" column="size_bytes"/>
+        <result property="durationSeconds" column="duration_seconds"/>
+        <result property="width" column="width"/>
+        <result property="height" column="height"/>
+        <result property="caption" column="caption"/>
+        <result property="ocrText" column="ocr_text"/>
+        <result property="takenAt" column="taken_at"/>
+        <result property="locationName" column="location_name"/>
+        <result property="latitude" column="latitude"/>
+        <result property="longitude" column="longitude"/>
+        <result property="status" column="status"/>
+        <result property="processingError" column="processing_error"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+        <result property="sort" column="sort"/>
+    </resultMap>
+
+    <insert id="insertAsset" parameterType="MediaAsset" useGeneratedKeys="true" keyProperty="assetId">
+        INSERT INTO media_asset(public_id,space_id,owner_user_id,media_type,original_filename,storage_provider,
+                                storage_key,content_type,size_bytes,caption,taken_at,location_name,latitude,longitude,status)
+        VALUES(#{publicId},#{spaceId},#{ownerUserId},#{mediaType},#{originalFilename},#{storageProvider},
+               #{storageKey},#{contentType},#{sizeBytes},#{caption},#{takenAt},#{locationName},#{latitude},#{longitude},#{status})
+    </insert>
+
+    <insert id="attachToDiary">
+        INSERT INTO diary_media(diary_id,asset_id,sort) VALUES(#{diaryId},#{assetId},#{sort})
+    </insert>
+
+    <select id="nextDiarySort" resultType="int">
+        SELECT COALESCE(MAX(sort),-1)+1 FROM diary_media WHERE diary_id=#{diaryId}
+    </select>
+
+    <select id="findByPublicId" resultMap="mediaResultMap">
+        SELECT * FROM media_asset WHERE public_id=#{publicId} AND deleted_at IS NULL
+    </select>
+
+    <select id="findByIdForUpdate" resultMap="mediaResultMap">
+        SELECT * FROM media_asset WHERE asset_id=#{assetId} FOR UPDATE
+    </select>
+
+    <select id="findByDiaryId" resultMap="mediaResultMap">
+        SELECT dm.diary_id,a.*,dm.sort
+        FROM diary_media dm INNER JOIN media_asset a ON a.asset_id=dm.asset_id
+        WHERE dm.diary_id=#{diaryId} AND a.deleted_at IS NULL
+        ORDER BY dm.sort, a.asset_id
+    </select>
+
+    <select id="findByDiaryIds" resultMap="mediaResultMap">
+        SELECT dm.diary_id,a.*,dm.sort
+        FROM diary_media dm INNER JOIN media_asset a ON a.asset_id=dm.asset_id
+        WHERE dm.diary_id IN
+        <foreach collection="diaryIds" item="diaryId" open="(" separator="," close=")">
+            #{diaryId}
+        </foreach>
+          AND a.deleted_at IS NULL
+        ORDER BY dm.diary_id,dm.sort,a.asset_id
+    </select>
+
+    <select id="countAccessibleSharedLinks" resultType="int">
+        SELECT COUNT(*)
+        FROM diary_media dm INNER JOIN diary d ON d.diary_id=dm.diary_id
+        WHERE dm.asset_id=#{assetId} AND d.deleted_at IS NULL AND d.visibility='SHARED' AND d.locked=0
+    </select>
+
+    <select id="countLockedLinks" resultType="int">
+        SELECT COUNT(*)
+        FROM diary_media dm INNER JOIN diary d ON d.diary_id=dm.diary_id
+        WHERE dm.asset_id=#{assetId} AND d.deleted_at IS NULL AND d.locked=1
+    </select>
+
+    <select id="countDiaryLinks" resultType="int">
+        SELECT COUNT(*) FROM diary_media WHERE asset_id=#{assetId}
+    </select>
+
+    <select id="findPending" resultMap="mediaResultMap">
+        SELECT * FROM media_asset WHERE status='PROCESSING' AND deleted_at IS NULL ORDER BY created_at LIMIT #{limit}
+    </select>
+
+    <update id="updateProcessing" parameterType="MediaAsset">
+        UPDATE media_asset SET status=#{status},thumbnail_key=#{thumbnailKey},poster_key=#{posterKey},
+            waveform_key=#{waveformKey},transcoded_key=#{transcodedKey},duration_seconds=#{durationSeconds},
+            width=#{width},height=#{height},ocr_text=#{ocrText},processing_error=#{processingError}
+        WHERE asset_id=#{assetId} AND deleted_at IS NULL
+    </update>
+
+    <update id="updateMetadata">
+        UPDATE media_asset SET caption=#{caption},location_name=#{locationName},latitude=#{latitude},longitude=#{longitude}
+        WHERE asset_id=#{assetId} AND deleted_at IS NULL
+    </update>
+
+    <select id="findUsedBytesForUpdate" resultType="long">
+        SELECT used_bytes FROM space_storage_usage WHERE space_id=#{spaceId} FOR UPDATE
+    </select>
+
+    <select id="findQuotaBytes" resultType="long">
+        SELECT storage_quota_bytes FROM diary_space WHERE space_id=#{spaceId}
+    </select>
+
+    <update id="addUsedBytes">
+        UPDATE space_storage_usage SET used_bytes=GREATEST(0,used_bytes+#{delta}) WHERE space_id=#{spaceId}
+    </update>
+
+    <update id="softDelete">
+        UPDATE media_asset SET deleted_at=NOW() WHERE asset_id=#{assetId} AND deleted_at IS NULL
+    </update>
+</mapper>

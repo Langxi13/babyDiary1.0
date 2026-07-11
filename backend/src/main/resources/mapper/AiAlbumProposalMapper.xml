@@ -6,6 +6,7 @@
     <resultMap id="proposalResultMap" type="AiAlbumProposal">
         <id property="proposalId" column="proposal_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
         <result property="status" column="status"/>
         <result property="startDate" column="start_date"/>
         <result property="endDate" column="end_date"/>
@@ -17,8 +18,9 @@
     </resultMap>
 
     <insert id="insert" parameterType="AiAlbumProposal" useGeneratedKeys="true" keyProperty="proposalId">
-        INSERT INTO ai_album_proposal (user_id, status, start_date, end_date, prompt, content_json, model)
-        VALUES (#{userId}, #{status}, #{startDate}, #{endDate}, #{prompt}, #{contentJson}, #{model})
+        INSERT INTO ai_album_proposal (user_id, space_id, status, start_date, end_date, prompt, content_json, model)
+        VALUES (#{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
+                #{status}, #{startDate}, #{endDate}, #{prompt}, #{contentJson}, #{model})
     </insert>
 
     <select id="findById" resultMap="proposalResultMap">

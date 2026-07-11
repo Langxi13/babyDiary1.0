@@ -6,6 +6,7 @@
     <resultMap id="anniversaryResultMap" type="Anniversary">
         <id property="anniversaryId" column="anniversary_id"/>
         <result property="userId" column="user_id"/>
+        <result property="spaceId" column="space_id"/>
         <result property="title" column="title"/>
         <result property="date" column="date"/>
         <result property="description" column="description"/>
@@ -24,8 +25,9 @@
     </select>
 
     <insert id="insertAnniversary" parameterType="Anniversary" useGeneratedKeys="true" keyProperty="anniversaryId">
-        INSERT INTO anniversary (user_id, title, date, description, cover_image_path, sort)
-        VALUES (#{userId}, #{title}, #{date}, #{description}, #{coverImagePath}, #{sort})
+        INSERT INTO anniversary (user_id, space_id, title, date, description, cover_image_path, sort)
+        VALUES (#{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
+                #{title}, #{date}, #{description}, #{coverImagePath}, #{sort})
     </insert>
 
     <update id="updateAnniversary" parameterType="Anniversary">

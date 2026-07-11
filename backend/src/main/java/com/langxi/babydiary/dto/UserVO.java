@@ -15,6 +15,18 @@ public class UserVO {
     @Schema(description = "用户名")
     private String username;
 
+    @Schema(description = "已验证邮箱")
+    private String email;
+
+    @Schema(description = "邮箱是否已验证")
+    private Boolean emailVerified;
+
+    @Schema(description = "系统角色")
+    private String systemRole;
+
+    @Schema(description = "用户时区")
+    private String timezone;
+
     @Schema(description = "头像路径")
     private String avatarPath;
 
@@ -25,6 +37,10 @@ public class UserVO {
         UserVO vo = new UserVO();
         vo.setUserId(user.getUserId());
         vo.setUsername(user.getUsername());
+        vo.setEmail(user.getEmail());
+        vo.setEmailVerified(user.getEmailVerified());
+        vo.setSystemRole(user.getSystemRole());
+        vo.setTimezone(user.getTimezone());
         vo.setAvatarPath(user.getAvatarPath());
         vo.setCreatedAt(user.getCreatedAt());
         return vo;

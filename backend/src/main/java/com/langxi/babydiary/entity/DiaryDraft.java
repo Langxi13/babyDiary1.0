@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 public class DiaryDraft {
     private Integer draftId;
     private Integer userId;
+    private Long spaceId;
     private String draftKey;
     private Integer diaryId;
     private String title;
