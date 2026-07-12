@@ -19,6 +19,7 @@ export default async function globalSetup() {
   const api = await request.newContext({ baseURL: apiBaseURL })
   const username = 'e2e_user'
   const password = 'e2e_password_123'
+  const secondUsername = 'e2e_user_b'
 
   await expectSuccess(await api.post('/api/auth/register', {
     data: {
@@ -36,6 +37,15 @@ export default async function globalSetup() {
   const token = login.data.token
   const userInfo = login.data.userInfo
   const authorization = { Authorization: `Bearer ${token}` }
+
+  await expectSuccess(await api.post('/api/auth/register', {
+    data: {
+      username: secondUsername,
+      password,
+      confirmPassword: password,
+      invitationCode: 'e2e-invitation-code'
+    }
+  }), 'second account registration')
 
   await expectSuccess(await api.put('/api/ai/config', {
     headers: authorization,
@@ -75,6 +85,7 @@ export default async function globalSetup() {
   await writeFile(path.join(authDirectory, 'user.json'), JSON.stringify(browserState, null, 2))
   await writeFile(path.join(authDirectory, 'context.json'), JSON.stringify({
     username,
+    secondUsername,
     spaceId,
     diaryId: diary.data.publicId,
     legacyDiaryId: diary.data.diaryId

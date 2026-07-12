@@ -1,9 +1,9 @@
 <template>
   <el-config-provider :locale="zhCn">
-    <mobile-app-shell v-if="route.meta.requiresAuth">
+    <mobile-app-shell v-if="route.meta.requiresAuth && authStore.isLoggedIn" :key="authStore.sessionVersion">
       <router-view />
     </mobile-app-shell>
-    <router-view v-else />
+    <router-view v-else-if="!route.meta.requiresAuth" />
   </el-config-provider>
 </template>
 
@@ -23,7 +23,7 @@ let syncTimer = null
 
 const startWorkspaceSync = () => {
   if (!authStore.isLoggedIn || syncTimer) return
-  workspaceStore.initialize()
+  workspaceStore.initialize().catch(() => {})
   syncTimer = window.setInterval(() => workspaceStore.syncActive().catch(() => {}), 60000)
 }
 

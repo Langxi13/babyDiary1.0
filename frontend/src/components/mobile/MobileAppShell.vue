@@ -238,7 +238,7 @@ const openInstall = async () => {
 }
 
 onMounted(() => {
-  workspaceStore.initialize()
+  workspaceStore.initialize().catch(() => {})
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('keydown', handleKeydown)
   window.visualViewport?.addEventListener('resize', updateKeyboardState)

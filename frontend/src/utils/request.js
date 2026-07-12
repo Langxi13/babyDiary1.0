@@ -1,6 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import router from '@/router'
+import {
+  getClientSessionGeneration,
+  isClientSessionGenerationCurrent
+} from '@/utils/sessionScope'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -9,6 +13,49 @@ const request = axios.create({
 })
 
 let refreshPromise = null
+let refreshGeneration = null
+let refreshAbortController = null
+
+const staleSessionError = (config) => new axios.CanceledError('请求所属会话已结束', config)
+
+const isStaleSessionRequest = (config) => {
+  const generation = config?.__clientSessionGeneration
+  return generation !== undefined && !isClientSessionGenerationCurrent(generation)
+}
+
+const cancelRefreshRequest = () => {
+  refreshAbortController?.abort()
+  refreshAbortController = null
+  refreshPromise = null
+  refreshGeneration = null
+}
+
+const getRefreshRequest = () => {
+  const generation = getClientSessionGeneration()
+  if (!refreshPromise || refreshGeneration !== generation) {
+    cancelRefreshRequest()
+    const controller = new AbortController()
+    const pending = axios.post(
+      `${request.defaults.baseURL || ''}/api/v2/auth/refresh`,
+      null,
+      { withCredentials: true, timeout: 15000, signal: controller.signal }
+    ).finally(() => {
+      if (refreshPromise === pending) {
+        refreshPromise = null
+        refreshGeneration = null
+        refreshAbortController = null
+      }
+    })
+    refreshPromise = pending
+    refreshGeneration = generation
+    refreshAbortController = controller
+  }
+  return { generation, promise: refreshPromise }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:session-reset', cancelRefreshRequest)
+}
 
 const parseMessage = async (data, fallback = '服务器错误') => {
   if (data instanceof Blob) {
@@ -46,8 +93,9 @@ const redirectToLogin = () => {
 
 request.interceptors.request.use(
   config => {
+    config.__clientSessionGeneration = getClientSessionGeneration()
     const token = localStorage.getItem('token')
-    if (token) {
+    if (token && !config.headers.Authorization) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
     return config
@@ -59,6 +107,9 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   async response => {
+    if (isStaleSessionRequest(response.config)) {
+      return Promise.reject(staleSessionError(response.config))
+    }
     if (response.config.responseType === 'blob') {
       const contentType = response.headers?.['content-type'] || ''
       if (contentType.includes('json')) {
@@ -76,10 +127,16 @@ request.interceptors.response.use(
     return Promise.reject(new Error(data.message || '请求失败'))
   },
   async error => {
+    if (axios.isCancel(error) || isStaleSessionRequest(error.config)) {
+      return Promise.reject(axios.isCancel(error) ? error : staleSessionError(error.config))
+    }
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
         const originalRequest = error.config || {}
+        if (originalRequest.__skipAuthRecovery) {
+          return Promise.reject(error)
+        }
         const isRefreshRequest = originalRequest.url?.includes('/api/v2/auth/refresh')
         const isPublicAuthRequest = /\/api\/v2\/auth\/(login|password|email\/confirm)/.test(originalRequest.url || '')
         const isPublicShareRequest = originalRequest.url?.includes('/api/v2/public/shares/')
@@ -90,20 +147,15 @@ request.interceptors.response.use(
         if (!originalRequest.__retried && !isRefreshRequest && !isPublicAuthRequest && localStorage.getItem('token')) {
           originalRequest.__retried = true
           try {
-            if (!refreshPromise) {
-              refreshPromise = axios.post(
-                `${request.defaults.baseURL || ''}/api/v2/auth/refresh`,
-                null,
-                { withCredentials: true, timeout: 15000 }
-              ).finally(() => {
-                refreshPromise = null
-              })
+            const refreshRequest = getRefreshRequest()
+            const refreshResponse = await refreshRequest.promise
+            if (!isClientSessionGenerationCurrent(refreshRequest.generation)) {
+              return Promise.reject(staleSessionError(originalRequest))
             }
-            const refreshResponse = await refreshPromise
             const payload = refreshResponse.data
             if (payload?.code === 200 && payload.data?.token) {
-              localStorage.setItem('token', payload.data.token)
               localStorage.setItem('userInfo', JSON.stringify(payload.data.userInfo || null))
+              localStorage.setItem('token', payload.data.token)
               window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: payload.data }))
               originalRequest.headers = originalRequest.headers || {}
               originalRequest.headers.Authorization = `Bearer ${payload.data.token}`
@@ -112,6 +164,9 @@ request.interceptors.response.use(
           } catch {
             // The shared expiry path below clears stale local credentials.
           }
+        }
+        if (isStaleSessionRequest(originalRequest)) {
+          return Promise.reject(staleSessionError(originalRequest))
         }
         ElMessage.error('登录已过期，请重新登录')
         localStorage.removeItem('token')

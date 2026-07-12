@@ -16,3 +16,17 @@ test('an obsolete user info response cannot restore a cleared or replaced sessio
   assert.match(source, /response\.code === 200 && token\.value === requestedToken/)
   assert.doesNotMatch(source, /console\.error\('获取用户信息失败/)
 })
+
+test('login and logout establish an immediate client session boundary', () => {
+  assert.match(source, /import\s*\{\s*resetClientSession\s*\}\s*from '@\/utils\/sessionBoundary'/)
+  assert.match(source, /resetClientSession\('login'\)[\s\S]*?localStorage\.setItem\('token'/)
+  assert.match(source, /function clearAuth\([\s\S]*?resetClientSession\(reason\)/)
+  assert.match(source, /const accessToken = token\.value[\s\S]*?clearAuth\('logout'\)[\s\S]*?router\.replace\('\/login'\)[\s\S]*?await authApi\.logout\(accessToken\)/)
+  assert.match(source, /if \(logoutRequest\) await logoutRequest/)
+})
+
+test('cross-tab account changes reset protected state and remount the session shell', () => {
+  assert.match(source, /window\.addEventListener\('storage', syncAuthFromStorage\)/)
+  assert.match(source, /const accountChanged = userIdentity\(userInfo\.value\) !== userIdentity\(storedUser\)/)
+  assert.match(source, /sessionVersion\.value = resetClientSession\('storage'\)/)
+})

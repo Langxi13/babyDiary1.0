@@ -19,3 +19,8 @@ test('app refreshes authenticated user info on startup and foreground resume', (
   assert.match(source, /onMounted\(\(\) => \{[\s\S]*?refreshUserInfo\(\)/)
   assert.match(source, /onBeforeUnmount\(\(\) => \{[\s\S]*?document\.removeEventListener\('visibilitychange', refreshUserInfo\)/)
 })
+
+test('protected page content is hidden as soon as the local session is cleared', () => {
+  assert.match(source, /<mobile-app-shell v-if="route\.meta\.requiresAuth && authStore\.isLoggedIn" :key="authStore\.sessionVersion">/)
+  assert.match(source, /<router-view v-else-if="!route\.meta\.requiresAuth"/)
+})

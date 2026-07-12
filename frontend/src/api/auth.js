@@ -9,8 +9,12 @@ export const authApi = {
     return request.post('/api/auth/register', data)
   },
 
-  logout() {
-    return request.post('/api/v2/auth/logout')
+  logout(accessToken) {
+    return request.post('/api/v2/auth/logout', null, {
+      __skipAuthRecovery: true,
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      timeout: 10000
+    })
   },
 
   getUserInfo() {

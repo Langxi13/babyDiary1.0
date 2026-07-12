@@ -2,6 +2,8 @@
 
 ## 2026-07-12
 
+- Isolated frontend API caches by account and added a client session generation boundary so logout or account switching immediately clears protected state and rejects stale responses or refresh results.
+- Added cross-tab authentication synchronization, current-account-only offline queue counts, Pinia reset guards, and a two-account Chromium/Firefox/WebKit regression for anniversary privacy.
 - Replaced the SPA fallback health false-positive with an exact Nginx proxy to the loopback Actuator endpoint, and made release checks require a top-level `status=UP` JSON response.
 - Added a systemd `PrivateTmp` deployment drop-in, host `/tmp` permission governance, and shared-system-directory guards so media permission setup cannot alter `/tmp` or other top-level runtime directories.
 - Moved Nginx validation ahead of backend shutdown and added script regressions for deployment ordering, Actuator `DOWN`, private temporary directories, and unsafe media roots.

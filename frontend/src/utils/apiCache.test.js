@@ -3,6 +3,16 @@ import assert from 'node:assert/strict'
 
 import { cachedRequest, clearApiCache, invalidateApiCache } from './apiCache.js'
 
+const memoryStorage = () => {
+  const values = new Map()
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key),
+    clear: () => values.clear()
+  }
+}
+
 test('cachedRequest deduplicates concurrent requests with the same key', async () => {
   clearApiCache()
   let calls = 0
@@ -86,4 +96,32 @@ test('an older request finishing does not remove the newer in-flight request', a
   resolveFresh('fresh')
   assert.equal(await deduplicated, 'fresh')
   assert.equal(calls, 2)
+})
+
+test('the same API cache key is isolated between authenticated accounts', async (t) => {
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  const storage = memoryStorage()
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+  t.after(() => {
+    clearApiCache()
+    if (previousStorage) Object.defineProperty(globalThis, 'localStorage', previousStorage)
+    else delete globalThis.localStorage
+  })
+
+  clearApiCache()
+  let calls = 0
+  storage.setItem('userInfo', JSON.stringify({ userId: 101, username: 'account-a' }))
+  const accountA = await cachedRequest('anniversaries:list', async () => ({ owner: 'A', calls: ++calls }))
+
+  storage.setItem('userInfo', JSON.stringify({ userId: 202, username: 'account-b' }))
+  const accountB = await cachedRequest('anniversaries:list', async () => ({ owner: 'B', calls: ++calls }))
+
+  storage.setItem('userInfo', JSON.stringify({ userId: 101, username: 'account-a' }))
+  const accountAAgain = await cachedRequest('anniversaries:list', async () => {
+    throw new Error('account A should reuse only its own cached value')
+  })
+
+  assert.deepEqual(accountA, { owner: 'A', calls: 1 })
+  assert.deepEqual(accountB, { owner: 'B', calls: 2 })
+  assert.strictEqual(accountAAgain, accountA)
 })

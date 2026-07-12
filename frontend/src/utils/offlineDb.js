@@ -120,8 +120,15 @@ function transactionDone(transaction) {
   })
 }
 
-export async function pendingOfflineCount() {
-  return readStore(OPERATIONS, target => target.count(), 0)
+export async function pendingOfflineCount(spaceIds) {
+  if (!Array.isArray(spaceIds)) {
+    return readStore(OPERATIONS, target => target.count(), 0)
+  }
+  if (!spaceIds.length) return 0
+
+  const allowedSpaces = new Set(spaceIds)
+  const values = await readStore(OPERATIONS, target => target.getAll(), [])
+  return values.filter(value => allowedSpaces.has(value.spaceId)).length
 }
 
 export async function setOfflineMeta(key, value) {

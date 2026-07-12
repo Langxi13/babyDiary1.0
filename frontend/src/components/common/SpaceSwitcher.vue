@@ -51,7 +51,7 @@ const handleCommand = command => {
   }
 }
 
-onMounted(() => workspaceStore.initialize())
+onMounted(() => workspaceStore.initialize().catch(() => {}))
 </script>
 
 <style scoped lang="scss">
