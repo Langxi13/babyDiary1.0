@@ -75,7 +75,9 @@ scripts/verify-e2e.sh
 scripts/security-scan.sh
 ```
 
-打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。
+`security-scan.sh` 会先获取远端公开分支、标签、Notes 和 PR refs，检查当前非忽略文件、提交/标签元数据与全部可达 Git 历史中的未批准域名、邮箱、IP、主机路径、个人标识和敏感文件名，再执行依赖、配置和凭据扫描。图片、文档、归档和音视频等不可可靠文本扫描的资产必须经过人工检查，并记录在 `config/public-asset-allowlist.sha256`。允许公开的示例及依赖主机集中维护在 `config/privacy-host-allowlist.txt`，不得将生产地址加入该列表。
+
+打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。开源发布基线与审查证据见 [开源隐私审查记录](document/开源隐私审查记录.md)。
 
 ## 生产部署
 
@@ -85,8 +87,8 @@ scripts/security-scan.sh
 
 项目不会跟踪以下私有内容：
 
-- `.env`、`*.env` 和本地覆盖配置
-- `data/images/` 中的用户图片
+- `.env`、`.env.*`、`*.env` 和本地覆盖配置
+- `data/images/` 和 `data/objects/` 中的用户媒体
 - `backups/`、`logs/` 和构建产物
 - `.private/` 中的本机运维记录
 

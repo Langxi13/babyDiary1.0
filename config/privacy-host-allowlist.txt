@@ -1,0 +1,22 @@
+# Hosts that are intentionally public in source, tests, or documentation.
+# Shell globs are supported. Keep this list narrow and review every addition.
+localhost
+127.0.0.1
+0.0.0.0
+backend
+example.com
+*.example.com
+api.openai.com
+github.com
+ghcr.io
+maven.apache.org
+mybatis.org
+opencollective.com
+opensource.org
+paulmillr.com
+purl.org
+registry.npmjs.org
+registry.npmmirror.com
+tidelift.com
+www.idpf.org
+www.w3.org

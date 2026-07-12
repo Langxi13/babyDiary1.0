@@ -19,6 +19,16 @@ Before committing, verify that the change does not contain:
 
 Use `example.com`, localhost addresses, generic usernames, and clearly marked placeholders in examples.
 
+Run the disclosure gate before committing:
+
+```bash
+scripts/privacy-scan.sh
+```
+
+The scan covers non-ignored working-tree files, commit/tag metadata, and every commit reachable from local refs. `scripts/security-scan.sh` first fetches public branch, tag, note, and pull-request refs from `origin`. Add a host to `config/privacy-host-allowlist.txt` only when it is a deliberate public dependency or RFC example; production, personal, and self-hosted domains must remain outside the repository.
+
+New or changed images, documents, archives, fonts, audio, or video require a visual/metadata privacy review. Add the reviewed SHA-256 and path to `config/public-asset-allowlist.sha256`, and keep old entries when a previously published asset is replaced so historical versions remain auditable.
+
 ## Tests
 
 ```bash

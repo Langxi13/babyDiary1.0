@@ -1,0 +1,8 @@
+# Visually reviewed public assets. Keep historical hashes when replacing a file.
+a811d3bf99add4080f2839af6d2b605c6800c51ca03d863c0e3fa03b08b0f40d  frontend/public/favicon.svg
+5bb4004e25e258dcdadb5b2d00533c66e443b2d89849de330e8597f471072130  frontend/public/app-icon.png
+39c8436c90487058761a406b6b7c5d0314d6d01a7455d543a5613ed8a88e8402  frontend/e2e/visual.spec.js-snapshots/album-desktop-chromium-linux.png
+717030bbf655158ed2fd8388051dd9bc6772bb05ba8732aec01cb8fff4ead5ee  frontend/e2e/visual.spec.js-snapshots/diaries-desktop-chromium-linux.png
+1f040e9884bde4f44de77fb421a5753efc16d4b0dd69c408488f2c104efcd086  frontend/e2e/visual.spec.js-snapshots/diaries-mobile-chromium-linux.png
+0cf452f41d8e31a97c6f2a599e5a41a778662a4be69325a8449c6658a69022c9  frontend/e2e/visual.spec.js-snapshots/home-desktop-chromium-linux.png
+98e5e6ea25521832344a1865e98d3f3563a81a1ccbb61869f65f9c50d7efe54a  frontend/e2e/visual.spec.js-snapshots/home-mobile-chromium-linux.png

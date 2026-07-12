@@ -33,3 +33,14 @@ Include the affected component, reproduction steps, expected impact, and any sug
 ## Sensitive Data
 
 Database rows, object storage, legacy images, exports, backups, AI prompts, email tokens, refresh cookies, recovery codes, and VAPID/S3/SMTP credentials all contain or protect private data. Encrypt backups at rest, restrict filesystem permissions, and avoid sending real diary content to an AI provider without the users' informed consent.
+
+## Public Repository Guardrails
+
+- `scripts/privacy-scan.sh` checks current non-ignored files, commit/tag metadata, and all reachable Git history for unapproved domains, email addresses, IP addresses, server paths, phone/identity patterns, and sensitive filenames.
+- `scripts/fetch-public-refs.sh` fetches public branches, tags, notes, and GitHub pull-request refs before a release scan so deleted source branches cannot hide still-public commits.
+- `scripts/security-scan.sh` runs that disclosure check plus Trivy and Gitleaks scans of both the current source snapshot and complete reachable history.
+- GitHub Secret Scanning and Push Protection remain enabled on the public repository as an additional server-side control.
+- Findings print only the category and source location; detected values are not repeated into public CI logs.
+- Non-text assets must match a visually reviewed current or historical checksum in `config/public-asset-allowlist.sha256`; unknown or changed images, documents, archives, fonts, audio, and video fail the gate.
+- Public examples and dependency hosts are narrowly listed in `config/privacy-host-allowlist.txt`. Never add a production, personal, or self-hosted address to bypass a finding.
+- Treat a committed secret as compromised even if a later commit deletes it: rotate it first, then remove it from history and invalidate cached artifacts or releases.

@@ -8,6 +8,8 @@
 - Added a systemd `PrivateTmp` deployment drop-in, host `/tmp` permission governance, and shared-system-directory guards so media permission setup cannot alter `/tmp` or other top-level runtime directories.
 - Moved Nginx validation ahead of backend shutdown and added script regressions for deployment ordering, Actuator `DOWN`, private temporary directories, and unsafe media roots.
 - Replaced mutable GitHub Action tags with verified full commit SHAs, upgraded Trivy Action to the safe v0.36.0 release, and forced the development-only `glob` chain to patched v13.0.6.
+- Added a redacting open-source privacy gate for current files, Git metadata, and all public branch/tag/note/PR refs, covering private hosts, email and IP addresses, server paths, personal identifiers, sensitive filenames, and full-history Gitleaks scans.
+- Added checksum enforcement for visually reviewed public images and other non-text assets, including every historical version reachable through public refs.
 
 ## 2026-07-11
 
