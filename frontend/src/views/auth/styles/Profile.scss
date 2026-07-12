@@ -34,6 +34,105 @@
   grid-column: 1 / -1;
 }
 
+.invitation-admin-panel {
+  grid-column: 1 / -1;
+}
+
+.invitation-heading {
+  margin-bottom: 20px;
+}
+
+.invitation-heading-copy {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+
+  > div {
+    min-width: 0;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: #6f6661;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+}
+
+.invitation-heading-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #d9c4a5;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff9ea;
+  color: #8a642c;
+  font-size: 20px;
+}
+
+.invitation-title-line {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.invitation-code-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+
+  > .el-button {
+    margin: 0;
+  }
+}
+
+.invitation-code-input {
+  min-width: 0;
+
+  :deep(.el-input__wrapper) {
+    min-height: 42px;
+    padding-left: 13px;
+  }
+
+  :deep(.el-input__inner) {
+    min-width: 0;
+    color: #403a36;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+}
+
+.invitation-visibility-button {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  color: #6f6661;
+}
+
+.invitation-meta {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px 16px;
+  color: #756a65;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .security-heading {
   display: flex;
   align-items: flex-start;
@@ -241,6 +340,22 @@
   .email-row :deep(.el-button) { width: 100%; margin: 0; }
   .session-list article { grid-template-columns: 34px minmax(0, 1fr) auto; padding: 8px; }
 
+  .invitation-heading {
+    margin-bottom: 16px;
+  }
+
+  .invitation-code-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    .invitation-code-input {
+      grid-column: 1 / -1;
+    }
+
+    > .el-button {
+      width: 100%;
+    }
+  }
+
   .avatar-panel {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
@@ -281,5 +396,29 @@
 
   .mobile-upload-copy {
     display: block;
+  }
+}
+
+@media (max-width: 420px) {
+  .invitation-heading-copy {
+    gap: 10px;
+  }
+
+  .invitation-heading-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .invitation-code-controls {
+    grid-template-columns: 1fr;
+
+    .invitation-code-input {
+      grid-column: auto;
+    }
+  }
+
+  .invitation-meta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

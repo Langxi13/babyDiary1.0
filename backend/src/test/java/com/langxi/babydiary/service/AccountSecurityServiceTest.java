@@ -24,11 +24,12 @@ class AccountSecurityServiceTest {
     @Mock private UserMapper userMapper;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AccountMailService mailService;
+    @Mock private StepUpTokenVerifier stepUpTokenVerifier;
 
     @Test
     void passwordResetConsumesTheLockedTokenBeforeChangingTheAccount() {
         AccountSecurityService service = new AccountSecurityService(
-                securityMapper, userMapper, passwordEncoder, mailService);
+                securityMapper, userMapper, passwordEncoder, mailService, stepUpTokenVerifier);
         AccountToken token = token(4L, 2);
         String rawToken = "one-time-token";
         when(securityMapper.findValidAccountTokenForUpdate(
@@ -49,7 +50,7 @@ class AccountSecurityServiceTest {
     @Test
     void passwordResetStopsWhenTheOneTimeTokenCannotBeConsumed() {
         AccountSecurityService service = new AccountSecurityService(
-                securityMapper, userMapper, passwordEncoder, mailService);
+                securityMapper, userMapper, passwordEncoder, mailService, stepUpTokenVerifier);
         AccountToken token = token(4L, 2);
         String rawToken = "one-time-token";
         when(securityMapper.findValidAccountTokenForUpdate(

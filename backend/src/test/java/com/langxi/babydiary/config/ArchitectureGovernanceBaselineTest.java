@@ -76,18 +76,21 @@ class ArchitectureGovernanceBaselineTest {
         String productionConfig = read("../config/application-prod.yml");
         String jwtProvider = read("src/main/java/com/langxi/babydiary/security/JwtTokenProvider.java");
         String aiConfigCrypto = read("src/main/java/com/langxi/babydiary/service/AiConfigCrypto.java");
+        String invitationCodeCrypto = read("src/main/java/com/langxi/babydiary/service/InvitationCodeCrypto.java");
 
         assertThat(applicationConfig).contains("password: ${DB_PASSWORD}");
-        assertThat(applicationConfig).contains("invitationCode: ${INVITATION_CODE}");
+        assertThat(applicationConfig).contains("bootstrap-code: ${INVITATION_CODE:}");
+        assertThat(applicationConfig).contains("encryption-key: ${INVITATION_CODE_ENCRYPTION_KEY}");
         assertThat(applicationConfig).contains("secret: ${JWT_SECRET}");
         assertThat(applicationConfig).contains("encryption-key: ${AI_CONFIG_ENCRYPTION_KEY}");
         assertThat(applicationConfig).doesNotContain("${DB_PASSWORD:");
-        assertThat(applicationConfig).doesNotContain("${INVITATION_CODE:");
         assertThat(applicationConfig).doesNotContain("${JWT_SECRET:");
+        assertThat(applicationConfig).doesNotContain("${INVITATION_CODE_ENCRYPTION_KEY:");
         assertThat(applicationConfig).doesNotContain("${AI_CONFIG_ENCRYPTION_KEY:");
         assertThat(productionConfig).doesNotContain("/usr/local/");
         assertThat(jwtProvider).contains("@Value(\"${jwt.secret}\")");
         assertThat(aiConfigCrypto).contains("@Value(\"${ai.config.encryption-key}\")");
+        assertThat(invitationCodeCrypto).contains("@Value(\"${app.invitation.encryption-key}\")");
     }
 
     private String readAllJavaSources(Path root) throws Exception {

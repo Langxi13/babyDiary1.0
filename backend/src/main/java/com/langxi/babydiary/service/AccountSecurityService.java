@@ -26,6 +26,7 @@ public class AccountSecurityService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final AccountMailService mailService;
+    private final StepUpTokenVerifier stepUpTokenVerifier;
 
     @Value("${app.auth.step-up-minutes:10}")
     private int stepUpMinutes;
@@ -33,11 +34,13 @@ public class AccountSecurityService {
     public AccountSecurityService(AccountSecurityMapper securityMapper,
                                   UserMapper userMapper,
                                   PasswordEncoder passwordEncoder,
-                                  AccountMailService mailService) {
+                                  AccountMailService mailService,
+                                  StepUpTokenVerifier stepUpTokenVerifier) {
         this.securityMapper = securityMapper;
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
+        this.stepUpTokenVerifier = stepUpTokenVerifier;
     }
 
     @Transactional
@@ -54,13 +57,7 @@ public class AccountSecurityService {
     }
 
     public void requireStepUp(Integer userId, String rawToken) {
-        if (rawToken == null || rawToken.isBlank()) {
-            throw new BusinessException(ErrorCode.DIARY_LOCKED);
-        }
-        AccountToken token = securityMapper.findValidAccountToken(SecureTokens.sha256(rawToken), "STEP_UP");
-        if (token == null || !userId.equals(token.getUserId())) {
-            throw new BusinessException(ErrorCode.DIARY_LOCKED);
-        }
+        stepUpTokenVerifier.require(userId, rawToken);
     }
 
     @Transactional

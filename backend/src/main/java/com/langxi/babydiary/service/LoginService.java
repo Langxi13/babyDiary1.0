@@ -7,7 +7,6 @@ import com.langxi.babydiary.mapper.UserMapper;
 import com.langxi.babydiary.mapper.AccountSecurityMapper;
 import com.langxi.babydiary.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -29,8 +28,8 @@ public class LoginService implements UserDetailsService {
 
     private PasswordEncoder passwordEncoder;
 
-    @Value("${invitationCode}")
-    private String privateInvitationCode;
+    @Autowired
+    private InvitationCodeService invitationCodeService;
 
     @Autowired
     private ImageStorageService imageStorageService;
@@ -72,7 +71,7 @@ public class LoginService implements UserDetailsService {
         if (existingUser != null) {
             throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
         }
-        if (!isValidInvitationCode(invitationCode)) {
+        if (!invitationCodeService.matches(invitationCode)) {
             throw new BusinessException(ErrorCode.INVALID_INVITATION_CODE);
         }
 
@@ -88,10 +87,6 @@ public class LoginService implements UserDetailsService {
 
     public User findByUsername(String username) {
         return userMapper.findByUsername(username);
-    }
-
-    private boolean isValidInvitationCode(String invitationCode) {
-        return privateInvitationCode.equals(invitationCode);
     }
 
     @Transactional

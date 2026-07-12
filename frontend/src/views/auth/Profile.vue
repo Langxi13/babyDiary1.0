@@ -75,14 +75,71 @@
             </article>
           </div>
         </div>
+
+        <div v-if="isAdmin" class="profile-panel invitation-admin-panel">
+          <div class="invitation-heading">
+            <div class="invitation-heading-copy">
+              <span class="invitation-heading-icon" aria-hidden="true">
+                <el-icon><Key /></el-icon>
+              </span>
+              <div>
+                <div class="invitation-title-line">
+                  <h2>注册邀请码</h2>
+                  <el-tag size="small" effect="plain">仅管理员</el-tag>
+                </div>
+                <p>用于控制新账号注册，随机刷新后旧邀请码立即失效。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="invitation-code-controls">
+            <el-input
+              class="invitation-code-input"
+              :model-value="invitationCodeDisplay"
+              :placeholder="invitationLoading ? '正在读取邀请码...' : '点击查看按钮显示邀请码'"
+              readonly
+              aria-label="当前注册邀请码"
+            >
+              <template #prefix><el-icon><Key /></el-icon></template>
+              <template #suffix>
+                <el-button
+                  class="invitation-visibility-button"
+                  text
+                  circle
+                  :loading="invitationLoading"
+                  :title="invitationVisible ? '隐藏邀请码' : '查看邀请码'"
+                  :aria-label="invitationVisible ? '隐藏邀请码' : '查看邀请码'"
+                  @click="toggleInvitationVisibility"
+                >
+                  <el-icon v-if="!invitationLoading">
+                    <Hide v-if="invitationVisible" />
+                    <View v-else />
+                  </el-icon>
+                </el-button>
+              </template>
+            </el-input>
+            <el-button :loading="invitationLoading" @click="copyInvitationCode">
+              <el-icon><CopyDocument /></el-icon>
+              复制
+            </el-button>
+            <el-button type="danger" plain :loading="invitationRotating" @click="rotateInvitationCode">
+              <el-icon><RefreshRight /></el-icon>
+              随机刷新
+            </el-button>
+          </div>
+
+          <div class="invitation-meta">
+            <span>{{ invitationUpdatedLabel }}</span>
+            <span>明文显示后将在60秒内自动隐藏</span>
+          </div>
+        </div>
       </section>
     </main>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElAvatar } from 'element-plus/es/components/avatar/index.mjs'
@@ -92,11 +149,13 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
-import { Lock, Monitor, Upload } from '@element-plus/icons-vue'
+import { CopyDocument, Hide, Key, Lock, Monitor, RefreshRight, Upload, View } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
 import { originalImageUrl } from '@/utils/imageUrl'
+import { copyText } from '@/utils/copyText'
+import { getStepUpToken, requestStepUp, withStepUpRetry } from '@/utils/stepUp'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
@@ -114,6 +173,12 @@ const passwordFormRef = ref(null)
 const email = ref(authStore.userInfo?.email || '')
 const emailSaving = ref(false)
 const sessions = ref([])
+const invitationCode = ref('')
+const invitationVisible = ref(false)
+const invitationLoading = ref(false)
+const invitationRotating = ref(false)
+const invitationUpdatedAt = ref(null)
+let invitationMaskTimer = null
 
 const passwordForm = reactive({
   oldPassword: '',
@@ -145,6 +210,104 @@ const passwordRules = {
 const avatarUrl = computed(() => originalImageUrl(authStore.userInfo?.avatarPath))
 const usernameInitial = computed(() => authStore.username?.charAt(0)?.toUpperCase() || '')
 const joinedAt = computed(() => formatChineseDate(authStore.userInfo?.createdAt))
+const isAdmin = computed(() => authStore.userInfo?.systemRole === 'ADMIN')
+const invitationCodeDisplay = computed(() => {
+  if (!invitationCode.value) return ''
+  return invitationVisible.value ? invitationCode.value : '********************************'
+})
+const invitationUpdatedLabel = computed(() => invitationUpdatedAt.value
+  ? `最近刷新：${formatChineseDateTime(invitationUpdatedAt.value)}`
+  : '尚未读取邀请码')
+
+const clearInvitationTimer = () => {
+  if (invitationMaskTimer) {
+    window.clearTimeout(invitationMaskTimer)
+    invitationMaskTimer = null
+  }
+}
+
+const clearInvitationCode = () => {
+  clearInvitationTimer()
+  invitationCode.value = ''
+  invitationVisible.value = false
+}
+
+const scheduleInvitationMask = () => {
+  clearInvitationTimer()
+  invitationMaskTimer = window.setTimeout(clearInvitationCode, 60000)
+}
+
+const withAdminStepUp = async action => {
+  if (!getStepUpToken()) await requestStepUp()
+  return withStepUpRetry(action)
+}
+
+const applyInvitationResponse = response => {
+  invitationCode.value = response.data.invitationCode
+  invitationUpdatedAt.value = response.data.updatedAt
+  invitationVisible.value = true
+  scheduleInvitationMask()
+}
+
+const revealInvitationCode = async () => {
+  if (invitationLoading.value) return false
+  invitationLoading.value = true
+  try {
+    const { adminApi } = await import('@/api/admin')
+    const response = await withAdminStepUp(token => adminApi.getInvitationCode(token))
+    applyInvitationResponse(response)
+    return true
+  } catch {
+    return false
+  } finally {
+    invitationLoading.value = false
+  }
+}
+
+const toggleInvitationVisibility = async () => {
+  if (invitationVisible.value) {
+    clearInvitationCode()
+    return
+  }
+  await revealInvitationCode()
+}
+
+const copyInvitationCode = async () => {
+  if (!invitationCode.value && !await revealInvitationCode()) return
+  const copied = await copyText(invitationCode.value)
+  if (copied) {
+    ElMessage.success('邀请码已复制')
+    scheduleInvitationMask()
+  } else {
+    ElMessage.warning('复制失败，请手动选择邀请码')
+  }
+}
+
+const rotateInvitationCode = async () => {
+  if (invitationRotating.value) return
+  try {
+    const { ElMessageBox } = await import('element-plus/es/components/message-box/index.mjs')
+    await ElMessageBox.confirm(
+      '刷新后旧邀请码将立即失效，已经发出的旧邀请码也无法继续注册。',
+      '确认刷新邀请码',
+      { confirmButtonText: '确认刷新', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  invitationRotating.value = true
+  try {
+    const { adminApi } = await import('@/api/admin')
+    const response = await withAdminStepUp(token => adminApi.rotateInvitationCode(token))
+    applyInvitationResponse(response)
+    ElMessage.success('邀请码已刷新，旧邀请码已失效')
+  } catch {
+    // Request and authentication errors are displayed by the shared handlers.
+  } finally {
+    invitationRotating.value = false
+  }
+}
 
 const handleAvatarChange = async (uploadFile) => {
   if (!uploadFile.raw) return
@@ -216,6 +379,7 @@ const revokeSession = async session => {
 }
 
 onMounted(async () => {
+  document.addEventListener('visibilitychange', handlePageVisibility)
   const currentRoute = router.currentRoute.value
   const hashToken = new URLSearchParams((currentRoute.hash || '').replace(/^#/, '')).get('verifyEmail')
   const token = currentRoute.query.verifyEmail || hashToken
@@ -228,6 +392,15 @@ onMounted(async () => {
   }
   email.value = authStore.userInfo?.email || ''
   await loadSessions()
+})
+
+const handlePageVisibility = () => {
+  if (document.hidden) clearInvitationCode()
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handlePageVisibility)
+  clearInvitationCode()
 })
 </script>
 

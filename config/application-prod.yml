@@ -32,7 +32,6 @@ spring:
 
 diaryFilePath: ${DIARY_FILE_PATH}
 diaryPageSize: ${DIARY_PAGE_SIZE:5}
-invitationCode: ${INVITATION_CODE}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -43,6 +42,9 @@ cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 app:
+  invitation:
+    bootstrap-code: ${INVITATION_CODE:}
+    encryption-key: ${INVITATION_CODE_ENCRYPTION_KEY}
   auth:
     refresh-days: ${AUTH_REFRESH_DAYS:30}
     secure-cookie: ${AUTH_SECURE_COOKIE:true}

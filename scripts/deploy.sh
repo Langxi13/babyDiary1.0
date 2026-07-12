@@ -16,6 +16,9 @@ npm --prefix frontend run build
 chmod +x scripts/ensure-ai-env.sh
 scripts/ensure-ai-env.sh
 
+chmod +x scripts/ensure-invitation-env.sh
+scripts/ensure-invitation-env.sh
+
 chmod +x scripts/ensure-redis.sh
 scripts/ensure-redis.sh
 

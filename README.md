@@ -13,8 +13,9 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
+- 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
-- Redis 缓存、Flyway V1-V13 迁移、真实 Actuator 健康检查和部署前治理脚本
+- Redis 缓存、Flyway V1-V14 迁移、真实 Actuator 健康检查和部署前治理脚本
 
 完整功能、接口与质量门禁见 [document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
 
@@ -35,7 +36,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 cp .env.example .env
 ```
 
-编辑 `.env`，至少替换 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`INVITATION_CODE`、`JWT_SECRET` 和 `AI_CONFIG_ENCRYPTION_KEY`。可使用 `openssl rand -base64 48` 生成随机密钥。邮件、Web Push、S3 和媒体处理工具均为可选配置，变量说明已写在模板中。
+编辑 `.env`，至少替换 `DB_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`INVITATION_CODE`、`INVITATION_CODE_ENCRYPTION_KEY`、`JWT_SECRET` 和 `AI_CONFIG_ENCRYPTION_KEY`。`INVITATION_CODE` 只在空数据库首次启动时导入；两个加密密钥和 JWT 密钥可使用 `openssl rand -base64 48` 生成。邮件、Web Push、S3 和媒体处理工具均为可选配置，变量说明已写在模板中。
 
 2. 启动 MySQL 和 Redis：
 
@@ -81,7 +82,7 @@ scripts/security-scan.sh
 
 ## 生产部署
 
-生产配置模板位于 `config/application-prod.yml`，所有数据库密码、邀请码、JWT 密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署脚本会安装 Nginx 安全头与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须读取 Actuator JSON 且确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产配置模板位于 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署脚本会安装 Nginx 安全头与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须读取 Actuator JSON 且确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
 `DIARY_FILE_PATH` 只保存旧版兼容图片，`DIARY_OBJECT_PATH` 保存 V2 富媒体，两者必须是不同目录。V2 富媒体通过短时签名 URL 访问；旧版 `/images/**` 为兼容现有客户端仍可公开读取，因此文件名不可视为访问控制，建议新功能统一使用 V2 媒体接口。
 

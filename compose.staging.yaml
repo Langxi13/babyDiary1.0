@@ -56,7 +56,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_PREFIX: "baby-diary:staging:"
-      INVITATION_CODE: ${INVITATION_CODE:?set INVITATION_CODE in the staging env file}
+      INVITATION_CODE: ${INVITATION_CODE:-}
+      INVITATION_CODE_ENCRYPTION_KEY: ${INVITATION_CODE_ENCRYPTION_KEY:?set INVITATION_CODE_ENCRYPTION_KEY in the staging env file}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in the staging env file}
       JWT_ACCESS_EXPIRATION: 900000
       JWT_EXPIRATION: 2592000000

@@ -8,6 +8,7 @@
 - [错误码说明](#错误码说明)
 - [接口列表](#接口列表)
   - [认证管理接口](#认证管理接口)
+  - [管理员邀请码接口](#管理员邀请码接口)
   - [日记管理接口](#日记管理接口)
   - [图片读取与生命周期](#图片读取与生命周期)
   - [体验增强接口](#体验增强接口)
@@ -238,6 +239,40 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
   }
 }
 ```
+
+---
+
+### 管理员邀请码接口
+
+以下接口仅允许系统角色为 `ADMIN` 的用户调用，并且必须携带通过 `/api/v2/auth/step-up` 获取的短期二次验证令牌。响应包含邀请码明文，因此统一返回 `Cache-Control: no-store`，前端不得写入持久缓存。
+
+#### 1. 查看当前邀请码
+
+- 方法：GET
+- 路径：`/api/admin/invitation-code`
+- 请求头：`Authorization: Bearer {token}`、`X-Step-Up-Token: {stepUpToken}`
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "invitationCode": "example-random-invitation-code",
+    "updatedAt": "2026-07-12T15:00:00+08:00"
+  }
+}
+```
+
+#### 2. 随机刷新邀请码
+
+- 方法：POST
+- 路径：`/api/admin/invitation-code/rotate`
+- 请求头：`Authorization: Bearer {token}`、`X-Step-Up-Token: {stepUpToken}`
+- 请求体：无
+
+后端使用安全随机数生成新的 Base64URL 邀请码。事务提交后旧邀请码立即失效，响应只向本次管理员请求返回新邀请码。
+
+普通用户调用返回 HTTP `403`；缺少或失效的二次验证令牌返回 HTTP `423`。
 
 ---
 

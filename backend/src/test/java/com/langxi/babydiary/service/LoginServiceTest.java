@@ -15,7 +15,6 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -45,6 +44,9 @@ class LoginServiceTest {
     @Mock
     private AccountSecurityMapper accountSecurityMapper;
 
+    @Mock
+    private InvitationCodeService invitationCodeService;
+
     @Spy
     private ImageStorageService imageStorageService = new ImageStorageService();
 
@@ -57,8 +59,7 @@ class LoginServiceTest {
     @BeforeEach
     void setUp() {
         loginService.setPasswordEncoder(passwordEncoder);
-        ReflectionTestUtils.setField(loginService, "privateInvitationCode", "invite");
-        ReflectionTestUtils.setField(imageStorageService, "uploadDir", uploadDir.toString());
+        org.springframework.test.util.ReflectionTestUtils.setField(imageStorageService, "uploadDir", uploadDir.toString());
     }
 
     @Test
@@ -82,6 +83,7 @@ class LoginServiceTest {
     @Test
     void registerUserTrimsUsernameBeforeSaving() {
         when(userMapper.findByUsername("new-user")).thenReturn(null);
+        when(invitationCodeService.matches("invite")).thenReturn(true);
         when(passwordEncoder.encode("password")).thenReturn("encoded");
         doAnswer(invocation -> {
             User user = invocation.getArgument(0);

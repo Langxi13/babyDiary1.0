@@ -22,6 +22,7 @@ export REDIS_PORT=6381
 export SPRING_CACHE_TYPE=redis
 export CACHE_PREFIX=baby-diary:e2e:
 export INVITATION_CODE=e2e-invitation-code
+export INVITATION_CODE_ENCRYPTION_KEY=test-only-invitation-key-000000000000000000000000
 export JWT_SECRET=e2e-jwt-secret-that-is-longer-than-thirty-two-characters
 export JWT_ACCESS_EXPIRATION=900000
 export JWT_EXPIRATION=2592000000

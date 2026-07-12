@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.mapper.SystemInvitationConfigMapper">
+    <resultMap id="systemInvitationConfigResultMap" type="SystemInvitationConfig">
+        <id property="configId" column="config_id"/>
+        <result property="encryptedCode" column="encrypted_code"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="configColumns">
+        config_id, encrypted_code, updated_by, updated_at
+    </sql>
+
+    <select id="findConfig" resultMap="systemInvitationConfigResultMap">
+        SELECT <include refid="configColumns"/>
+        FROM system_invitation_config
+        WHERE config_id = 1
+    </select>
+
+    <select id="findConfigForShare" resultMap="systemInvitationConfigResultMap">
+        SELECT <include refid="configColumns"/>
+        FROM system_invitation_config
+        WHERE config_id = 1
+        FOR SHARE
+    </select>
+
+    <insert id="insertIfAbsent" parameterType="SystemInvitationConfig">
+        INSERT IGNORE INTO system_invitation_config (config_id, encrypted_code, updated_by)
+        VALUES (1, #{encryptedCode}, #{updatedBy})
+    </insert>
+
+    <insert id="upsertConfig" parameterType="SystemInvitationConfig">
+        INSERT INTO system_invitation_config (config_id, encrypted_code, updated_by)
+        VALUES (1, #{encryptedCode}, #{updatedBy})
+        ON DUPLICATE KEY UPDATE
+          encrypted_code = VALUES(encrypted_code),
+          updated_by = VALUES(updated_by),
+          updated_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

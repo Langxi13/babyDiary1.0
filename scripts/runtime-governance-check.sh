@@ -96,14 +96,15 @@ require_env_value DB_URL
 require_env_value DB_PASSWORD
 require_env_value DIARY_FILE_PATH
 require_env_value JWT_SECRET
-require_env_value INVITATION_CODE
 require_env_value CORS_ALLOWED_ORIGINS
 require_env_value AI_CONFIG_ENCRYPTION_KEY
+require_env_value INVITATION_CODE_ENCRYPTION_KEY
 
 reject_placeholder_value DB_PASSWORD
 reject_placeholder_value JWT_SECRET
 reject_placeholder_value INVITATION_CODE
 reject_placeholder_value AI_CONFIG_ENCRYPTION_KEY
+reject_placeholder_value INVITATION_CODE_ENCRYPTION_KEY
 
 if [[ "$DB_URL" != *"connectionTimeZone=%2B08:00"* ]] \
   || [[ "$DB_URL" != *"forceConnectionTimeZoneToSession=true"* ]]; then
@@ -118,6 +119,10 @@ if [ "${#JWT_SECRET}" -lt 32 ]; then
 fi
 if [ "${#AI_CONFIG_ENCRYPTION_KEY}" -lt 32 ]; then
   echo "AI_CONFIG_ENCRYPTION_KEY should contain at least 32 characters" >&2
+  exit 1
+fi
+if [ "${#INVITATION_CODE_ENCRYPTION_KEY}" -lt 32 ]; then
+  echo "INVITATION_CODE_ENCRYPTION_KEY should contain at least 32 characters" >&2
   exit 1
 fi
 if tr ',' '\n' <<<"$CORS_ALLOWED_ORIGINS" | grep -Eq '^[[:space:]]*\*[[:space:]]*$'; then

@@ -48,6 +48,7 @@ JWT_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 INVITATION_CODE=test-invitation
 CORS_ALLOWED_ORIGINS=https://diary.example.com
 AI_CONFIG_ENCRYPTION_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+INVITATION_CODE_ENCRYPTION_KEY=cccccccccccccccccccccccccccccccc
 SERVER_ADDRESS=127.0.0.1
 ENV
 
