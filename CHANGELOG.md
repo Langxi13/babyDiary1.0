@@ -5,6 +5,7 @@
 - Replaced the SPA fallback health false-positive with an exact Nginx proxy to the loopback Actuator endpoint, and made release checks require a top-level `status=UP` JSON response.
 - Added a systemd `PrivateTmp` deployment drop-in, host `/tmp` permission governance, and shared-system-directory guards so media permission setup cannot alter `/tmp` or other top-level runtime directories.
 - Moved Nginx validation ahead of backend shutdown and added script regressions for deployment ordering, Actuator `DOWN`, private temporary directories, and unsafe media roots.
+- Replaced mutable GitHub Action tags with verified full commit SHAs, upgraded Trivy Action to the safe v0.36.0 release, and forced the development-only `glob` chain to patched v13.0.6.
 
 ## 2026-07-11
 

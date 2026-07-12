@@ -68,7 +68,7 @@ npm --prefix frontend ci
 scripts/verify.sh
 ```
 
-验证脚本会运行 Shell 脚本自测、MySQL 8.4 后端集成测试、覆盖率门禁、前端测试和生产构建。发布候选还必须执行三浏览器 E2E 和供应链扫描：
+验证脚本会运行 Shell 脚本自测、MySQL 8.4 后端集成测试、覆盖率门禁、前端测试和生产构建。发布候选还必须执行三浏览器 E2E 和供应链扫描；CI 中的第三方 GitHub Actions 固定到经过核验的完整提交 SHA，避免可变标签带来的供应链风险：
 
 ```bash
 scripts/verify-e2e.sh
