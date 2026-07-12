@@ -1,5 +1,4 @@
-import { ElMessageBox } from 'element-plus/es/components/message-box/index.mjs'
-import { authApi } from '@/api/auth'
+import { openStepUpDialog } from '@/utils/stepUpDialog'
 
 export function getStepUpToken() {
   const token = sessionStorage.getItem('stepUpToken') || ''
@@ -13,18 +12,10 @@ export function getStepUpToken() {
 }
 
 export async function requestStepUp() {
-  const { value } = await ElMessageBox.prompt('请输入当前登录密码', '二次验证', {
-    confirmButtonText: '验证',
-    cancelButtonText: '取消',
-    inputType: 'password',
-    inputPattern: /.+/,
-    inputErrorMessage: '请输入密码',
-    closeOnClickModal: false
-  })
-  const response = await authApi.stepUp(value)
-  sessionStorage.setItem('stepUpToken', response.data.token)
-  sessionStorage.setItem('stepUpExpiresAt', String(new Date(response.data.expiresAt).getTime()))
-  return response.data.token
+  const result = await openStepUpDialog()
+  sessionStorage.setItem('stepUpToken', result.token)
+  sessionStorage.setItem('stepUpExpiresAt', String(new Date(result.expiresAt).getTime()))
+  return result.token
 }
 
 export async function withStepUpRetry(action) {

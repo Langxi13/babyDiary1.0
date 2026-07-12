@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test'
 import { expectNoHorizontalOverflow, watchPageQuality } from './helpers/quality.js'
 
 test('administrator invitation panel requires step-up and stays responsive', async ({ page }, testInfo) => {
-  const assertQuality = watchPageQuality(page)
   await page.goto('/profile')
 
   const panel = page.locator('.invitation-admin-panel')
@@ -13,10 +12,19 @@ test('administrator invitation panel requires step-up and stays responsive', asy
     response.request().method() === 'GET'
     && response.url().endsWith('/api/admin/invitation-code'))
   await panel.getByRole('button', { name: '查看邀请码' }).click()
-  const stepUpDialog = page.getByRole('dialog', { name: '二次验证' })
+  const stepUpDialog = page.getByRole('dialog', { name: '验证身份' })
   await expect(stepUpDialog).toBeVisible()
+  await stepUpDialog.locator('input[type="password"]').fill('wrong-password')
+  await stepUpDialog.getByRole('button', { name: '确认验证', exact: true }).click()
+  await expect(stepUpDialog.getByRole('alert')).toHaveText('当前密码不正确')
+  await expect(page.locator('.el-message--error')).toHaveCount(0)
+  const assertQuality = watchPageQuality(page)
   await stepUpDialog.locator('input[type="password"]').fill('e2e_password_123')
-  await stepUpDialog.getByRole('button', { name: '验证', exact: true }).click()
+  await page.screenshot({
+    path: testInfo.outputPath('step-up-dialog-desktop.png'),
+    animations: 'disabled'
+  })
+  await stepUpDialog.getByRole('button', { name: '确认验证', exact: true }).click()
 
   const response = await responsePromise
   expect(response.status()).toBe(200)
@@ -33,6 +41,21 @@ test('administrator invitation panel requires step-up and stays responsive', asy
   const panelBox = await panel.boundingBox()
   expect(panelBox.x).toBeGreaterThanOrEqual(0)
   expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(390)
+  await page.evaluate(() => {
+    sessionStorage.removeItem('stepUpToken')
+    sessionStorage.removeItem('stepUpExpiresAt')
+  })
+  await panel.getByRole('button', { name: '查看邀请码' }).click()
+  const mobileStepUpDialog = page.getByRole('dialog', { name: '验证身份' })
+  await expect(mobileStepUpDialog).toBeVisible()
+  const dialogBox = await mobileStepUpDialog.boundingBox()
+  expect(dialogBox.x).toBeGreaterThanOrEqual(0)
+  expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(390)
+  await page.screenshot({
+    path: testInfo.outputPath('step-up-dialog-mobile.png'),
+    animations: 'disabled'
+  })
+  await mobileStepUpDialog.getByRole('button', { name: '取消', exact: true }).click()
   await page.screenshot({ path: testInfo.outputPath('profile-admin-mobile.png'), fullPage: true })
   await assertQuality()
 })

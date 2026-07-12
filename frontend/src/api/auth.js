@@ -46,7 +46,7 @@ export const authApi = {
   },
 
   stepUp(password) {
-    return request.post('/api/v2/auth/step-up', { password })
+    return request.post('/api/v2/auth/step-up', { password }, { __silentError: true })
   },
 
   recoveryCodes(password) {

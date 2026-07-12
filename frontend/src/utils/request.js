@@ -123,7 +123,7 @@ request.interceptors.response.use(
     if (data?.code === 200) {
       return data
     }
-    ElMessage.error(data.message || '请求失败')
+    if (!response.config.__silentError) ElMessage.error(data.message || '请求失败')
     return Promise.reject(new Error(data.message || '请求失败'))
   },
   async error => {
@@ -132,6 +132,7 @@ request.interceptors.response.use(
     }
     if (error.response) {
       const { status, data } = error.response
+      const shouldNotify = !error.config?.__silentError
       if (status === 401) {
         const originalRequest = error.config || {}
         if (originalRequest.__skipAuthRecovery) {
@@ -173,20 +174,20 @@ request.interceptors.response.use(
         localStorage.removeItem('userInfo')
         window.dispatchEvent(new Event('auth:expired'))
         redirectToLogin()
-      } else if (status === 403) {
+      } else if (status === 403 && shouldNotify) {
         ElMessage.error(await parseMessage(data, '没有权限访问'))
-      } else if (status === 409) {
+      } else if (status === 409 && shouldNotify) {
         ElMessage.warning(await parseMessage(data, '内容已被其他成员更新，请刷新后重试'))
-      } else if (status === 423) {
+      } else if (status === 423 && shouldNotify) {
         ElMessage.warning(await parseMessage(data, '请先完成二次验证'))
-      } else if (status === 429) {
+      } else if (status === 429 && shouldNotify) {
         ElMessage.warning(await parseMessage(data, '请求过于频繁，请稍后再试'))
-      } else if (status === 404) {
+      } else if (status === 404 && shouldNotify) {
         ElMessage.error(await parseMessage(data, '资源不存在'))
-      } else {
+      } else if (shouldNotify) {
         ElMessage.error(await parseMessage(data, '服务器错误'))
       }
-    } else {
+    } else if (!error.config?.__silentError) {
       ElMessage.error('网络连接失败')
     }
     return Promise.reject(error)

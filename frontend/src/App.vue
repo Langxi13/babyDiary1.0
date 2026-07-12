@@ -4,6 +4,7 @@
       <router-view />
     </mobile-app-shell>
     <router-view v-else-if="!route.meta.requiresAuth" />
+    <step-up-dialog />
   </el-config-provider>
 </template>
 
@@ -13,6 +14,7 @@ import { useRoute } from 'vue-router'
 import { ElConfigProvider } from 'element-plus/es/components/config-provider/index.mjs'
 import zhCn from 'element-plus/es/locale/lang/zh-cn.mjs'
 import MobileAppShell from '@/components/mobile/MobileAppShell.vue'
+import StepUpDialog from '@/components/security/StepUpDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 

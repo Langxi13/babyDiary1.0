@@ -2,6 +2,7 @@
 
 ## 2026-07-12
 
+- Replaced the generic password prompt with a reusable identity-verification dialog for sensitive actions, including responsive desktop/mobile layouts, safe-area spacing, password visibility, inline validation errors, loading locks, and session-reset cleanup.
 - Isolated frontend API caches by account and added a client session generation boundary so logout or account switching immediately clears protected state and rejects stale responses or refresh results.
 - Added cross-tab authentication synchronization, current-account-only offline queue counts, Pinia reset guards, and a two-account Chromium/Firefox/WebKit regression for anniversary privacy.
 - Replaced the SPA fallback health false-positive with an exact Nginx proxy to the loopback Actuator endpoint, and made release checks require a top-level `status=UP` JSON response.
