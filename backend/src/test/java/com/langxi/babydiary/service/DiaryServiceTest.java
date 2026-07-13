@@ -137,6 +137,36 @@ class DiaryServiceTest {
     }
 
     @Test
+    void replacingAllExistingImagesClearsOldFilesOnTheFirstUpdate() throws Exception {
+        Files.write(uploadDir.resolve("old.jpg"), new byte[]{1});
+        Diary diary = new Diary();
+        diary.setDiaryId(12);
+        diary.setUserId(3);
+        diary.setTitle("updated");
+        diary.setContent("content");
+        diary.setDate(Date.valueOf("2026-06-08"));
+        MockMultipartFile replacement = new MockMultipartFile(
+                "imageFiles", "replacement.jpg", "image/jpeg", imageBytes(800, 600, "jpg"));
+
+        when(diaryImageMapper.findImagePathsByDiaryId(12)).thenReturn(Collections.singletonList("old.jpg"));
+
+        diaryService.updateDiary(
+                diary,
+                new MockMultipartFile[]{replacement},
+                true,
+                null,
+                Collections.emptyList(),
+                Collections.singletonList("new:0"));
+
+        verify(diaryImageMapper).deleteDiaryImageByDiaryId(12);
+        verify(diaryImageMapper).insertDiaryImages(argThat(images ->
+                images.length == 1
+                        && images[0].getImagePath().startsWith("diary_3_")
+                        && images[0].getSort() == 1));
+        assertThat(Files.exists(uploadDir.resolve("old.jpg"))).isFalse();
+    }
+
+    @Test
     void addingImagesWithoutRetentionParametersKeepsExistingImages() throws Exception {
         Files.write(uploadDir.resolve("keep.jpg"), new byte[]{1});
         Diary diary = new Diary();

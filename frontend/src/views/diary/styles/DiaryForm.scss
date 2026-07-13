@@ -717,13 +717,10 @@
   }
 
   .form-actions {
-    position: sticky;
-    bottom: calc(var(--mobile-tabbar-height) + 10px + env(safe-area-inset-bottom));
-    z-index: 20;
+    position: static;
     padding: 12px;
     border-radius: 8px;
     border-color: rgba(79, 111, 104, 0.18);
-    background: rgba(255, 253, 250, 0.96);
-    backdrop-filter: blur(14px);
+    background: #fffdfa;
   }
 }

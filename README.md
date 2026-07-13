@@ -12,7 +12,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - OpenAI 兼容接口、模型列表、AI 周报/月报/年报和定时生成
 - 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
-- Android 原生相册、拍照、系统图片分享、HTTPS 私有服务器切换和原生刷新会话
+- Android 原生相册、拍照、HTTPS 私有服务器切换和原生刷新会话
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
@@ -67,7 +67,7 @@ npm --prefix frontend run dev
 
 ## Android 客户端
 
-Android 客户端复用同一套 Vue 页面，首次启动时由用户输入自己的 Baby Diary HTTPS 根地址；仓库和 APK 都不内置生产域名、账号或密钥。登录、刷新和退出通过 Capacitor 原生 HTTP 与 HttpOnly Cookie 桥接，普通业务请求继续使用带 Bearer Token 的统一 Axios 层。日记图片、头像、纪念日封面和共同空间图片可直接调用系统相册或相机，Android 系统“分享图片”也可把最多 20 张、每张不超过 10MB 的照片导入新日记。
+Android 客户端复用同一套 Vue 页面，首次启动时由用户输入自己的 Baby Diary HTTPS 根地址；仓库和 APK 都不内置生产域名、账号或密钥。登录、刷新和退出通过 Capacitor 原生 HTTP 与 HttpOnly Cookie 桥接，普通业务请求继续使用带 Bearer Token 的统一 Axios 层。日记图片、头像、纪念日封面和共同空间图片可直接在应用内调用系统相册或相机，不需要先从系统相册分享给应用。
 
 ```bash
 npm --prefix frontend ci
@@ -96,7 +96,7 @@ scripts/security-scan.sh
 
 `security-scan.sh` 会先获取远端公开分支、标签、Notes 和 PR refs，检查当前非忽略文件、提交/标签元数据与全部可达 Git 历史中的未批准域名、邮箱、IP、主机路径、个人标识和敏感文件名，再执行依赖、配置和凭据扫描。图片、文档、归档和音视频等不可可靠文本扫描的资产必须经过人工检查，并记录在 `config/public-asset-allowlist.sha256`。允许公开的示例及依赖主机集中维护在 `config/privacy-host-allowlist.txt`，不得将生产地址加入该列表。
 
-Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。完整 Android 构建纳入 CI；相册、相机、系统分享、Cookie 持久化和返回键仍必须在真实设备上验收，桌面构建成功不能替代真机结论。
+Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。完整 Android 构建纳入 CI；相册、相机、Cookie 持久化和返回键仍必须在真实设备上验收，桌面构建成功不能替代真机结论。
 
 打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。开源发布基线与审查证据见 [开源隐私审查记录](document/开源隐私审查记录.md)。
 

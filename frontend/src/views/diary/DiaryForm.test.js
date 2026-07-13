@@ -64,6 +64,12 @@ test('diary update submits image order for existing and new images', () => {
   assert.match(source, /formData\.append\('imageOrder', orderEntry\)/)
 })
 
+test('diary update clears every old image even when replacement images are uploaded', () => {
+  assert.match(source, /initialImageCount\.value > 0 && retainedCount === 0/)
+  assert.match(source, /formData\.append\('clearImages', 'true'\)/)
+  assert.doesNotMatch(source, /retainedCount === 0 && newFileCount === 0/)
+})
+
 test('android mobile upload keeps the native file control visible and offers copy-link fallback dialog', () => {
   assert.match(source, /const isAndroidDevice = ref\(false\)/)
   assert.match(source, /const androidUploadHelpVisible = ref\(false\)/)
@@ -88,14 +94,6 @@ test('android mobile upload keeps the native file control visible and offers cop
   assert.doesNotMatch(source, /\.android-native-file-input\s*\{[\s\S]*?position:\s*absolute;/)
 })
 
-test('diary form imports shared Android gallery images into the create upload list', () => {
-  assert.match(source, /import\s*\{\s*consumeSharedImageFiles,\s*isShareTargetEntryRoute,\s*toSharedUploadItem\s*\}\s*from '@\/utils\/shareTargetFiles'/)
-  assert.match(source, /const sharedImporting = ref\(false\)/)
-  assert.match(source, /const loadSharedImages = async \(\) =>/)
-  assert.match(source, /if \(isEdit\.value \|\| !isShareTargetEntryRoute\(route\)\) return/)
-  assert.match(source, /const sharedFiles = await consumeSharedImageFiles\(\)/)
-  assert.match(source, /fileList\.value = \[\.\.\.fileList\.value,\s*\.\.\.acceptedFiles\.map\(\(file, index\) => toSharedUploadItem\(file, index\)\)\]/)
-  assert.match(source, /ElMessage\.success\(`已从系统分享载入 \$\{acceptedFiles\.length\} 张照片`\)/)
-  assert.match(source, /router\.replace\(\{ path: '\/diaries\/create' \}\)/)
-  assert.match(source, /await loadSharedImages\(\)/)
+test('diary form does not retain the removed system share import path', () => {
+  assert.doesNotMatch(source, /shareTargetFiles|nativeShareInbox|sharedImporting|native-share:ready/)
 })

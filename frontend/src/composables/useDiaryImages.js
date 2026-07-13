@@ -1,15 +1,13 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { originalImageUrl } from '@/utils/imageUrl'
-import { consumeSharedImageFiles, isShareTargetEntryRoute, toSharedUploadItem } from '@/utils/shareTargetFiles'
 import { copyText } from '@/utils/copyText'
-import { takeStagedNativeShareFiles } from '@/platform/nativeShareInbox'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 const MAX_DIARY_IMAGES = 50
 
-export function useDiaryImages({ route, router, isEdit }) {
+export function useDiaryImages({ route, isEdit }) {
   const fileList = ref([])
   const previewVisible = ref(false)
   const previewUrl = ref('')
@@ -17,7 +15,6 @@ export function useDiaryImages({ route, router, isEdit }) {
   const isAndroidDevice = ref(false)
   const androidUploadHelpVisible = ref(false)
   const androidUploadUrlInput = ref(null)
-  const sharedImporting = ref(false)
 
   const browserUploadUrl = computed(() => {
     if (typeof window === 'undefined') {
@@ -123,35 +120,6 @@ export function useDiaryImages({ route, router, isEdit }) {
     fileList.value = [...fileList.value, ...acceptedFiles]
   }
 
-  const loadSharedImages = async () => {
-    if (isEdit.value || !isShareTargetEntryRoute(route)) return
-    sharedImporting.value = true
-    try {
-      const sharedFiles = await consumeSharedImageFiles()
-      const acceptedFiles = sharedFiles.filter(isValidImageFile)
-      if (acceptedFiles.length) {
-        fileList.value = [...fileList.value, ...acceptedFiles.map((file, index) => toSharedUploadItem(file, index))]
-        ElMessage.success(`已从系统分享载入 ${acceptedFiles.length} 张照片`)
-      } else {
-        ElMessage.warning('没有可载入的分享照片')
-      }
-    } catch {
-      ElMessage.warning('分享照片载入失败，请在浏览器中上传')
-    } finally {
-      sharedImporting.value = false
-      router.replace({ path: '/diaries/create' })
-    }
-  }
-
-  const loadNativeSharedImages = () => {
-    if (isEdit.value) return 0
-    const sharedFiles = takeStagedNativeShareFiles()
-    if (!sharedFiles.length) return 0
-    appendNativeFiles(sharedFiles)
-    ElMessage.success(`已从系统分享载入 ${sharedFiles.length} 张照片`)
-    return sharedFiles.length
-  }
-
   const imageOrderForFile = (file, newImageIndex) => {
     if (file.raw) return `new:${newImageIndex}`
     if (file.isExisting && file.name) return `existing:${file.name}`
@@ -181,8 +149,7 @@ export function useDiaryImages({ route, router, isEdit }) {
     }
 
     const retainedCount = fileList.value.filter(file => file.isExisting && file.name).length
-    const newFileCount = fileList.value.filter(file => file.raw).length
-    if (initialImageCount.value > 0 && retainedCount === 0 && newFileCount === 0) {
+    if (initialImageCount.value > 0 && retainedCount === 0) {
       formData.append('clearImages', 'true')
     }
   }
@@ -212,7 +179,6 @@ export function useDiaryImages({ route, router, isEdit }) {
     isAndroidDevice,
     androidUploadHelpVisible,
     androidUploadUrlInput,
-    sharedImporting,
     browserUploadUrl,
     selectAndroidUploadUrl,
     copyBrowserUploadUrl,
@@ -223,8 +189,6 @@ export function useDiaryImages({ route, router, isEdit }) {
     moveImage,
     handleNativeImageChange,
     appendNativeFiles,
-    loadSharedImages,
-    loadNativeSharedImages,
     appendImagesToFormData,
     setExistingImages,
     initializeImageUpload,

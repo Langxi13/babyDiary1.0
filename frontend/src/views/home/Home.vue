@@ -36,6 +36,7 @@
                 v-for="diary in recentDiaries"
                 :key="diary.diaryId"
                 class="recent-item"
+                :class="{ 'has-image': diary.imagePathList?.length }"
                 @click="router.push(`/diaries/${diary.diaryId}`)"
               >
                 <div class="recent-copy">

@@ -47,6 +47,23 @@
   }
 
   .mobile-shell-content {
+    .page-title-row > *,
+    .page-header > *,
+    .panel > *,
+    .detail-panel > *,
+    .filter-section > *,
+    .form-panel > *,
+    .profile-panel > *,
+    .el-form-item__content {
+      min-width: 0;
+    }
+
+    h1,
+    h2,
+    h3 {
+      overflow-wrap: break-word;
+    }
+
     .page-shell,
     .home-container,
     .diary-list-container,

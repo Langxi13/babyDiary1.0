@@ -6,22 +6,6 @@
   "display": "standalone",
   "background_color": "#f6f3f0",
   "theme_color": "#b14f64",
-  "share_target": {
-    "action": "/share-target",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url",
-      "files": [
-        {
-          "name": "photos",
-          "accept": ["image/*", ".jpg", ".jpeg", ".png", ".gif", ".webp"]
-        }
-      ]
-    }
-  },
   "icons": [
     {
       "src": "/app-icon.png",

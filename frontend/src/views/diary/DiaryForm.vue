@@ -10,7 +10,7 @@
           <h1>{{ isEdit ? '编辑日记' : '写日记' }}</h1>
           <span v-if="draftStatus">{{ draftStatus }}</span>
         </div>
-        <el-button class="header-submit" type="primary" :loading="loading || sharedImporting" :disabled="loading || sharedImporting" @click="handleSubmit">
+        <el-button class="header-submit" type="primary" :loading="loading" :disabled="loading" @click="handleSubmit">
           <el-icon><Check /></el-icon>
           {{ isEdit ? '更新' : '发布' }}
         </el-button>
@@ -214,7 +214,7 @@
               </div>
 
               <div class="form-actions">
-                <el-button type="primary" size="large" :loading="loading || sharedImporting" :disabled="loading || sharedImporting" @click="handleSubmit">
+                <el-button type="primary" size="large" :loading="loading" :disabled="loading" @click="handleSubmit">
                   <el-icon><Check /></el-icon>
                   {{ isEdit ? '更新' : '发布' }}
                 </el-button>
@@ -347,7 +347,6 @@ const {
   isAndroidDevice,
   androidUploadHelpVisible,
   androidUploadUrlInput,
-  sharedImporting,
   browserUploadUrl,
   selectAndroidUploadUrl,
   copyBrowserUploadUrl,
@@ -358,13 +357,11 @@ const {
   moveImage,
   handleNativeImageChange,
   appendNativeFiles,
-  loadSharedImages,
-  loadNativeSharedImages,
   appendImagesToFormData,
   setExistingImages,
   initializeImageUpload,
   disposeImages
-} = useDiaryImages({ route, router, isEdit })
+} = useDiaryImages({ route, isEdit })
 const createDraftKey = buildCreateDraftKey()
 const fallbackDraftKey = computed(() => isEdit.value ? `edit-${diaryId.value}` : createDraftKey)
 const draftKey = computed(() => draftKeyFromRoute(route, fallbackDraftKey.value))
@@ -637,15 +634,11 @@ onMounted(async () => {
   loadingInitialData.value = true
   await Promise.all([fetchTags(), loadDiary()])
   await loadDraft()
-  loadNativeSharedImages()
-  window.addEventListener('native-share:ready', loadNativeSharedImages)
-  await loadSharedImages()
   initEditor()
   loadingInitialData.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('native-share:ready', loadNativeSharedImages)
   window.clearTimeout(autosaveTimer.value)
   disposeImages()
   editor.value?.destroy()
