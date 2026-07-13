@@ -5,6 +5,8 @@
 - Replaced the WireMock E2E container with a repository-local loopback Node AI provider, removing an external image dependency while retaining model-list and report-generation coverage.
 - Fixed the AI report browser regression to use the same deterministic week as its synthetic diary fixture, preventing date-dependent failures when the test run crosses a calendar week.
 - Revalidated the release candidate across backend, frontend, Chromium, Firefox, WebKit, Android lint/unit/build, script governance, privacy scanning, and reviewed public-asset checks.
+- Fixed GitHub Android jobs to invoke `sdkmanager` from the hosted SDK root, and synchronized the Java 17 baseline test with optional Maven mirror arguments.
+- Completed npm audit, Trivy, and Gitleaks scans against current dependency data, the source snapshot, and all reachable Git history with no blocking findings.
 
 ## 2026-07-12
 

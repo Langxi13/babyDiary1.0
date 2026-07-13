@@ -87,7 +87,10 @@ jobs:
             frontend/android/**/*.gradle
             frontend/android/gradle/wrapper/gradle-wrapper.properties
       - run: npm ci --prefix frontend
-      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install Android SDK 36
+        run: |
+          sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          "$sdk_root/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
       - run: scripts/build-android.sh
         env:
           ANDROID_JAVA_HOME: ${{ env.JAVA_HOME }}
