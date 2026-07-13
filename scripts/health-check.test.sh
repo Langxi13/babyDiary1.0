@@ -68,6 +68,11 @@ case "$path" in
     content_type="text/html"
     body='<html></html>'
     ;;
+  /api/v2/client/bootstrap)
+    code=200
+    content_type="application/json"
+    body='{"code":200,"data":{"apiVersion":2,"nativeSessionMode":"COOKIE"}}'
+    ;;
   /actuator/health)
     code=200
     content_type="application/vnd.spring-boot.actuator.v3+json"
@@ -119,6 +124,7 @@ grep -q "service nginx active" <<<"$OUTPUT"
 grep -q "GET / 200" <<<"$OUTPUT"
 grep -q "GET /album 200" <<<"$OUTPUT"
 grep -q "GET /diaries 200" <<<"$OUTPUT"
+grep -q "GET /api/v2/client/bootstrap 200" <<<"$OUTPUT"
 grep -q "GET /actuator/health 200 application/vnd.spring-boot.actuator.v3+json" <<<"$OUTPUT"
 grep -q "actuator status UP" <<<"$OUTPUT"
 grep -q "GET /api/auth/info 401" <<<"$OUTPUT"

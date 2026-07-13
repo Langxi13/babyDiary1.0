@@ -1,5 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { hasServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
 
 const routeComponents = {
   Login: () => import('@/views/auth/Login.vue'),
@@ -21,10 +22,17 @@ const routeComponents = {
   SpaceDiaryDetail: () => import('@/views/workspace/SpaceDiaryDetail.vue'),
   Notifications: () => import('@/views/workspace/Notifications.vue'),
   SharedDiary: () => import('@/views/workspace/SharedDiary.vue'),
-  AcceptInvitation: () => import('@/views/workspace/AcceptInvitation.vue')
+  AcceptInvitation: () => import('@/views/workspace/AcceptInvitation.vue'),
+  ServerSetup: () => import('@/views/auth/ServerSetup.vue')
 }
 
 const routes = [
+  {
+    path: '/connect-server',
+    name: 'ServerSetup',
+    component: routeComponents.ServerSetup,
+    meta: { requiresAuth: false, nativeOnly: true }
+  },
   {
     path: '/shared/:token',
     name: 'SharedDiary',
@@ -164,7 +172,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: isNativeApp() ? createWebHashHistory() : createWebHistory(),
   routes
 })
 
@@ -181,6 +189,15 @@ router.beforeEach((to, from, next) => {
   const hasToken = !!localStorage.getItem('token')
   const hashParams = new URLSearchParams((to.hash || '').replace(/^#/, ''))
   const isPasswordReset = to.path === '/login' && (!!to.query.resetToken || hashParams.has('resetToken'))
+
+  if (isNativeApp() && !hasServerOrigin() && to.path !== '/connect-server') {
+    next('/connect-server')
+    return
+  }
+  if ((!isNativeApp() || hasServerOrigin()) && to.path === '/connect-server') {
+    next(hasToken ? '/' : '/login')
+    return
+  }
 
   if (authStore.isLoggedIn && !hasToken) {
     authStore.clearAuth()

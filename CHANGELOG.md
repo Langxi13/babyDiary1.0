@@ -1,7 +1,17 @@
 # Changelog
 
+## 2026-07-13
+
+- Replaced the WireMock E2E container with a repository-local loopback Node AI provider, removing an external image dependency while retaining model-list and report-generation coverage.
+- Fixed the AI report browser regression to use the same deterministic week as its synthetic diary fixture, preventing date-dependent failures when the test run crosses a calendar week.
+- Revalidated the release candidate across backend, frontend, Chromium, Firefox, WebKit, Android lint/unit/build, script governance, privacy scanning, and reviewed public-asset checks.
+
 ## 2026-07-12
 
+- Added a Capacitor 8 Android client that reuses the Vue application, validates a user-supplied HTTPS server, keeps refresh sessions in native HttpOnly cookies, and preserves the existing Web/PWA transport path.
+- Added native gallery and camera actions for diaries, avatars, anniversary covers, and shared spaces, plus Android single/multiple image share intents with bounded private cache, HEIC/HEIF-to-JPEG handling, per-file rejection, and 24-hour cleanup.
+- Added Android launcher and splash resources, backup/data-transfer denial, narrowed FileProvider paths, resource-aware single-worker builds, CI Debug APKs, and a manually triggered signed APK/AAB workflow with signature verification.
+- Added the public native compatibility bootstrap endpoint, explicit Capacitor CORS origins, path-scoped Nginx cross-origin media policy, production health coverage, and native deployment/test documentation.
 - Replaced the generic password prompt with a reusable identity-verification dialog for sensitive actions, including responsive desktop/mobile layouts, safe-area spacing, password visibility, inline validation errors, loading locks, and session-reset cleanup.
 - Isolated frontend API caches by account and added a client session generation boundary so logout or account switching immediately clears protected state and rejects stale responses or refresh results.
 - Added cross-tab authentication synchronization, current-account-only offline queue counts, Pinia reset guards, and a two-account Chromium/Firefox/WebKit regression for anniversary privacy.

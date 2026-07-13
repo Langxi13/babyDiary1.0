@@ -31,7 +31,7 @@ requires_review() {
   local lower="${1,,}"
 
   case "$lower" in
-    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.avif|*.heic|*.heif|*.tif|*.tiff|*.bmp|*.ico|*.svg|*.pdf|*.doc|*.docx|*.xls|*.xlsx|*.ppt|*.pptx|*.zip|*.tar|*.tgz|*.gz|*.7z|*.rar|*.mp3|*.wav|*.m4a|*.aac|*.ogg|*.flac|*.mp4|*.mov|*.mkv|*.webm|*.woff|*.woff2|*.ttf|*.otf)
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.avif|*.heic|*.heif|*.tif|*.tiff|*.bmp|*.ico|*.svg|*.pdf|*.doc|*.docx|*.xls|*.xlsx|*.ppt|*.pptx|*.zip|*.tar|*.tgz|*.gz|*.7z|*.rar|*.jar|*.mp3|*.wav|*.m4a|*.aac|*.ogg|*.flac|*.mp4|*.mov|*.mkv|*.webm|*.woff|*.woff2|*.ttf|*.otf)
       return 0
       ;;
   esac

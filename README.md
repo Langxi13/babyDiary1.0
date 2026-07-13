@@ -1,6 +1,6 @@
 # Baby Diary
 
-Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目采用 Vue 3 + Vite 前端和 Spring Boot + MyBatis 后端，支持响应式 Web 与可安装 PWA，并围绕长期记录、共同回忆、隐私保护和数据可迁移性设计。
+Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目采用 Vue 3 + Vite 前端和 Spring Boot + MyBatis 后端，支持响应式 Web、可安装 PWA 与 Capacitor 原生客户端，并围绕长期记录、共同回忆、隐私保护和数据可迁移性设计。
 
 ## 功能概览
 
@@ -12,6 +12,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - OpenAI 兼容接口、模型列表、AI 周报/月报/年报和定时生成
 - 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
+- Android 原生相册、拍照、系统图片分享、HTTPS 私有服务器切换和原生刷新会话
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
@@ -27,6 +28,8 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - MySQL 8.0+，Compose 默认使用 MySQL 8.4 LTS
 - Redis 7+
 - Docker Compose，可选但推荐用于本地基础设施
+- Android 构建可选：JDK 21、Android SDK Platform 36 和 Build Tools 36
+- iOS 构建可选：macOS、Xcode 26 和 Apple Developer 签名环境
 
 ## 本地运行
 
@@ -62,6 +65,21 @@ npm --prefix frontend run dev
 
 访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，Flyway 会自动创建和升级数据库结构。JDBC URL 必须保留 `connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true`，以固定 MySQL 会话为东八区并避免依赖命名时区表。
 
+## Android 客户端
+
+Android 客户端复用同一套 Vue 页面，首次启动时由用户输入自己的 Baby Diary HTTPS 根地址；仓库和 APK 都不内置生产域名、账号或密钥。登录、刷新和退出通过 Capacitor 原生 HTTP 与 HttpOnly Cookie 桥接，普通业务请求继续使用带 Bearer Token 的统一 Axios 层。日记图片、头像、纪念日封面和共同空间图片可直接调用系统相册或相机，Android 系统“分享图片”也可把最多 20 张、每张不超过 10MB 的照片导入新日记。
+
+```bash
+npm --prefix frontend ci
+scripts/build-android.sh
+```
+
+脚本串行执行前端构建、`cap sync android`、Android lint、单元测试和 Debug APK 构建，并固定单 Gradle worker、无常驻 daemon，降低小型服务器上的资源峰值。产物位于 `frontend/android/app/build/outputs/apk/debug/app-debug.apk`。Android 使用 JDK 21，后端仍使用 JDK 17；不要修改系统默认 Java 来迁就其中一端。
+
+默认客户端只接受 HTTPS。仅本机/模拟器调试时可执行 `VITE_NATIVE_ALLOW_HTTP=true scripts/build-android.sh`，此开关只允许 localhost、`10.0.2.2` 和私有局域网地址；Release Manifest 始终禁止明文流量。
+
+签名 APK/AAB 由 `.github/workflows/android-release.yml` 手动触发，签名材料只保存在 GitHub Secrets。iOS 依赖已锁定，但平台工程和真机构建必须在 Mac/Xcode 环境完成，当前 Linux 服务器不伪造 iOS 验收结果。
+
 ## 验证
 
 ```bash
@@ -78,11 +96,13 @@ scripts/security-scan.sh
 
 `security-scan.sh` 会先获取远端公开分支、标签、Notes 和 PR refs，检查当前非忽略文件、提交/标签元数据与全部可达 Git 历史中的未批准域名、邮箱、IP、主机路径、个人标识和敏感文件名，再执行依赖、配置和凭据扫描。图片、文档、归档和音视频等不可可靠文本扫描的资产必须经过人工检查，并记录在 `config/public-asset-allowlist.sha256`。允许公开的示例及依赖主机集中维护在 `config/privacy-host-allowlist.txt`，不得将生产地址加入该列表。
 
+Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。完整 Android 构建纳入 CI；相册、相机、系统分享、Cookie 持久化和返回键仍必须在真实设备上验收，桌面构建成功不能替代真机结论。
+
 打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。开源发布基线与审查证据见 [开源隐私审查记录](document/开源隐私审查记录.md)。
 
 ## 生产部署
 
-生产配置模板位于 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 CORS 使用明确来源。部署脚本会安装 Nginx 安全头与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须读取 Actuator JSON 且确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产配置模板位于 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、原生媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证原生兼容接口并读取 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
 `DIARY_FILE_PATH` 只保存旧版兼容图片，`DIARY_OBJECT_PATH` 保存 V2 富媒体，两者必须是不同目录。V2 富媒体通过短时签名 URL 访问；旧版 `/images/**` 为兼容现有客户端仍可公开读取，因此文件名不可视为访问控制，建议新功能统一使用 V2 媒体接口。
 

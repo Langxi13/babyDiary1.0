@@ -17,6 +17,10 @@ for header in \
 done
 
 grep -q 'config/nginx-security-headers.conf' "$ROOT/scripts/deploy.sh"
+grep -q 'config/nginx-resource-policy-map.conf' "$ROOT/scripts/deploy.sh"
+grep -q '~\^/images/ "cross-origin"' "$ROOT/config/nginx-resource-policy-map.conf"
+grep -q '~\^/api/v2/media/ "cross-origin"' "$ROOT/config/nginx-resource-policy-map.conf"
 grep -q 'baby-diary-security-headers.conf' "$ROOT/scripts/runtime-governance-check.sh"
+grep -q 'baby-diary-resource-policy-map.conf' "$ROOT/scripts/runtime-governance-check.sh"
 
 echo "nginx security headers are tracked and deployed"

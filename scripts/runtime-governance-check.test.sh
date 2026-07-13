@@ -13,6 +13,7 @@ OBJECT_DIR="$TMP_DIR/objects"
 HOST_TMP="$TMP_DIR/host-tmp"
 NGINX_SITE_FILE="$TMP_DIR/diary.nginx"
 NGINX_HEALTH_SNIPPET_FILE="$TMP_DIR/backend-health.nginx"
+NGINX_RESOURCE_POLICY_MAP_FILE="$TMP_DIR/resource-policy-map.nginx"
 
 cat > "$SERVICE_FILE" <<'SERVICE'
 [Service]
@@ -35,6 +36,14 @@ NGINX
 cat > "$NGINX_HEALTH_SNIPPET_FILE" <<'NGINX'
 location = /actuator/health {
   proxy_pass http://127.0.0.1:10002/actuator/health;
+}
+NGINX
+
+cat > "$NGINX_RESOURCE_POLICY_MAP_FILE" <<'NGINX'
+map $request_uri $baby_diary_resource_policy {
+  default "same-origin";
+  ~^/images/ "cross-origin";
+  ~^/api/v2/media/ "cross-origin";
 }
 NGINX
 
@@ -71,6 +80,7 @@ OUTPUT="$(
   DB_APP_USER="baby_diary_app" \
   NGINX_SITE_FILE="$NGINX_SITE_FILE" \
   NGINX_HEALTH_SNIPPET_FILE="$NGINX_HEALTH_SNIPPET_FILE" \
+  NGINX_RESOURCE_POLICY_MAP_FILE="$NGINX_RESOURCE_POLICY_MAP_FILE" \
   TMP_ROOT="$HOST_TMP" \
   CHECK_OS_USER="false" \
   "$ROOT/scripts/runtime-governance-check.sh"
@@ -85,6 +95,7 @@ grep -q "database user baby_diary_app" <<<"$OUTPUT"
 grep -q "database timezone configured" <<<"$OUTPUT"
 grep -q "security environment configured" <<<"$OUTPUT"
 grep -q "backend bound to loopback" <<<"$OUTPUT"
+grep -q "nginx native resource policy included" <<<"$OUTPUT"
 grep -q "nginx backend health proxy included" <<<"$OUTPUT"
 grep -q "image directory readable by nginx group" <<<"$OUTPUT"
 grep -q "private object directory isolated" <<<"$OUTPUT"
@@ -100,6 +111,7 @@ if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
   DB_APP_USER="baby_diary_app" \
   NGINX_SITE_FILE="$NGINX_SITE_FILE" \
   NGINX_HEALTH_SNIPPET_FILE="$NGINX_HEALTH_SNIPPET_FILE" \
+  NGINX_RESOURCE_POLICY_MAP_FILE="$NGINX_RESOURCE_POLICY_MAP_FILE" \
   TMP_ROOT="$HOST_TMP" \
   CHECK_OS_USER="false" \
   "$ROOT/scripts/runtime-governance-check.sh" >/dev/null 2>&1; then
@@ -118,6 +130,7 @@ if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
   DB_APP_USER="baby_diary_app" \
   NGINX_SITE_FILE="$NGINX_SITE_FILE" \
   NGINX_HEALTH_SNIPPET_FILE="$NGINX_HEALTH_SNIPPET_FILE" \
+  NGINX_RESOURCE_POLICY_MAP_FILE="$NGINX_RESOURCE_POLICY_MAP_FILE" \
   TMP_ROOT="$HOST_TMP" \
   CHECK_OS_USER="false" \
   "$ROOT/scripts/runtime-governance-check.sh" >/dev/null 2>&1; then

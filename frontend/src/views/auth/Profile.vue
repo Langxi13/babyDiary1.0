@@ -17,7 +17,14 @@
             <h2>{{ authStore.username }}</h2>
             <span>加入于 {{ joinedAt }}</span>
           </div>
+          <native-image-actions
+            v-if="nativeApp"
+            class="native-avatar-actions"
+            :limit="1"
+            @selected="handleAvatarFiles"
+          />
           <el-upload
+            v-else
             class="avatar-upload-card"
             action="#"
             accept="image/*"
@@ -74,6 +81,14 @@
               <el-button v-else text type="danger" @click="revokeSession(session)">退出</el-button>
             </article>
           </div>
+        </div>
+
+        <div v-if="nativeApp" class="profile-panel native-server-panel">
+          <div>
+            <h2>应用服务器</h2>
+            <p>{{ nativeServerOrigin }}</p>
+          </div>
+          <el-button :loading="serverResetting" @click="resetNativeServer">更换服务器</el-button>
         </div>
 
         <div v-if="isAdmin" class="profile-panel invitation-admin-panel">
@@ -141,6 +156,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { CapacitorCookies } from '@capacitor/core'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElAvatar } from 'element-plus/es/components/avatar/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
@@ -151,11 +167,14 @@ import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
 import { CopyDocument, Hide, Key, Lock, Monitor, RefreshRight, Upload, View } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
 import { originalImageUrl } from '@/utils/imageUrl'
 import { copyText } from '@/utils/copyText'
 import { getStepUpToken, requestStepUp, withStepUpRetry } from '@/utils/stepUp'
+import { clearOfflineData } from '@/utils/offlineDb'
+import { clearServerOrigin, getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
@@ -167,6 +186,9 @@ import 'element-plus/es/components/upload/style/css.mjs'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const nativeApp = isNativeApp()
+const nativeServerOrigin = getServerOrigin()
+const serverResetting = ref(false)
 const avatarUploading = ref(false)
 const passwordSaving = ref(false)
 const passwordFormRef = ref(null)
@@ -179,6 +201,31 @@ const invitationLoading = ref(false)
 const invitationRotating = ref(false)
 const invitationUpdatedAt = ref(null)
 let invitationMaskTimer = null
+
+const resetNativeServer = async () => {
+  if (serverResetting.value) return
+  const { ElMessageBox } = await import('element-plus/es/components/message-box/index.mjs')
+  try {
+    await ElMessageBox.confirm(
+      '更换服务器会退出当前账号并清除本机离线队列和缓存，服务器上的数据不会删除。',
+      '更换应用服务器',
+      { confirmButtonText: '确认更换', cancelButtonText: '取消', type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  serverResetting.value = true
+  try {
+    await authStore.logout()
+    await clearOfflineData()
+    await CapacitorCookies.clearAllCookies()
+    await clearServerOrigin()
+    await router.replace('/connect-server')
+  } finally {
+    serverResetting.value = false
+  }
+}
 
 const passwordForm = reactive({
   oldPassword: '',
@@ -322,6 +369,11 @@ const handleAvatarChange = async (uploadFile) => {
   } finally {
     avatarUploading.value = false
   }
+}
+
+const handleAvatarFiles = (files) => {
+  const file = files?.[0]
+  if (file) handleAvatarChange({ raw: file })
 }
 
 const submitPassword = async () => {

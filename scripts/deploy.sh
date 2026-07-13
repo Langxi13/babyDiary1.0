@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT"
 
 source scripts/java-env.sh
 
-mvn -q -DskipTests clean package -f backend/pom.xml
+mvn "${MAVEN_SETTINGS_ARGS[@]}" -q -DskipTests clean package -f backend/pom.xml
 npm --prefix frontend run build
 
 chmod +x scripts/ensure-ai-env.sh
@@ -31,6 +31,7 @@ scripts/generate-thumbnails.sh
 scripts/ensure-image-permissions.sh
 
 install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
+install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
 install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf
 

@@ -32,14 +32,6 @@ services:
       timeout: 3s
       retries: 20
 
-  ai-mock:
-    image: wiremock/wiremock:3.13.1
-    command: ["--global-response-templating", "--disable-gzip"]
-    ports:
-      - "127.0.0.1:8090:8080"
-    volumes:
-      - ./test-support/wiremock:/home/wiremock:ro
-
   mailpit:
     image: axllent/mailpit:v1.27
     ports:

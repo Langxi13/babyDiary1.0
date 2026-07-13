@@ -9,6 +9,15 @@ fi
 export JAVA_HOME="${JAVA_HOME:-$JAVA_HOME_DEFAULT}"
 export PATH="$JAVA_HOME/bin:$PATH"
 
+MAVEN_SETTINGS_ARGS=()
+if [ -n "${MAVEN_SETTINGS_FILE:-}" ]; then
+  if [ ! -r "$MAVEN_SETTINGS_FILE" ]; then
+    echo "Maven settings file is not readable: $MAVEN_SETTINGS_FILE" >&2
+    exit 1
+  fi
+  MAVEN_SETTINGS_ARGS=(-s "$MAVEN_SETTINGS_FILE")
+fi
+
 if [ ! -x "$JAVA_HOME/bin/java" ]; then
   echo "Java runtime not found at $JAVA_HOME/bin/java" >&2
   exit 1

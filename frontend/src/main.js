@@ -6,7 +6,10 @@ import 'element-plus/es/components/loading/style/css.mjs'
 
 import App from './App.vue'
 import router from './router'
+import { initializeRuntimeConfig, isNativeApp } from './platform/runtimeConfig'
 import './assets/styles/main.scss'
+
+await initializeRuntimeConfig()
 
 const app = createApp(App)
 
@@ -16,7 +19,7 @@ app.directive('loading', vLoading)
 
 app.mount('#app')
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if (!isNativeApp() && 'serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(registration => registration.update()).catch(() => {})
   })

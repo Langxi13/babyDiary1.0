@@ -1,0 +1,15 @@
+{
+  "appId": "io.github.langxi13.babydiary",
+  "appName": "Baby Diary",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "https",
+    "iosScheme": "capacitor"
+  },
+  "plugins": {
+    "CapacitorCookies": {
+      "enabled": true
+    }
+  }
+}

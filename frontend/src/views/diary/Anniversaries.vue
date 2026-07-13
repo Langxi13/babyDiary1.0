@@ -69,7 +69,23 @@
             </div>
             <el-form-item label="封面图片">
               <div class="cover-upload-field">
+                <div
+                  v-if="nativeApp"
+                  class="cover-upload-preview native-cover-preview"
+                  :class="{ 'has-cover': !!coverPreviewUrl }"
+                  :style="coverPreviewStyle"
+                >
+                  <template v-if="coverPreviewUrl">
+                    <span class="cover-preview-mask">当前封面</span>
+                  </template>
+                  <template v-else>
+                    <el-icon><UploadFilled /></el-icon>
+                    <strong>选择一张封面照片</strong>
+                  </template>
+                </div>
+                <native-image-actions v-if="nativeApp" :limit="1" @selected="handleNativeCoverFiles" />
                 <el-upload
+                  v-else
                   class="cover-upload-card"
                   action="#"
                   accept="image/*"
@@ -138,6 +154,8 @@ import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
 import { Delete, Edit, Plus, UploadFilled } from '@element-plus/icons-vue'
 import { anniversaryApi } from '@/api/experience'
+import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatLocalDate } from '@/utils/diaryFormState'
 import { thumbnailImageUrl } from '@/utils/imageUrl'
@@ -162,6 +180,7 @@ const deletingId = ref(null)
 const coverFile = ref(null)
 const coverPreviewUrl = ref('')
 const coverObjectUrl = ref('')
+const nativeApp = isNativeApp()
 
 const form = reactive({
   title: '',
@@ -241,6 +260,11 @@ const handleCoverChange = (uploadFile) => {
   }
   coverFile.value = file
   setCoverPreviewUrl(URL.createObjectURL(file), true)
+}
+
+const handleNativeCoverFiles = (files) => {
+  const file = files?.[0]
+  if (file) handleCoverChange({ raw: file })
 }
 
 const removeCover = () => {

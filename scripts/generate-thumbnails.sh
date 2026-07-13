@@ -12,7 +12,7 @@ if [ -f scripts/java-env.sh ]; then
   source scripts/java-env.sh
 fi
 
-mvn -q -DskipTests -f "$PROJECT_ROOT/backend/pom.xml" compile dependency:build-classpath -Dmdep.outputFile="$CLASSPATH_FILE"
+mvn "${MAVEN_SETTINGS_ARGS[@]}" -q -DskipTests -f "$PROJECT_ROOT/backend/pom.xml" compile dependency:build-classpath -Dmdep.outputFile="$CLASSPATH_FILE"
 
 java -cp "$PROJECT_ROOT/backend/target/classes:$(cat "$CLASSPATH_FILE")" \
   com.langxi.babydiary.tools.ThumbnailBackfillTool "$IMAGE_DIR"

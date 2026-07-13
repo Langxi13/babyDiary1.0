@@ -2,11 +2,15 @@
 # Shell globs are supported. Keep this list narrow and review every addition.
 localhost
 127.0.0.1
+10.0.2.2
 0.0.0.0
 backend
 example.com
 *.example.com
 api.openai.com
+android.googlesource.com
+developer.android.com
+feross.org
 github.com
 ghcr.io
 maven.apache.org
@@ -17,6 +21,11 @@ paulmillr.com
 purl.org
 registry.npmjs.org
 registry.npmmirror.com
+schemas.android.com
+services.gradle.org
 tidelift.com
+www.apache.org
+www.gradle.org
 www.idpf.org
+www.patreon.com
 www.w3.org

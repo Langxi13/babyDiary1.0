@@ -1,3 +1,5 @@
+import { resolveServerUrl } from '../platform/runtimeConfig.js'
+
 const encodeImagePath = (filename) => String(filename || '')
   .split('/')
   .filter(Boolean)
@@ -6,10 +8,10 @@ const encodeImagePath = (filename) => String(filename || '')
 
 export const originalImageUrl = (filename) => {
   const encoded = encodeImagePath(filename)
-  return encoded ? `/images/${encoded}` : ''
+  return encoded ? resolveServerUrl(`/images/${encoded}`) : ''
 }
 
 export const thumbnailImageUrl = (filename) => {
   const encoded = encodeImagePath(filename)
-  return encoded ? `/images/thumbs/480/${encoded}` : ''
+  return encoded ? resolveServerUrl(`/images/thumbs/480/${encoded}`) : ''
 }

@@ -1,7 +1,10 @@
 import request from '@/utils/request'
+import { nativeAuthResultRequest } from '@/platform/nativeAuth'
+import { isNativeApp } from '@/platform/runtimeConfig'
 
 export const authApi = {
   login(data) {
+    if (isNativeApp()) return nativeAuthResultRequest('POST', '/api/v2/auth/login', data)
     return request.post('/api/v2/auth/login', data)
   },
 
@@ -10,6 +13,10 @@ export const authApi = {
   },
 
   logout(accessToken) {
+    if (isNativeApp()) {
+      return nativeAuthResultRequest('POST', '/api/v2/auth/logout', null,
+        accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    }
     return request.post('/api/v2/auth/logout', null, {
       __skipAuthRecovery: true,
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},

@@ -19,13 +19,18 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
 public class ImageStorageService {
 
-    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+    public static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+
+    public static final Set<String> SUPPORTED_IMAGE_TYPES = Set.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp"
+    );
 
     private static final Map<String, String> EXTENSIONS_BY_CONTENT_TYPE = Map.of(
             "image/jpeg", ".jpg",

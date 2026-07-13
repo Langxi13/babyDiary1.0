@@ -150,6 +150,20 @@ export async function getOfflineCache(key, maxAge = 7 * 24 * 60 * 60 * 1000) {
   return value.value
 }
 
+export async function clearOfflineData() {
+  if (typeof indexedDB === 'undefined') return
+  const db = await openDb().catch(() => null)
+  db?.close()
+  dbPromise = null
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME)
+    request.onsuccess = resolve
+    request.onerror = () => reject(request.error)
+    request.onblocked = resolve
+  })
+  notifyQueueChanged()
+}
+
 async function readStore(name, operation, fallback) {
   const db = await openDb()
   if (!db) return fallback

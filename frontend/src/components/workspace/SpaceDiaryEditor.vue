@@ -62,12 +62,18 @@
             <strong>照片与音视频</strong>
             <span v-if="files.length">{{ files.length }} 个文件</span>
           </div>
-          <label class="media-add-button">
+          <label v-if="!nativeApp" class="media-add-button">
             <el-icon><Plus /></el-icon>
             添加
             <input type="file" multiple accept="image/*,audio/*,video/mp4,video/webm,video/quicktime" @change="selectFiles" />
           </label>
+          <label v-else class="media-add-button">
+            <el-icon><Plus /></el-icon>
+            音视频
+            <input type="file" multiple accept="audio/*,video/mp4,video/webm,video/quicktime" @change="selectFiles" />
+          </label>
         </div>
+        <native-image-actions v-if="nativeApp" compact :limit="remainingMediaSlots" @selected="selectNativeImages" />
         <div v-if="files.length" class="selected-media-list">
           <div
             v-for="(file, index) in files"
@@ -128,6 +134,8 @@ import { Check, Close, Plus, Rank } from '@element-plus/icons-vue'
 import { workspaceApi } from '@/api/workspace'
 import { queueOfflineDiaryOperation, queueOfflineOperation } from '@/utils/offlineDb'
 import { withStepUpRetry } from '@/utils/stepUp'
+import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/checkbox/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
@@ -156,6 +164,9 @@ const saving = ref(false)
 const selectedTemplate = ref('')
 const dragIndex = ref(-1)
 const offline = computed(() => typeof navigator !== 'undefined' && !navigator.onLine)
+const nativeApp = isNativeApp()
+const MAX_SELECTED_MEDIA = 20
+const remainingMediaSlots = computed(() => Math.max(0, MAX_SELECTED_MEDIA - files.value.length))
 const drawerSize = computed(() => window.innerWidth <= 768 ? '100%' : 'min(720px, 92vw)')
 const visibilityOptions = [
   { label: '共同可见', value: 'SHARED' },
@@ -283,10 +294,23 @@ const saveMedia = async (diaryId, forceQueue = false) => {
 }
 
 const selectFiles = event => {
-  const next = Array.from(event.target.files || []).map(raw => ({ key: `${raw.name}-${raw.size}-${raw.lastModified}`, raw }))
-  files.value.push(...next)
+  appendSelectedFiles(Array.from(event.target.files || []))
   event.target.value = ''
 }
+
+const appendSelectedFiles = selected => {
+  const available = remainingMediaSlots.value
+  const selectedFiles = Array.from(selected || [])
+  if (selectedFiles.length > available) {
+    ElMessage.warning(`每次编辑最多添加 ${MAX_SELECTED_MEDIA} 个媒体文件`)
+  }
+  const next = selectedFiles
+    .slice(0, available)
+    .map(raw => ({ key: `${raw.name}-${raw.size}-${raw.lastModified}`, raw }))
+  files.value.push(...next)
+}
+
+const selectNativeImages = selected => appendSelectedFiles(selected)
 
 const moveFile = targetIndex => {
   if (dragIndex.value < 0 || dragIndex.value === targetIndex) return

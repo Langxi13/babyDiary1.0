@@ -13,7 +13,7 @@ git -C "$REPO" config user.name test
 git -C "$REPO" config user.email test@example.com
 
 printf '%s\n' 'PUBLIC_URL=https://diary.example.com' 'MAIL_FROM=admin@example.com' > "$REPO/config/public.env.example"
-printf '%s\n' 'loopback=127.0.0.1' > "$REPO/README.md"
+printf '%s\n' 'loopback=127.0.0.1' 'android_emulator=10.0.2.2' > "$REPO/README.md"
 external_host="outside-machine.$(printf '%s' 'cn')"
 printf 'PUBLIC_URL=https://%s\n' "$external_host" > "$TMP_DIR/private-local-file"
 ln -s "$TMP_DIR/private-local-file" "$REPO/config/local-link"

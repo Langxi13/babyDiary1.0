@@ -232,6 +232,25 @@
   }
 }
 
+.native-avatar-actions {
+  width: 100%;
+}
+
+.native-server-panel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  p {
+    margin: 6px 0 0;
+    color: #6f6661;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+}
+
 .avatar-upload-trigger {
   min-height: 108px;
   padding: 16px;
@@ -371,6 +390,17 @@
     .avatar-upload-card {
       grid-column: 1 / -1;
     }
+
+    .native-avatar-actions {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .native-server-panel {
+    align-items: stretch;
+    flex-direction: column;
+
+    :deep(.el-button) { width: 100%; margin: 0; }
   }
 
   .profile-copy {

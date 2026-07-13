@@ -47,6 +47,7 @@ public class SecurityConfig {
                                 "/api/v2/auth/password/reset-request",
                                 "/api/v2/auth/password/reset",
                                 "/api/v2/auth/password/recover",
+                                "/api/v2/client/bootstrap",
                                 "/api/v2/public/shares/**",
                                 "/api/v2/media/public/**",
                                 "/swagger-ui/**",

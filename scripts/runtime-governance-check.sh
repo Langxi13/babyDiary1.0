@@ -15,6 +15,7 @@ NGINX_USER="${NGINX_USER:-www-data}"
 NGINX_GROUP="${NGINX_GROUP:-www-data}"
 NGINX_SITE_FILE="${NGINX_SITE_FILE:-/etc/nginx/sites-available/diary}"
 NGINX_HEALTH_SNIPPET_FILE="${NGINX_HEALTH_SNIPPET_FILE:-/etc/nginx/snippets/baby-diary-backend-health.conf}"
+NGINX_RESOURCE_POLICY_MAP_FILE="${NGINX_RESOURCE_POLICY_MAP_FILE:-/etc/nginx/conf.d/baby-diary-resource-policy-map.conf}"
 TMP_ROOT="${TMP_ROOT:-/tmp}"
 CHECK_OS_USER="${CHECK_OS_USER:-true}"
 
@@ -138,6 +139,17 @@ fi
 echo "backend bound to loopback"
 
 if [ -f "$NGINX_SITE_FILE" ]; then
+  require_file "$NGINX_RESOURCE_POLICY_MAP_FILE"
+  grep -q 'map $request_uri $baby_diary_resource_policy' "$NGINX_RESOURCE_POLICY_MAP_FILE" || {
+    echo "nginx native resource policy map is missing" >&2
+    exit 1
+  }
+  grep -q '~\^/images/ "cross-origin"' "$NGINX_RESOURCE_POLICY_MAP_FILE" || {
+    echo "nginx image resource policy must allow native clients" >&2
+    exit 1
+  }
+  echo "nginx native resource policy included"
+
   grep -q 'include /etc/nginx/snippets/baby-diary-security-headers.conf;' "$NGINX_SITE_FILE" || {
     echo "nginx site must include the Baby Diary security header snippet" >&2
     exit 1

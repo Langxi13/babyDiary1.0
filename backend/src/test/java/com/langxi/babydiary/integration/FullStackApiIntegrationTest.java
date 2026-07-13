@@ -85,11 +85,24 @@ class FullStackApiIntegrationTest {
         assertThat(apiMappings).hasSizeGreaterThanOrEqualTo(132);
         assertThat(apiMappings).contains(
                 "GET /api/albums/groups",
+                "GET /api/v2/client/bootstrap",
                 "GET /api/v2/spaces",
                 "POST /api/v2/spaces/{spaceId}/diaries",
                 "POST /api/v2/auth/login"
         );
         assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void nativeClientBootstrapIsPublicVersionedAndNotCached() {
+        ResponseEntity<JsonNode> response = rest.getForEntity("/api/v2/client/bootstrap", JsonNode.class);
+
+        assertSuccess(response);
+        assertThat(response.getHeaders().getCacheControl()).contains("no-store");
+        assertThat(response.getBody().path("data").path("apiVersion").asInt()).isEqualTo(2);
+        assertThat(response.getBody().path("data").path("nativeSessionMode").asText()).isEqualTo("COOKIE");
+        assertThat(response.getBody().path("data").path("upload").path("maxImageBytes").asLong())
+                .isEqualTo(10L * 1024L * 1024L);
     }
 
     @Test
@@ -265,7 +278,8 @@ class FullStackApiIntegrationTest {
                 "/api/v2/auth/email/confirm",
                 "/api/v2/auth/password/reset-request",
                 "/api/v2/auth/password/reset",
-                "/api/v2/auth/password/recover"
+                "/api/v2/auth/password/recover",
+                "/api/v2/client/bootstrap"
         ).contains(path) || path.startsWith("/api/v2/public/shares/") || path.startsWith("/api/v2/media/public/");
     }
 

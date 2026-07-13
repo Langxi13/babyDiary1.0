@@ -22,7 +22,7 @@ public class DiaryRequestValidator {
     private static final int MAX_KEYWORD_LENGTH = 200;
     private static final int MAX_MOOD_KEY_LENGTH = 32;
     private static final int MAX_TAGS = 50;
-    private static final int MAX_IMAGES = 50;
+    public static final int MAX_IMAGES = 50;
     private static final LocalDate DEFAULT_START_DATE = LocalDate.of(2022, 1, 1);
 
     public DiaryInput diaryInput(String title, String content, String date,

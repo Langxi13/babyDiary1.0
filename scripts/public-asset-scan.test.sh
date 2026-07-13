@@ -21,6 +21,15 @@ git -C "$REPO" commit -qm first-version
 PROJECT_ROOT="$REPO" PRIVACY_ASSET_ALLOWLIST_FILE="$ALLOWLIST" \
   bash "$ROOT/scripts/public-asset-scan.sh" >/dev/null
 
+printf '%s\n' 'unreviewed executable archive' > "$REPO/public/tool.jar"
+if PROJECT_ROOT="$REPO" PRIVACY_SCAN_HISTORY=false PRIVACY_ASSET_ALLOWLIST_FILE="$ALLOWLIST" \
+  bash "$ROOT/scripts/public-asset-scan.sh" >"$TMP_DIR/jar.out" 2>&1; then
+  echo "asset scan should review executable JAR files" >&2
+  exit 1
+fi
+grep -q 'unreviewed public asset: public/tool.jar' "$TMP_DIR/jar.out"
+rm "$REPO/public/tool.jar"
+
 printf '%s\n' 'reviewed synthetic image version two' > "$REPO/public/fixture.png"
 if PROJECT_ROOT="$REPO" PRIVACY_SCAN_HISTORY=false PRIVACY_ASSET_ALLOWLIST_FILE="$ALLOWLIST" \
   bash "$ROOT/scripts/public-asset-scan.sh" >"$TMP_DIR/changed.out" 2>&1; then

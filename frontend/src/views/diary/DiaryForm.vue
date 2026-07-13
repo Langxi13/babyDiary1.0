@@ -169,7 +169,12 @@
                       </div>
                     </article>
                   </div>
-                  <div v-if="isAndroidDevice" class="android-native-upload">
+                  <native-image-actions
+                    v-if="nativeApp"
+                    :limit="Math.max(0, 50 - fileList.length)"
+                    @selected="appendNativeFiles"
+                  />
+                  <div v-else-if="isAndroidDevice" class="android-native-upload">
                     <span class="android-upload-title">添加照片</span>
                     <input
                       class="android-native-file-input"
@@ -295,6 +300,8 @@ import { ArrowLeft, Check, Close, Plus } from '@element-plus/icons-vue'
 import { useDiaryStore } from '@/stores/diary'
 import { draftApi, tagApi } from '@/api/experience'
 import { useDiaryImages } from '@/composables/useDiaryImages'
+import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import { MOODS, stripHtml } from '@/utils/diaryMeta'
 import {
   DEFAULT_TAG_COLORS,
@@ -329,6 +336,7 @@ const draftStatus = ref('')
 const autosaveTimer = ref(null)
 const loadingInitialData = ref(true)
 const tagSaving = ref(false)
+const nativeApp = isNativeApp()
 
 const isEdit = computed(() => !!route.params.id)
 const diaryId = computed(() => route.params.id)
@@ -349,7 +357,9 @@ const {
   removeImageAt,
   moveImage,
   handleNativeImageChange,
+  appendNativeFiles,
   loadSharedImages,
+  loadNativeSharedImages,
   appendImagesToFormData,
   setExistingImages,
   initializeImageUpload,
@@ -627,12 +637,15 @@ onMounted(async () => {
   loadingInitialData.value = true
   await Promise.all([fetchTags(), loadDiary()])
   await loadDraft()
+  loadNativeSharedImages()
+  window.addEventListener('native-share:ready', loadNativeSharedImages)
   await loadSharedImages()
   initEditor()
   loadingInitialData.value = false
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('native-share:ready', loadNativeSharedImages)
   window.clearTimeout(autosaveTimer.value)
   disposeImages()
   editor.value?.destroy()

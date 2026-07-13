@@ -84,7 +84,7 @@
                 <span>{{ link.label }}</span>
                 <el-icon class="sheet-link-arrow"><ArrowRight /></el-icon>
               </button>
-              <button type="button" @click="openInstall">
+              <button v-if="!nativeApp" type="button" @click="openInstall">
                 <el-icon class="sheet-link-icon"><Download /></el-icon>
                 <span>添加到桌面</span>
                 <el-icon class="sheet-link-arrow"><ArrowRight /></el-icon>
@@ -153,6 +153,7 @@ import {
   isMobileTabActive,
   isPrimaryMobileTab
 } from './mobileNavigation'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/icon/style/css.mjs'
 
 const route = useRoute()
@@ -163,6 +164,7 @@ const secondarySheetOpen = ref(false)
 const installSheetOpen = ref(false)
 const deferredInstallPrompt = ref(null)
 const keyboardOpen = ref(false)
+const nativeApp = isNativeApp()
 
 const iconMap = {
   HomeFilled,

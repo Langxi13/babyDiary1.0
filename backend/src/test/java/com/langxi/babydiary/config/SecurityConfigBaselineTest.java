@@ -22,6 +22,7 @@ class SecurityConfigBaselineTest {
         assertThat(source).contains("UsernamePasswordAuthenticationFilter.class");
         assertThat(source).contains("\"/api/auth/login\"");
         assertThat(source).contains("\"/api/auth/register\"");
+        assertThat(source).contains("\"/api/v2/client/bootstrap\"");
         assertThat(source).contains("\"/images/**\"");
         assertThat(source).contains("\"/swagger-ui/**\"");
         assertThat(source).contains("\"/v3/api-docs/**\"");

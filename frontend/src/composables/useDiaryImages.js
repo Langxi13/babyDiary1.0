@@ -3,9 +3,11 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { originalImageUrl } from '@/utils/imageUrl'
 import { consumeSharedImageFiles, isShareTargetEntryRoute, toSharedUploadItem } from '@/utils/shareTargetFiles'
 import { copyText } from '@/utils/copyText'
+import { takeStagedNativeShareFiles } from '@/platform/nativeShareInbox'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const MAX_DIARY_IMAGES = 50
 
 export function useDiaryImages({ route, router, isEdit }) {
   const fileList = ref([])
@@ -98,8 +100,19 @@ export function useDiaryImages({ route, router, isEdit }) {
 
   const handleNativeImageChange = (event) => {
     const input = event.target
-    const acceptedFiles = Array.from(input.files || [])
+    appendNativeFiles(Array.from(input.files || []))
+    input.value = ''
+  }
+
+  const appendNativeFiles = (files) => {
+    const available = Math.max(0, MAX_DIARY_IMAGES - fileList.value.length)
+    const validFiles = Array.from(files || [])
       .filter(isValidImageFile)
+    if (validFiles.length > available) {
+      ElMessage.warning(`单篇日记最多添加 ${MAX_DIARY_IMAGES} 张图片`)
+    }
+    const acceptedFiles = validFiles
+      .slice(0, available)
       .map((file, index) => ({
         name: file.name,
         uid: `native-${Date.now()}-${index}`,
@@ -108,7 +121,6 @@ export function useDiaryImages({ route, router, isEdit }) {
       }))
 
     fileList.value = [...fileList.value, ...acceptedFiles]
-    input.value = ''
   }
 
   const loadSharedImages = async () => {
@@ -129,6 +141,15 @@ export function useDiaryImages({ route, router, isEdit }) {
       sharedImporting.value = false
       router.replace({ path: '/diaries/create' })
     }
+  }
+
+  const loadNativeSharedImages = () => {
+    if (isEdit.value) return 0
+    const sharedFiles = takeStagedNativeShareFiles()
+    if (!sharedFiles.length) return 0
+    appendNativeFiles(sharedFiles)
+    ElMessage.success(`已从系统分享载入 ${sharedFiles.length} 张照片`)
+    return sharedFiles.length
   }
 
   const imageOrderForFile = (file, newImageIndex) => {
@@ -201,7 +222,9 @@ export function useDiaryImages({ route, router, isEdit }) {
     removeImageAt,
     moveImage,
     handleNativeImageChange,
+    appendNativeFiles,
     loadSharedImages,
+    loadNativeSharedImages,
     appendImagesToFormData,
     setExistingImages,
     initializeImageUpload,

@@ -1,6 +1,8 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import router from '@/router'
+import { nativeAuthRawRequest } from '@/platform/nativeAuth'
+import { getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
 import {
   getClientSessionGeneration,
   isClientSessionGenerationCurrent
@@ -35,11 +37,14 @@ const getRefreshRequest = () => {
   if (!refreshPromise || refreshGeneration !== generation) {
     cancelRefreshRequest()
     const controller = new AbortController()
-    const pending = axios.post(
-      `${request.defaults.baseURL || ''}/api/v2/auth/refresh`,
-      null,
-      { withCredentials: true, timeout: 15000, signal: controller.signal }
-    ).finally(() => {
+    const pendingRequest = isNativeApp()
+      ? nativeAuthRawRequest('POST', '/api/v2/auth/refresh', null)
+      : axios.post(
+          `${request.defaults.baseURL || ''}/api/v2/auth/refresh`,
+          null,
+          { withCredentials: true, timeout: 15000, signal: controller.signal }
+        )
+    const pending = pendingRequest.finally(() => {
       if (refreshPromise === pending) {
         refreshPromise = null
         refreshGeneration = null
@@ -94,6 +99,12 @@ const redirectToLogin = () => {
 request.interceptors.request.use(
   config => {
     config.__clientSessionGeneration = getClientSessionGeneration()
+    if (isNativeApp()) {
+      const origin = getServerOrigin()
+      if (!origin) return Promise.reject(new Error('请先配置服务器地址'))
+      config.baseURL = origin
+      config.withCredentials = false
+    }
     const token = localStorage.getItem('token')
     if (token && !config.headers.Authorization) {
       config.headers['Authorization'] = `Bearer ${token}`
