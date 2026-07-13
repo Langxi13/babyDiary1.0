@@ -2,6 +2,10 @@
 
 ## 2026-07-13
 
+- Reworked the phone diary list around a persistent search field and compact date, tag, and mood disclosures, keeping advanced filters collapsed until requested and preserving a stable narrow-screen layout.
+- Kept diary titles, dates, and always-visible edit/delete actions on one mobile card header row, reduced preview density, and added direct deletion to the diary detail action bar.
+- Added router scroll restoration rules so newly opened diary details start at the top while browser back navigation still restores the previous list position.
+- Extended component and three-browser regressions for filter disclosures, card action alignment, top-of-detail navigation, and 320px mobile visual coverage.
 - Fixed diary image replacement so removing every existing image while adding new uploads clears the old files on the first update, with frontend FormData and backend storage regressions.
 - Removed the obsolete PWA and Android system-share receivers now that the native client can open the gallery and camera directly inside every image upload surface.
 - Added a permanent Chromium phone-layout matrix for 320px, 390px, and 430px widths, and corrected narrow-screen diary actions, workspace filters, home cards, AI report summaries, text wrapping, and spacing.

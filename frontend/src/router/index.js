@@ -173,7 +173,11 @@ const routes = [
 
 const router = createRouter({
   history: isNativeApp() ? createWebHashHistory() : createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(_to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { left: 0, top: 0 }
+  }
 })
 
 export function preloadRouteComponent(path) {

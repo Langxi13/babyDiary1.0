@@ -8,6 +8,19 @@
         </el-button>
         <div class="actions">
           <el-button class="detail-list-button" @click="router.push('/diaries')">列表</el-button>
+          <el-popconfirm
+            title="确定要删除这篇日记吗？"
+            confirm-button-text="确定"
+            cancel-button-text="取消"
+            @confirm="handleDelete"
+          >
+            <template #reference>
+              <el-button type="danger" plain :loading="deleting" :disabled="deleting">
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </template>
+          </el-popconfirm>
           <el-button type="primary" @click="router.push(`/diaries/${diaryId}/edit`)">
             <el-icon><Edit /></el-icon>
             编辑
@@ -68,8 +81,9 @@ import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElImage } from 'element-plus/es/components/image/index.mjs'
+import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
-import { ArrowLeft, Edit } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, Edit } from '@element-plus/icons-vue'
 import { diaryApi } from '@/api/diary'
 import { moodColor, moodLabel } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
@@ -79,12 +93,14 @@ import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
 import 'element-plus/es/components/image/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
+import 'element-plus/es/components/popconfirm/style/css.mjs'
 import 'element-plus/es/components/tag/style/css.mjs'
 
 const route = useRoute()
 const router = useRouter()
 const diaryId = computed(() => route.params.id)
 const loading = ref(false)
+const deleting = ref(false)
 const diary = ref(null)
 
 const loadDiary = async () => {
@@ -99,6 +115,20 @@ const loadDiary = async () => {
     }
   } finally {
     loading.value = false
+  }
+}
+
+const handleDelete = async () => {
+  if (deleting.value) return
+  deleting.value = true
+  try {
+    await diaryApi.deleteDiary(diaryId.value)
+    ElMessage.success('删除成功')
+    await router.replace('/diaries')
+  } catch (error) {
+    if (!error?.message) ElMessage.error('删除失败')
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -214,13 +244,22 @@ onMounted(loadDiary)
 
 @media (max-width: 768px) {
   .page-header {
+    position: sticky;
+    top: calc(var(--mobile-topbar-height) + env(safe-area-inset-top));
+    z-index: 15;
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 10px;
+    margin: -4px 0 10px;
+    padding: 6px 0;
+    background: rgba(247, 243, 239, 0.96);
+    backdrop-filter: blur(12px);
   }
 
   .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
+    gap: 8px;
 
     :deep(.el-button) {
       width: 100%;
@@ -234,8 +273,11 @@ onMounted(loadDiary)
   }
 
   .detail-panel {
-    padding: 16px;
-    border-radius: 8px;
+    padding: 6px 2px 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .detail-head h1 {

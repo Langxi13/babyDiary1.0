@@ -97,3 +97,77 @@ test.describe('critical phone layouts stay readable', () => {
     })
   }
 })
+
+test('phone diary list keeps filters collapsed, actions aligned, and detail routes at the top', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The phone diary interaction regression runs once on Chromium.')
+  const assertQuality = watchPageQuality(page)
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/diaries')
+  await page.waitForLoadState('networkidle')
+
+  const filterSection = page.locator('.filter-section')
+  const collapsedFilter = await filterSection.boundingBox()
+  expect(collapsedFilter?.height).toBeLessThan(110)
+  await expect(page.locator('.mobile-filter-panel')).toHaveCount(0)
+
+  const dateTrigger = page.locator('.mobile-filter-trigger').first()
+  await dateTrigger.click()
+  await expect(page.locator('.mobile-filter-panel')).toBeVisible()
+  await expect(dateTrigger).toHaveAttribute('aria-expanded', 'true')
+  if (process.env.MOBILE_UI_SCREENSHOTS === 'true') {
+    await page.screenshot({
+      path: testInfo.outputPath('320-diaries-date-filter.png'),
+      animations: 'disabled'
+    })
+  }
+  await dateTrigger.click()
+  await expect(page.locator('.mobile-filter-panel')).toHaveCount(0)
+
+  const tagTrigger = page.locator('.mobile-filter-trigger').nth(1)
+  await tagTrigger.click()
+  await expect(page.locator('.mobile-filter-panel')).toBeVisible()
+  if (process.env.MOBILE_UI_SCREENSHOTS === 'true') {
+    await page.screenshot({
+      path: testInfo.outputPath('320-diaries-tag-filter.png'),
+      animations: 'disabled'
+    })
+  }
+  await tagTrigger.click()
+
+  const card = page.locator('.diary-card').first()
+  await expect(card).toBeVisible()
+  await expect(card.locator('.edit-action')).toBeVisible()
+  await expect(card.locator('.delete-action')).toBeVisible()
+  const alignment = await card.evaluate(element => {
+    const heading = element.querySelector('.diary-heading').getBoundingClientRect()
+    const edit = element.querySelector('.edit-action').getBoundingClientRect()
+    const remove = element.querySelector('.delete-action').getBoundingClientRect()
+    return {
+      headingTop: heading.top,
+      editTop: edit.top,
+      deleteTop: remove.top
+    }
+  })
+  expect(Math.abs(alignment.headingTop - alignment.editTop)).toBeLessThanOrEqual(2)
+  expect(Math.abs(alignment.editTop - alignment.deleteTop)).toBeLessThanOrEqual(2)
+
+  await page.evaluate(() => {
+    document.body.style.minHeight = '2400px'
+    window.scrollTo(0, 900)
+  })
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+  await card.evaluate(element => element.click())
+  await page.waitForURL(/\/diaries\/\d+$/)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await expect(page.getByRole('button', { name: '编辑' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '删除' })).toBeVisible()
+  await page.evaluate(() => { document.body.style.minHeight = '' })
+  if (process.env.MOBILE_UI_SCREENSHOTS === 'true') {
+    await page.screenshot({
+      path: testInfo.outputPath('320-diary-detail.png'),
+      fullPage: true,
+      animations: 'disabled'
+    })
+  }
+  await assertQuality()
+})

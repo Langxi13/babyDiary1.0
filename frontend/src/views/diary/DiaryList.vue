@@ -13,28 +13,25 @@
       </div>
 
       <div class="filter-section">
-        <el-form :inline="true" :model="filterForm" class="filter-form">
+        <diary-mobile-filters
+          v-if="isMobileViewport"
+          v-model:keyword="filterForm.keyword"
+          v-model:start-date="filterForm.startDate"
+          v-model:end-date="filterForm.endDate"
+          v-model:tag-id="filterForm.tagId"
+          v-model:mood-key="filterForm.moodKey"
+          :tags="tags"
+          :moods="MOODS"
+          :exporting="exporting"
+          @keyword-input="scheduleKeywordFilter"
+          @filter="handleFilter"
+          @reset="resetFilters"
+          @export="handleExport"
+        />
+
+        <el-form v-else :inline="true" :model="filterForm" class="filter-form">
           <el-form-item label="日期" class="date-filter">
-            <div v-if="isMobileViewport" class="mobile-date-fields">
-              <el-date-picker
-                v-model="filterForm.startDate"
-                type="date"
-                placeholder="开始日期"
-                format="YYYY年MM月DD日"
-                value-format="YYYY-MM-DD"
-                @change="handleFilter"
-              />
-              <el-date-picker
-                v-model="filterForm.endDate"
-                type="date"
-                placeholder="结束日期"
-                format="YYYY年MM月DD日"
-                value-format="YYYY-MM-DD"
-                @change="handleFilter"
-              />
-            </div>
             <el-date-picker
-              v-else
               v-model="desktopDateRange"
               type="daterange"
               range-separator="至"
@@ -89,7 +86,7 @@
         <article v-for="diary in diaries" :key="diary.diaryId" class="diary-card" @click="openDiary(diary.diaryId)">
           <div class="diary-content">
             <div class="diary-header">
-              <div>
+              <div class="diary-heading">
                 <h2 class="diary-title">{{ diary.title }}</h2>
                 <div class="meta-row">
                   <span class="diary-date">{{ formatChineseDate(diary.date) }}</span>
@@ -98,12 +95,20 @@
                   </el-tag>
                 </div>
               </div>
-              <div class="diary-actions">
+              <div class="diary-actions" role="group" aria-label="日记操作" @click.stop>
                 <el-button class="view-action" type="primary" size="small" text @click.stop="openDiary(diary.diaryId)">
                   <el-icon><View /></el-icon>
                   <span class="action-label">查看详情</span>
                 </el-button>
-                <el-button type="primary" size="small" text @click.stop="handleEdit(diary.diaryId)">
+                <el-button
+                  class="edit-action"
+                  type="primary"
+                  size="small"
+                  text
+                  aria-label="编辑日记"
+                  title="编辑日记"
+                  @click.stop="handleEdit(diary.diaryId)"
+                >
                   <el-icon><Edit /></el-icon>
                   <span class="action-label">编辑</span>
                 </el-button>
@@ -118,8 +123,11 @@
                       type="danger"
                       size="small"
                       text
+                      class="delete-action"
                       :loading="deletingId === diary.diaryId"
                       :disabled="!!deletingId"
+                      aria-label="删除日记"
+                      title="删除日记"
                       @click.stop
                     >
                       <el-icon><Delete /></el-icon>
@@ -192,6 +200,7 @@ import { ElPagination } from 'element-plus/es/components/pagination/index.mjs'
 import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { Search, Plus, Download, Edit, Delete, View } from '@element-plus/icons-vue'
+import DiaryMobileFilters from '@/components/diary/DiaryMobileFilters.vue'
 import { useDiaryStore } from '@/stores/diary'
 import { tagApi } from '@/api/experience'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
@@ -220,7 +229,7 @@ const pagination = computed(() => diaryStore.pagination)
 const tags = ref([])
 const exporting = ref(false)
 const deletingId = ref(null)
-const isMobileViewport = ref(false)
+const isMobileViewport = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches)
 const paginationLayout = computed(() => isMobileViewport.value ? 'prev, pager, next' : 'total, prev, pager, next, jumper')
 const pagerCount = computed(() => isMobileViewport.value ? 5 : 7)
 let keywordDebounceTimer = null
