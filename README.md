@@ -78,7 +78,17 @@ scripts/build-android.sh
 
 默认客户端只接受 HTTPS。仅本机/模拟器调试时可执行 `VITE_NATIVE_ALLOW_HTTP=true scripts/build-android.sh`，此开关只允许 localhost、`10.0.2.2` 和私有局域网地址；Release Manifest 始终禁止明文流量。
 
-签名 APK/AAB 由 `.github/workflows/android-release.yml` 手动触发，签名材料只保存在 GitHub Secrets。iOS 依赖已锁定，但平台工程和真机构建必须在 Mac/Xcode 环境完成，当前 Linux 服务器不伪造 iOS 验收结果。
+项目使用固定的 Android Release 证书。私钥和密码只保存在服务器权限为 `600` 的私有文件、受校验备份及 GitHub Actions Secrets 中；仓库仅保存 `config/android-release-cert.sha256` 公钥指纹。首次初始化与同步命令如下，已经初始化后重复执行不会替换密钥：
+
+```bash
+sudo scripts/ensure-android-signing.sh
+scripts/sync-android-signing-secrets.sh
+scripts/build-android-release.sh
+```
+
+正式版本由 `config/android-release-version.properties` 跟踪，每次发布先提交递增的 `VERSION_CODE` 和新的 `VERSION_NAME`，不在工作流界面临时填写。`.github/workflows/android-release.yml` 会校验证书指纹和版本信息，生成具名 APK、AAB 与 `SHA256SUMS`，并发布不可覆盖的 GitHub Beta Release。Debug 包使用临时调试证书，首次切换到正式签名 Beta 时需要卸载 Debug 包一次；此后只要版本号递增即可覆盖升级。分支项目必须生成自己的密钥并更新公开证书指纹，不能复用本项目私钥。
+
+iOS 依赖已锁定，但平台工程和真机构建必须在 Mac/Xcode 环境完成，当前 Linux 服务器不伪造 iOS 验收结果。
 
 ## 验证
 
@@ -96,7 +106,7 @@ scripts/security-scan.sh
 
 `security-scan.sh` 会先获取远端公开分支、标签、Notes 和 PR refs，检查当前非忽略文件、提交/标签元数据与全部可达 Git 历史中的未批准域名、邮箱、IP、主机路径、个人标识和敏感文件名，再执行依赖、配置和凭据扫描。图片、文档、归档和音视频等不可可靠文本扫描的资产必须经过人工检查，并记录在 `config/public-asset-allowlist.sha256`。允许公开的示例及依赖主机集中维护在 `config/privacy-host-allowlist.txt`，不得将生产地址加入该列表。
 
-Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。完整 Android 构建纳入 CI；相册、相机、Cookie 持久化和返回键仍必须在真实设备上验收，桌面构建成功不能替代真机结论。
+Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`scripts/verify-android-artifact.sh` 还会检查签名证书、版本、SDK、明文流量和包内服务器配置。完整 Android 构建纳入 CI；相册、相机、Cookie 持久化、返回键和签名版覆盖升级仍必须在真实设备上验收，桌面构建成功不能替代真机结论。
 
 打包预发布、ZAP、k6、iPhone/Android PWA 真机矩阵和生产冒烟步骤见 [测试与发布验收方案](document/测试与发布验收方案.md)。自动化环境只使用合成数据和 Mock AI，不复制真实用户资料。开源发布基线与审查证据见 [开源隐私审查记录](document/开源隐私审查记录.md)。
 

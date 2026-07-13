@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Established a permanent Android release identity outside Git, pinned its public certificate fingerprint, synchronized encrypted GitHub Actions secrets, and added checked backup coverage for signing recovery.
+- Added a resource-bounded local signed Release builder and artifact verifier covering APK/AAB signatures, package/version metadata, SDK levels, backup and cleartext policy, and server-free Capacitor configuration.
+- Extended the Android workflow to publish immutable, named APK/AAB beta releases with SHA-256 checksums, and added an Android 13 themed monochrome diary icon.
 - Reworked the phone diary list around a persistent search field and compact date, tag, and mood disclosures, keeping advanced filters collapsed until requested and preserving a stable narrow-screen layout.
 - Kept diary titles, dates, and always-visible edit/delete actions on one mobile card header row, reduced preview density, and added direct deletion to the diary detail action bar.
 - Added router scroll restoration rules so newly opened diary details start at the top while browser back navigation still restores the previous list position.

@@ -15,13 +15,17 @@ cat > "$BACKUP_DIR/baby-diary.sql" <<'SQL'
 -- MySQL dump
 CREATE TABLE diary (diary_id int);
 SQL
-sha256sum "$BACKUP_DIR/project.tgz" "$BACKUP_DIR/baby-diary.sql" > "$BACKUP_DIR/SHA256SUMS"
+printf 'ANDROID_KEYSTORE_FILE=/etc/baby-diary/android-signing/baby-diary-upload.jks\n' > "$BACKUP_DIR/android-signing.env"
+printf 'test keystore\n' > "$BACKUP_DIR/android-upload.jks"
+chmod 600 "$BACKUP_DIR/android-signing.env" "$BACKUP_DIR/android-upload.jks"
+sha256sum "$BACKUP_DIR/project.tgz" "$BACKUP_DIR/baby-diary.sql" "$BACKUP_DIR/android-signing.env" "$BACKUP_DIR/android-upload.jks" > "$BACKUP_DIR/SHA256SUMS"
 
 OUTPUT="$("$ROOT/scripts/verify-backup.sh" "$BACKUP_DIR")"
 
 grep -q "project archive ok" <<<"$OUTPUT"
 grep -q "database dump ok" <<<"$OUTPUT"
 grep -q "checksums ok" <<<"$OUTPUT"
+grep -q "Android signing backup permissions ok" <<<"$OUTPUT"
 
 rm "$BACKUP_DIR/baby-diary.sql"
 if "$ROOT/scripts/verify-backup.sh" "$BACKUP_DIR" >/dev/null 2>&1; then
@@ -34,3 +38,6 @@ if grep -q -- '-p"$MYSQL_PASSWORD"' "$ROOT/scripts/backup.sh"; then
   echo "backup should not expose the database password in process arguments" >&2
   exit 1
 fi
+
+grep -q 'android-signing.env' "$ROOT/scripts/backup.sh"
+grep -q 'android-upload.jks' "$ROOT/scripts/backup.sh"

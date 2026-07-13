@@ -48,6 +48,20 @@ if [ -f /etc/baby-diary/backend.env ]; then
   chmod 600 "$TARGET/backend.env"
 fi
 
+ANDROID_SIGNING_ENV_FILE="${ANDROID_SIGNING_ENV_FILE:-/etc/baby-diary/android-signing.env}"
+if [ -f "$ANDROID_SIGNING_ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ANDROID_SIGNING_ENV_FILE"
+  set +a
+  if [ ! -s "${ANDROID_KEYSTORE_FILE:-}" ]; then
+    echo "Android signing environment exists but its keystore is missing" >&2
+    exit 1
+  fi
+  install -m 0600 "$ANDROID_SIGNING_ENV_FILE" "$TARGET/android-signing.env"
+  install -m 0600 "$ANDROID_KEYSTORE_FILE" "$TARGET/android-upload.jks"
+fi
+
 sha256sum "$TARGET"/* > "$TARGET/SHA256SUMS"
 bash "$PROJECT_ROOT/scripts/verify-backup.sh" "$TARGET" >/dev/null
 echo "$TARGET"

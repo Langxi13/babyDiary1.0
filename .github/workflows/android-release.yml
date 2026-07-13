@@ -3,19 +3,14 @@ name: Android internal release
 on:
   workflow_dispatch:
     inputs:
-      version_code:
-        description: Monotonically increasing Android version code
+      prerelease:
+        description: Publish as a GitHub prerelease
         required: true
-        default: "1"
-        type: string
-      version_name:
-        description: User-visible version, for example 1.0.0
-        required: true
-        default: "1.0.0"
-        type: string
+        default: true
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -23,6 +18,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Resolve tracked release version
+        id: release_version
+        run: |
+          . config/android-release-version.properties
+          if [[ ! "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]] \
+            || [[ ! "$VERSION_NAME" =~ ^[0-9]+(\.[0-9]+){1,3}([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "Tracked Android release version is invalid" >&2
+            exit 1
+          fi
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v$VERSION_NAME" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "22"
@@ -54,6 +61,18 @@ jobs:
           : "${KEY_PASSWORD:?ANDROID_KEY_PASSWORD is required}"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/baby-diary-upload.jks"
           keytool -list -keystore "$RUNNER_TEMP/baby-diary-upload.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          expected_cert_sha256="$(tr -d '[:space:]' < config/android-release-cert.sha256)"
+          actual_cert_sha256="$(keytool -exportcert \
+            -keystore "$RUNNER_TEMP/baby-diary-upload.jks" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            | sha256sum \
+            | cut -d' ' -f1)"
+          if [ "$actual_cert_sha256" != "$expected_cert_sha256" ]; then
+            echo "Android signing certificate does not match the pinned release certificate" >&2
+            exit 1
+          fi
+          echo "Android release certificate sha256: $actual_cert_sha256"
       - run: npm --prefix frontend run build
       - run: npx cap sync android
         working-directory: frontend
@@ -64,19 +83,73 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_VERSION_CODE: ${{ inputs.version_code }}
-          ANDROID_VERSION_NAME: ${{ inputs.version_name }}
+          ANDROID_VERSION_CODE: ${{ steps.release_version.outputs.version_code }}
+          ANDROID_VERSION_NAME: ${{ steps.release_version.outputs.version_name }}
         run: ./gradlew assembleRelease bundleRelease
       - name: Verify signed artifacts
-        working-directory: frontend/android
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify app/build/outputs/bundle/release/app-release.aab >/dev/null
+          scripts/verify-android-artifact.sh \
+            frontend/android/app/build/outputs/apk/release/app-release.apk \
+            frontend/android/app/build/outputs/bundle/release/app-release.aab \
+            "${{ steps.release_version.outputs.version_code }}" \
+            "${{ steps.release_version.outputs.version_name }}"
+      - name: Prepare named release artifacts
+        id: release_assets
+        working-directory: frontend/android
+        env:
+          VERSION_NAME: ${{ steps.release_version.outputs.version_name }}
+        run: |
+          safe_version="$(printf '%s' "$VERSION_NAME" | tr -c 'A-Za-z0-9._-' '-')"
+          output_dir="$RUNNER_TEMP/android-release-assets"
+          mkdir -p "$output_dir"
+          install -m 0644 app/build/outputs/apk/release/app-release.apk "$output_dir/BabyDiary-$safe_version.apk"
+          install -m 0644 app/build/outputs/bundle/release/app-release.aab "$output_dir/BabyDiary-$safe_version.aab"
+          (
+            cd "$output_dir"
+            sha256sum "BabyDiary-$safe_version.apk" "BabyDiary-$safe_version.aab" > SHA256SUMS
+          )
+          echo "output_dir=$output_dir" >> "$GITHUB_OUTPUT"
       - name: Upload signed artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: baby-diary-android-internal
-          path: |
-            frontend/android/app/build/outputs/apk/release/app-release.apk
-            frontend/android/app/build/outputs/bundle/release/app-release.aab
+          name: baby-diary-android-${{ steps.release_version.outputs.version_name }}
+          path: ${{ steps.release_assets.outputs.output_dir }}/*
           if-no-files-found: error
+      - name: Publish immutable GitHub beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_version.outputs.release_tag }}
+          VERSION_CODE: ${{ steps.release_version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.release_version.outputs.version_name }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_ASSET_DIR: ${{ steps.release_assets.outputs.output_dir }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Signed Android releases must be built from main" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Android release tag already exists and will not be overwritten" >&2
+            exit 1
+          fi
+          notes_file="$RUNNER_TEMP/android-release-notes.md"
+          cat > "$notes_file" <<EOF
+          Permanently signed Baby Diary Android beta.
+
+          - Version name: $VERSION_NAME
+          - Version code: $VERSION_CODE
+          - Commit: $GITHUB_SHA
+          - Signing certificate SHA-256: $(tr -d '[:space:]' < config/android-release-cert.sha256)
+
+          The APK is for direct installation. The AAB is for Google Play internal testing. SHA256SUMS contains both artifact checksums.
+          EOF
+          release_flags=()
+          if [ "$PRERELEASE" = "true" ]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" \
+            "$RELEASE_ASSET_DIR"/* \
+            --target "$GITHUB_SHA" \
+            --title "Baby Diary Android $VERSION_NAME" \
+            --notes-file "$notes_file" \
+            "${release_flags[@]}"

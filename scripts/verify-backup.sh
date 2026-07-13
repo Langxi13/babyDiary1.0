@@ -55,3 +55,18 @@ if [ -f "$BACKUP_DIR/backend.env" ]; then
   fi
   echo "environment file permissions ok"
 fi
+
+if [ -f "$BACKUP_DIR/android-signing.env" ] || [ -f "$BACKUP_DIR/android-upload.jks" ]; then
+  if [ ! -s "$BACKUP_DIR/android-signing.env" ] || [ ! -s "$BACKUP_DIR/android-upload.jks" ]; then
+    echo "Android signing backup is incomplete" >&2
+    exit 1
+  fi
+  for signing_file in android-signing.env android-upload.jks; do
+    mode="$(stat -c '%a' "$BACKUP_DIR/$signing_file")"
+    if [ "$mode" != "600" ]; then
+      echo "$signing_file mode should be 600, got $mode" >&2
+      exit 1
+    fi
+  done
+  echo "Android signing backup permissions ok"
+fi
