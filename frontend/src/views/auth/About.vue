@@ -231,7 +231,7 @@ onMounted(() => updateStore.check())
   }
 
   span {
-    color: #2f8f83;
+    color: #26766e;
     font-size: 12px;
     font-weight: 700;
   }
@@ -324,7 +324,7 @@ onMounted(() => updateStore.check())
   }
 
   dt {
-    color: #82756d;
+    color: #6f625b;
     font-size: 13px;
   }
 
@@ -377,7 +377,7 @@ onMounted(() => updateStore.check())
   gap: 14px;
 
   > div { min-width: 0; display: grid; gap: 3px; }
-  span { color: #82756d; font-size: 12px; }
+  span { color: #6f625b; font-size: 12px; }
   strong { color: #302824; font-size: 20px; overflow-wrap: anywhere; }
 }
 
@@ -401,7 +401,7 @@ onMounted(() => updateStore.check())
   background: #faf8f6;
 
   > div { min-width: 0; display: grid; gap: 4px; }
-  span { color: #82756d; font-size: 11px; }
+  span { color: #6f625b; font-size: 11px; }
   code { overflow: hidden; color: #4f4641; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 }
 
@@ -411,7 +411,7 @@ onMounted(() => updateStore.check())
   align-items: center;
   gap: 14px;
 
-  p { color: #80736c; font-size: 12px; line-height: 1.5; }
+  p { color: #6f625b; font-size: 12px; line-height: 1.5; }
 }
 
 .update-action-buttons {
@@ -425,7 +425,7 @@ onMounted(() => updateStore.check())
 
 .about-footnote {
   margin: 16px 4px 0;
-  color: #82766f;
+  color: #6f625b;
   font-size: 12px;
   line-height: 1.6;
 }

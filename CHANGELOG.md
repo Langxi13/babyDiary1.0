@@ -2,6 +2,7 @@
 
 ## 2026-07-17
 
+- Corrected the About and Updates page's small-text contrast so the authenticated critical-page accessibility gate meets WCAG 2 AA, and advanced the immutable Android release line to `1.0.0-beta.3` (`versionCode=3`).
 - Added an authenticated About and Updates page showing the installed client version/build, server/API compatibility, release notes, and APK checksum without embedding a production server in the app.
 - Extended the public client bootstrap contract with validated Android release metadata; incomplete, cleartext, traversal, or malformed direct-download configurations are disabled instead of being exposed to clients.
 - Added non-blocking native update discovery with a compact mobile banner and explicit Android system-confirmed installation through the Capacitor Browser plugin.
