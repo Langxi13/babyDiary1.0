@@ -48,6 +48,18 @@ cors:
   native-origins: ${CORS_NATIVE_ORIGINS:https://localhost,capacitor://localhost}
 
 app:
+  release:
+    version: ${APP_RELEASE_VERSION:1.0.0}
+    android:
+      enabled: ${ANDROID_UPDATE_ENABLED:false}
+      distribution: ${ANDROID_UPDATE_DISTRIBUTION:DIRECT}
+      latest-version-code: ${ANDROID_UPDATE_VERSION_CODE:0}
+      latest-version-name: ${ANDROID_UPDATE_VERSION_NAME:}
+      minimum-version-code: ${ANDROID_MINIMUM_VERSION_CODE:1}
+      download-url: ${ANDROID_UPDATE_URL:}
+      sha256: ${ANDROID_UPDATE_SHA256:}
+      release-notes: ${ANDROID_UPDATE_RELEASE_NOTES:}
+      mandatory: ${ANDROID_UPDATE_MANDATORY:false}
   invitation:
     bootstrap-code: ${INVITATION_CODE:}
     encryption-key: ${INVITATION_CODE_ENCRYPTION_KEY}

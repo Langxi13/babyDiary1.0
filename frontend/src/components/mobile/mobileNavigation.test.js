@@ -28,7 +28,7 @@ test('mobile secondary links are grouped under memory and account areas', () => 
   const accountPaths = MOBILE_SECONDARY_LINKS.filter(link => link.group === 'account').map(link => link.path)
 
   assert.deepEqual(memoryPaths, ['/spaces', '/album', '/timeline', '/calendar', '/anniversaries'])
-  assert.deepEqual(accountPaths, ['/ai-reports', '/drafts', '/profile', '/notifications'])
+  assert.deepEqual(accountPaths, ['/ai-reports', '/drafts', '/profile', '/notifications', '/about'])
 })
 
 test('route titles and primary tab detection support nested diary routes', () => {

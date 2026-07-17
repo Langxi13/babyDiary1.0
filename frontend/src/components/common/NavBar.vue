@@ -60,6 +60,12 @@
                   个人信息
                 </router-link>
               </el-dropdown-item>
+              <el-dropdown-item class="profile-dropdown-item">
+                <router-link class="dropdown-route-link" to="/about">
+                  <el-icon><InfoFilled /></el-icon>
+                  关于与更新
+                </router-link>
+              </el-dropdown-item>
               <el-dropdown-item divided command="logout">
                 <el-icon><SwitchButton /></el-icon>
                 退出登录
@@ -101,7 +107,7 @@ import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus/es/components/dropdown/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElMenu, ElMenuItem, ElSubMenu } from 'element-plus/es/components/menu/index.mjs'
-import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection, MoreFilled } from '@element-plus/icons-vue'
+import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection, MoreFilled, InfoFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { preloadRouteComponent } from '@/router'
 import { originalImageUrl } from '@/utils/imageUrl'

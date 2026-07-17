@@ -34,6 +34,7 @@ install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-d
 install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
 install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf
+install -D -m 0644 config/diary-backend-update.conf /etc/systemd/system/diary-backend.service.d/20-baby-diary-update.conf
 
 systemctl daemon-reload
 
@@ -42,7 +43,7 @@ nginx -t
 
 systemctl stop "$SERVICE_NAME"
 cp "backend/target/$JAR_NAME" "deploy/backend/$JAR_NAME"
-rsync -a --delete frontend/dist/ deploy/frontend/
+rsync -a --delete --exclude downloads/ frontend/dist/ deploy/frontend/
 systemctl start "$SERVICE_NAME"
 
 systemctl reload nginx

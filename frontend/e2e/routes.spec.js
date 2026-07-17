@@ -13,6 +13,7 @@ const routes = [
   ['AI 报告', '/ai-reports'],
   ['草稿', '/drafts'],
   ['个人信息', '/profile'],
+  ['关于与更新', '/about'],
   ['通知', '/notifications'],
   ['写日记', '/diaries/create']
 ]
@@ -34,7 +35,7 @@ for (const [name, path] of routes) {
 
 test('critical pages have no serious accessibility violations', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Axe runs once in Chromium; layout still runs in every engine.')
-  for (const path of ['/', '/diaries', '/album', '/profile']) {
+  for (const path of ['/', '/diaries', '/album', '/profile', '/about']) {
     await page.goto(path)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('.el-loading-mask')).toHaveCount(0)

@@ -12,7 +12,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - OpenAI 兼容接口、模型列表、AI 周报/月报/年报和定时生成
 - 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
-- Android 原生相册、拍照、HTTPS 私有服务器切换和原生刷新会话
+- Android 原生相册、拍照、HTTPS 私有服务器切换、原生刷新会话和应用更新检测
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
@@ -87,6 +87,17 @@ scripts/build-android-release.sh
 ```
 
 正式版本由 `config/android-release-version.properties` 跟踪，每次发布先提交递增的 `VERSION_CODE` 和新的 `VERSION_NAME`，不在工作流界面临时填写。`.github/workflows/android-release.yml` 会校验证书指纹和版本信息，生成具名 APK、AAB 与 `SHA256SUMS`，并发布不可覆盖的 GitHub Beta Release。Debug 包使用临时调试证书，首次切换到正式签名 Beta 时需要卸载 Debug 包一次；此后只要版本号递增即可覆盖升级。分支项目必须生成自己的密钥并更新公开证书指纹，不能复用本项目私钥。
+
+登录后的“关于与更新”页面显示当前安装包版本、构建号、服务器/API 版本，并读取服务器发布的 Android 更新清单。原生端启动后会进行一次非阻断检查；发现新版本时显示窄提示条。直接分发版本只打开经过后端校验的 HTTPS 或同源 APK 地址，下载完成后仍由 Android 系统确认安装，不申请静默安装权限。为避免国内网络依赖 GitHub，可在签名构建后把 APK 发布到当前 Baby Diary 服务器：
+
+```bash
+scripts/build-android-release.sh
+sudo env ANDROID_UPDATE_RESTART_SERVICE=true scripts/publish-android-update.sh
+```
+
+发布脚本会再次验证 APK/AAB 版本和固定签名证书，生成 SHA-256，把 APK 放入 `deploy/frontend/downloads/android/`，并写入不含秘密的 `/etc/baby-diary/android-update.env`。普通网页部署会保留该下载目录。
+
+同一版本文件默认不可被不同内容覆盖；正常发布必须递增版本号。只有修复尚未对外发布的本地制品时，才可显式设置 `ANDROID_UPDATE_ALLOW_REPLACE=true`，并在发布后重新核对清单与文件校验值。
 
 iOS 依赖已锁定，但平台工程和真机构建必须在 Mac/Xcode 环境完成，当前 Linux 服务器不伪造 iOS 验收结果。
 

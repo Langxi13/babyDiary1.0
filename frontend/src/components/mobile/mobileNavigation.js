@@ -11,7 +11,7 @@ export const MOBILE_PRIMARY_TABS = [
 ]
 
 const memoryLinks = navigationItems('spaces', 'album', 'timeline', 'calendar', 'anniversaries')
-const accountLinks = navigationItems('aiReports', 'drafts', 'profile', 'notifications')
+const accountLinks = navigationItems('aiReports', 'drafts', 'profile', 'notifications', 'about')
 
 export const MOBILE_SECONDARY_LINKS = [
   ...memoryLinks.map(item => ({ ...item, label: item.id === 'spaces' ? '共同空间' : item.label, group: 'memory', icon: item.id === 'anniversaries' ? 'Trophy' : item.icon })),
@@ -21,6 +21,7 @@ export const MOBILE_SECONDARY_LINKS = [
 const routeTitles = new Map([
   ['/', '首页'],
   ['/profile', '我的'],
+  ['/about', '关于与更新'],
   ['/drafts', '草稿'],
   ['/diaries', '日记'],
   ['/timeline', '时间轴'],
@@ -43,7 +44,7 @@ export const getMobileRouteTitle = (path) => {
 
 export const mobileRouteGroup = (path) => {
   if (path === '/album' || path.startsWith('/album/') || ['/timeline', '/calendar', '/anniversaries'].includes(path)) return 'memory'
-  if (['/ai-reports', '/drafts', '/profile', '/notifications', '/spaces/settings'].includes(path)) return 'account'
+  if (['/ai-reports', '/drafts', '/profile', '/notifications', '/about', '/spaces/settings'].includes(path)) return 'account'
   if (path === '/spaces' || path.startsWith('/spaces/')) return 'memory'
   return ''
 }

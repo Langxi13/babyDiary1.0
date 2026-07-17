@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell" :class="{ 'keyboard-open': keyboardOpen }">
+  <div class="app-shell" :class="{ 'keyboard-open': keyboardOpen, 'has-update-banner': updateStore.updateAvailable }">
     <nav-bar class="desktop-navbar" />
 
     <header class="mobile-topbar">
@@ -21,6 +21,12 @@
         <el-icon><MoreFilled /></el-icon>
       </button>
     </header>
+
+    <button v-if="updateStore.updateAvailable" type="button" class="mobile-update-banner" @click="router.push('/about')">
+      <el-icon><WarningFilled /></el-icon>
+      <span>{{ updateStore.updateRequired ? '当前版本需要更新' : `发现新版本 ${updateStore.manifest.latestVersionName}` }}</span>
+      <el-icon><ArrowRight /></el-icon>
+    </button>
 
     <main class="mobile-shell-content">
       <slot />
@@ -133,6 +139,7 @@ import {
   Download,
   Edit,
   HomeFilled,
+  InfoFilled,
   MagicStick,
   MoreFilled,
   Notebook,
@@ -140,12 +147,14 @@ import {
   SwitchButton,
   Tickets,
   Trophy,
-  User
+  User,
+  WarningFilled
 } from '@element-plus/icons-vue'
 import NavBar from '@/components/common/NavBar.vue'
 import { preloadRouteComponent } from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useAppUpdateStore } from '@/stores/appUpdate'
 import {
   MOBILE_PRIMARY_TABS,
   MOBILE_SECONDARY_LINKS,
@@ -160,6 +169,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
+const updateStore = useAppUpdateStore()
 const secondarySheetOpen = ref(false)
 const installSheetOpen = ref(false)
 const deferredInstallPrompt = ref(null)
@@ -182,7 +192,8 @@ const secondaryIconMap = {
   Trophy,
   MagicStick,
   Tickets,
-  User
+  User,
+  InfoFilled
 }
 const preload = (path) => preloadRouteComponent(path)
 
@@ -241,6 +252,7 @@ const openInstall = async () => {
 
 onMounted(() => {
   workspaceStore.initialize().catch(() => {})
+  if (nativeApp) updateStore.check().catch(() => {})
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('keydown', handleKeydown)
   window.visualViewport?.addEventListener('resize', updateKeyboardState)

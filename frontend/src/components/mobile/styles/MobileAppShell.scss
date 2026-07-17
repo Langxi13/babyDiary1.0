@@ -4,6 +4,7 @@
 
 .mobile-topbar,
 .mobile-tabbar,
+.mobile-update-banner,
 .mobile-sheet-mask {
   display: none;
 }
@@ -93,6 +94,40 @@
     min-height: 100dvh;
     padding-top: calc(var(--mobile-topbar-height) + 12px + env(safe-area-inset-top));
     padding-bottom: calc(var(--mobile-tabbar-height) + 14px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-update-banner {
+    position: fixed;
+    top: calc(var(--mobile-topbar-height) + env(safe-area-inset-top));
+    right: 0;
+    left: 0;
+    z-index: 118;
+    min-height: 42px;
+    padding: 8px max(13px, env(safe-area-inset-right)) 8px max(13px, env(safe-area-inset-left));
+    border: 0;
+    border-bottom: 1px solid #e5c997;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: 8px;
+    background: #fff8e9;
+    color: #77501b;
+    font-size: 13px;
+    text-align: left;
+
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:active {
+      background: #f9edcf;
+    }
+  }
+
+  .app-shell.has-update-banner .mobile-shell-content {
+    padding-top: calc(var(--mobile-topbar-height) + 54px + env(safe-area-inset-top));
   }
 
   .mobile-tabbar {

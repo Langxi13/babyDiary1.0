@@ -12,6 +12,7 @@ const routes = [
   ['ai-reports', '/ai-reports'],
   ['drafts', '/drafts'],
   ['profile', '/profile'],
+  ['about', '/about'],
   ['notifications', '/notifications'],
   ['diary-create', '/diaries/create']
 ]
@@ -37,6 +38,7 @@ const layoutIssues = async page => page.evaluate(() => {
     '.panel',
     '.form-panel',
     '.profile-panel',
+    '.about-surface',
     '.calendar-panel',
     '.detail-panel'
   ]

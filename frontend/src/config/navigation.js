@@ -10,6 +10,7 @@ export const APP_NAVIGATION_ITEMS = Object.freeze([
   { id: 'drafts', label: '草稿', path: '/drafts', icon: 'Tickets' },
   { id: 'write', label: '写日记', path: '/diaries/create', icon: 'Edit' },
   { id: 'profile', label: '个人信息', path: '/profile', icon: 'User' },
+  { id: 'about', label: '关于与更新', path: '/about', icon: 'InfoFilled' },
   { id: 'notifications', label: '通知', path: '/notifications', icon: 'Bell' }
 ])
 

@@ -25,6 +25,8 @@ vi.mock('@/stores/auth', () => ({
 vi.mock('@/router', () => ({ preloadRouteComponent: mocks.preload }))
 
 const SlotStub = { template: '<div><slot /></div>' }
+const MenuStub = { name: 'ElMenu', emits: ['select'], template: '<div><slot /></div>' }
+const DropdownStub = { name: 'ElDropdown', emits: ['command'], template: '<div><slot /><slot name="dropdown" /></div>' }
 const MenuItemStub = {
   props: ['index'],
   template: '<button type="button" :data-index="index"><slot /></button>'
@@ -39,11 +41,11 @@ const mountNav = () => shallowMount(NavBar, {
     stubs: {
       ElAvatar: SlotStub,
       ElButton: MenuItemStub,
-      ElDropdown: SlotStub,
+      ElDropdown: DropdownStub,
       ElDropdownItem: MenuItemStub,
       ElDropdownMenu: SlotStub,
       ElIcon: { template: '<span><slot /></span>' },
-      ElMenu: SlotStub,
+      ElMenu: MenuStub,
       ElMenuItem: MenuItemStub,
       ElSubMenu: SubMenuStub,
       RouterLink: { template: '<a><slot /></a>' },
@@ -75,5 +77,25 @@ describe('desktop navigation', () => {
   it('marks the more menu active for a secondary route', () => {
     const wrapper = mountNav()
     expect(wrapper.find('.desktop-more-menu').classes()).toContain('is-route-active')
+  })
+
+  it('preloads and navigates from desktop menu events', async () => {
+    const wrapper = mountNav()
+    await wrapper.find('.desktop-primary-item').trigger('mouseenter')
+    wrapper.findComponent(MenuStub).vm.$emit('select', '/diaries')
+
+    expect(mocks.preload).toHaveBeenCalledWith('/')
+    expect(mocks.push).toHaveBeenCalledWith('/diaries')
+  })
+
+  it('routes to About and logs out through user commands', () => {
+    const wrapper = mountNav()
+    const dropdown = wrapper.findAllComponents(DropdownStub)[0]
+
+    dropdown.vm.$emit('command', '/about')
+    dropdown.vm.$emit('command', 'logout')
+
+    expect(mocks.push).toHaveBeenCalledWith('/about')
+    expect(mocks.logout).toHaveBeenCalledOnce()
   })
 })

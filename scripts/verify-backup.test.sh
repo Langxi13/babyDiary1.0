@@ -41,3 +41,4 @@ fi
 
 grep -q 'android-signing.env' "$ROOT/scripts/backup.sh"
 grep -q 'android-upload.jks' "$ROOT/scripts/backup.sh"
+grep -q 'android-update.env' "$ROOT/scripts/backup.sh"

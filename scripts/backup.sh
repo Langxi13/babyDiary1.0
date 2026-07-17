@@ -48,6 +48,10 @@ if [ -f /etc/baby-diary/backend.env ]; then
   chmod 600 "$TARGET/backend.env"
 fi
 
+if [ -f /etc/baby-diary/android-update.env ]; then
+  install -m 0600 /etc/baby-diary/android-update.env "$TARGET/android-update.env"
+fi
+
 ANDROID_SIGNING_ENV_FILE="${ANDROID_SIGNING_ENV_FILE:-/etc/baby-diary/android-signing.env}"
 if [ -f "$ANDROID_SIGNING_ENV_FILE" ]; then
   set -a

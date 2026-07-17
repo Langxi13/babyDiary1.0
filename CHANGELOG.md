@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-07-17
+
+- Added an authenticated About and Updates page showing the installed client version/build, server/API compatibility, release notes, and APK checksum without embedding a production server in the app.
+- Extended the public client bootstrap contract with validated Android release metadata; incomplete, cleartext, traversal, or malformed direct-download configurations are disabled instead of being exposed to clients.
+- Added non-blocking native update discovery with a compact mobile banner and explicit Android system-confirmed installation through the Capacitor Browser plugin.
+- Guarded update state with a server-generation boundary so a delayed response from a previous private server cannot overwrite the newly selected server state.
+- Advanced the permanent Android release line to `1.0.0-beta.2` (`versionCode=2`) so the signed Beta 1 to Beta 2 in-place upgrade path can be tested.
+- Added a resource-light self-hosted APK publishing script that re-verifies the pinned signature, publishes immutable checksum-protected same-origin downloads, preserves releases across web deployments, and backs up the generated update configuration.
+
 ## 2026-07-13
 
 - Established a permanent Android release identity outside Git, pinned its public certificate fingerprint, synchronized encrypted GitHub Actions secrets, and added checked backup coverage for signing recovery.

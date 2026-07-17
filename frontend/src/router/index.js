@@ -7,6 +7,7 @@ const routeComponents = {
   Register: () => import('@/views/auth/Register.vue'),
   Home: () => import('@/views/home/Home.vue'),
   Profile: () => import('@/views/auth/Profile.vue'),
+  About: () => import('@/views/auth/About.vue'),
   DraftList: () => import('@/views/diary/DraftList.vue'),
   DiaryList: () => import('@/views/diary/DiaryList.vue'),
   Timeline: () => import('@/views/diary/Timeline.vue'),
@@ -92,6 +93,12 @@ const routes = [
     name: 'Profile',
     component: routeComponents.Profile,
     meta: { requiresAuth: true, mobileTitle: '我的', mobileTab: 'account' }
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: routeComponents.About,
+    meta: { requiresAuth: true, mobileTitle: '关于与更新', mobileTab: 'account' }
   },
   {
     path: '/drafts',
