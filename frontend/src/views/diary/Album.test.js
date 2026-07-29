@@ -53,8 +53,8 @@ test('album supports a default favorites system album', () => {
   assert.match(detailSource, /'favorites'/)
   assert.match(detailSource, /route\.params\.systemKey === 'favorites'/)
   assert.match(detailSource, /await loadAlbumPhotos\(\{ force: true \}\)/)
-  assert.match(apiSource, /systemKey === 'favorites'/)
-  assert.match(apiSource, /\/api\/albums\/system\/favorites\/photos/)
+  assert.match(apiSource, /systemKey !== 'all' && systemKey !== 'favorites'/)
+  assert.match(apiSource, /albums\/system\/\$\{systemKey\}/)
 })
 
 test('system albums are shown as readonly while AI and custom albums can be edited', () => {
@@ -81,8 +81,8 @@ test('AI album proposal flow supports date range prompt and review editing', () 
 
 test('album API exposes group, photo, and AI proposal endpoints', () => {
   assert.match(apiSource, /getGroups\(options = \{\}\)/)
-  assert.match(apiSource, /getSystemPhotos/)
-  assert.match(apiSource, /getAlbumPhotos/)
+  assert.match(apiSource, /getSystemPhotoPage/)
+  assert.match(apiSource, /getAlbumPhotoPage/)
   assert.match(apiSource, /createGroup/)
   assert.match(apiSource, /createAlbum/)
   assert.match(apiSource, /generateProposal/)
@@ -99,7 +99,8 @@ test('album details load photos in bounded pages with progressive image states',
   assert.match(detailSource, /#placeholder/)
   assert.match(detailSource, /#error/)
   assert.match(detailStyle, /\.image-loading/)
-  assert.match(apiSource, /\/photos\/page/)
+  assert.match(apiSource, /request\.get\(path, \{ params: \{ page, size \} \}\)/)
+  assert.match(apiSource, /response\.data\.totalMedia/)
 })
 
 test('album pages display dates with Chinese formatting helpers', () => {

@@ -4,14 +4,15 @@ test('switching accounts does not expose the previous account anniversary cache'
   const accountAAnniversary = '仅属于测试账号 A 的纪念日'
   await page.goto('/')
   const accountAToken = await page.evaluate(() => localStorage.getItem('token'))
-  const createResponse = await page.request.post('/api/anniversaries', {
+  const spaceId = await page.evaluate(() => localStorage.getItem('activeSpaceId'))
+  const createResponse = await page.request.post(`/api/v3/spaces/${spaceId}/anniversaries`, {
     headers: { Authorization: `Bearer ${accountAToken}` },
     data: {
       title: accountAAnniversary,
       date: '2026-07-12',
       description: '用于验证切换账号后不会显示旧账号缓存。',
-      coverImagePath: '',
-      sort: 0
+      coverAssetId: null,
+      sortOrder: 0
     }
   })
   expect(createResponse.ok()).toBe(true)
@@ -20,7 +21,7 @@ test('switching accounts does not expose the previous account anniversary cache'
   await page.goto('/anniversaries')
   await expect(page.getByText(accountAAnniversary, { exact: true })).toBeVisible()
 
-  const deleteResponse = await page.request.delete(`/api/anniversaries/${created.data.anniversaryId}`, {
+  const deleteResponse = await page.request.delete(`/api/v3/spaces/${spaceId}/anniversaries/${created.id}`, {
     headers: { Authorization: `Bearer ${accountAToken}` }
   })
   expect(deleteResponse.ok()).toBe(true)

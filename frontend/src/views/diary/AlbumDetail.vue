@@ -135,7 +135,7 @@ const findAlbumMeta = async () => {
     }
     return { name: fallbackSystemTitle(), editable: false }
   }
-  const albumId = Number(route.params.albumId)
+  const albumId = route.params.albumId
   for (const group of groups) {
     const album = group.albums?.find(item => item.albumId === albumId)
     if (album) return album

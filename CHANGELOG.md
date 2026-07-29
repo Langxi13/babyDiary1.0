@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-30
+
+- Promoted the V3 UUID-based runtime to production with an isolated `baby_diary_v3` database and a verified migration of the existing accounts, spaces, diaries, media, albums, favorites, avatars, anniversaries, templates, and AI history.
+- Made `/api/v3` the only documented business API and switched local Compose, staging, Docker, systemd, health checks, media policy, and native bootstrap documentation to the V3 runtime.
+- Added the V3 migration CLI with read-only preflight, empty-target enforcement, semantic verification, media checksum validation, space-isolation checks, and explicit migration confirmation.
+- Removed the obsolete V15 media migration shell entry point and the production Nginx legacy `/images/` alias; V3 media is served only through short-lived signed URLs.
+- Consolidated the architecture, deployment, feature, API, testing, and rollback documentation around the V3 baseline and added the V3 migration runbook.
+- Moved custom, favorites, and all-photos album detail loading to bounded server-side pagination with accurate totals while preserving manual and favorite ordering and automatic cover fallback.
+- Pinned secure PostCSS, tar, and brace-expansion dependency versions and advanced the Capacitor CLI patch release; production and development npm audits now report zero vulnerabilities.
+- Revalidated the release with `mvn verify`, frontend tests/build, script governance, Chromium E2E, production health checks, and post-cutover database counts.
+
 ## 2026-07-17
 
 - Corrected the About and Updates page's small-text contrast so the authenticated critical-page accessibility gate meets WCAG 2 AA, and advanced the immutable Android release line to `1.0.0-beta.3` (`versionCode=3`).

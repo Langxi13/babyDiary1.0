@@ -28,8 +28,8 @@ fi
 PATH_CHECKS="${PATH_CHECKS:-/ 200
 /album 200
 /diaries 200
-/api/v2/client/bootstrap 200
-/api/auth/info 401}"
+/api/v3/client/bootstrap 200
+/api/v3/account/profile 401}"
 ACTUATOR_HEALTH_PATH="${ACTUATOR_HEALTH_PATH:-/actuator/health}"
 
 check_service() {

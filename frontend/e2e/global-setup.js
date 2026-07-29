@@ -7,8 +7,9 @@ const webBaseURL = process.env.E2E_WEB_BASE_URL || 'http://127.0.0.1:4173'
 const authDirectory = path.resolve('e2e/.auth')
 
 const expectSuccess = async (response, operation) => {
-  const payload = await response.json()
-  if (!response.ok() || payload.code !== 200) {
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok()) {
     throw new Error(`${operation} failed: HTTP ${response.status()} ${JSON.stringify(payload)}`)
   }
   return payload
@@ -21,7 +22,7 @@ export default async function globalSetup() {
   const password = 'e2e_password_123'
   const secondUsername = 'e2e_user_b'
 
-  await expectSuccess(await api.post('/api/auth/register', {
+  await expectSuccess(await api.post('/api/v3/auth/register', {
     data: {
       username,
       password,
@@ -30,15 +31,15 @@ export default async function globalSetup() {
     }
   }), 'registration')
 
-  const login = await expectSuccess(await api.post('/api/v2/auth/login', {
+  const login = await expectSuccess(await api.post('/api/v3/auth/login', {
     headers: { 'X-Device-Name': 'Playwright' },
     data: { username, password }
   }), 'login')
-  const token = login.data.token
-  const userInfo = login.data.userInfo
+  const token = login.token
+  const userInfo = login.userInfo
   const authorization = { Authorization: `Bearer ${token}` }
 
-  await expectSuccess(await api.post('/api/auth/register', {
+  await expectSuccess(await api.post('/api/v3/auth/register', {
     data: {
       username: secondUsername,
       password,
@@ -47,7 +48,7 @@ export default async function globalSetup() {
     }
   }), 'second account registration')
 
-  await expectSuccess(await api.put('/api/ai/config', {
+  await expectSuccess(await api.post('/api/v3/admin/ai', {
     headers: authorization,
     data: {
       enabled: true,
@@ -58,19 +59,20 @@ export default async function globalSetup() {
     }
   }), 'AI mock configuration')
 
-  const spaces = await expectSuccess(await api.get('/api/v2/spaces', { headers: authorization }), 'space list')
-  const spaceId = spaces.data[0].spaceId
-  const diary = await expectSuccess(await api.post(`/api/v2/spaces/${spaceId}/diaries`, {
+  const spaces = await expectSuccess(await api.get('/api/v3/spaces', { headers: authorization }), 'space list')
+  const spaceId = spaces[0].id
+  const diary = await expectSuccess(await api.post(`/api/v3/spaces/${spaceId}/diaries`, {
     headers: authorization,
     data: {
       clientId: '1cfd71c4-1a9c-4bb6-9bb0-28deaf4aa532',
       title: '浏览器端到端测试日记',
-      date: '2026-07-11',
-      content: '用于验证导航、列表、时间轴、日历和相册页面。',
-      contentFormat: 'plain',
-      moodKey: 'happy',
+      diaryDate: '2026-07-11',
+      contentHtml: '<p>用于验证导航、列表、时间轴、日历和相册页面。</p>',
+      mood: 'happy',
       visibility: 'SHARED',
-      locked: false
+      locked: false,
+      tagIds: [],
+      mediaIds: []
     }
   }), 'diary seed')
 
@@ -87,8 +89,7 @@ export default async function globalSetup() {
     username,
     secondUsername,
     spaceId,
-    diaryId: diary.data.publicId,
-    legacyDiaryId: diary.data.diaryId
+    diaryId: diary.id
   }, null, 2))
   await api.dispose()
 }

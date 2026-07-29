@@ -1,842 +1,194 @@
-# API接口文档
+# V3 API 接口文档
 
-## 目录
+本文档描述当前运行时的 `/api/v3` 接口。V3 是当前唯一业务 API，使用 UUID 公共标识、空间边界和统一媒体资产模型。旧版 `/api`、`/api/v2` 以及旧图片路径不属于当前运行时；历史数据迁移请参阅 [V3 统一架构与迁移运行手册](V3统一架构与迁移运行手册.md)。
 
-- [概述](#概述)
-- [认证方式](#认证方式)
-- [统一响应格式](#统一响应格式)
-- [错误码说明](#错误码说明)
-- [接口列表](#接口列表)
-  - [认证管理接口](#认证管理接口)
-  - [管理员邀请码接口](#管理员邀请码接口)
-  - [日记管理接口](#日记管理接口)
-  - [图片读取与生命周期](#图片读取与生命周期)
-  - [体验增强接口](#体验增强接口)
-- [V2空间协作与安全接口](#v2空间协作与安全接口)
-  - [原生客户端兼容](#原生客户端兼容)
-  - [V2认证与账户](#v2认证与账户)
+## 基本约定
 
----
+- 生产 API 通过 HTTPS 暴露，后端服务只绑定回环地址。
+- JSON 请求使用 `Content-Type: application/json`；上传使用 `multipart/form-data`。
+- 访问令牌放在 `Authorization: Bearer <accessToken>`，默认有效期 15 分钟。
+- 登录和刷新同时使用 HttpOnly、Secure、SameSite=Lax Cookie `baby_diary_refresh`，默认会话有效期 30 天。
+- 修改密码、退出和刷新令牌轮换会使相应旧会话失效。
+- 涉及锁定日记、导出、私密分享和管理员邀请码的接口，可要求 `X-Step-Up-Token`。
+- 所有时间戳使用 ISO-8601；日期字段使用 `YYYY-MM-DD`，由客户端按用户时区展示。
+- `204 No Content` 接口没有响应体。分页接口使用 `items`、`nextCursor` 和 `totalElements`。
 
-## 概述
+## 响应与错误
 
-本文档描述了Baby-Diary系统的所有RESTful API接口，包括接口说明、请求参数、响应格式、错误码等详细信息。
-
-**基础信息：**
-- 旧版接口基地址：`http://localhost:10002/api`
-- V2 接口基地址：`http://localhost:10002/api/v2`
-- 数据格式：JSON
-- 字符编码：UTF-8
-
----
-
-## 认证方式
-
-### JWT Token认证
-
-除登录、注册、刷新、账户找回、公开分享和签名媒体读取接口外，其余接口都需要在请求头中携带 JWT Token。
-
-**请求头格式：**
-```
-Authorization: Bearer {token}
-```
-
-**Token获取方式：**
-当前前端通过 `/api/v2/auth/login` 获取默认15分钟的访问令牌，同时接收默认30天的 HttpOnly 刷新 Cookie。访问令牌过期后调用 `/api/v2/auth/refresh` 轮换刷新会话。旧版 `/api/auth/login` 仍返回30天 JWT，只用于兼容。
-
-锁定日记相关接口还可能要求：
-
-```text
-X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
-```
-
----
-
-## 统一响应格式
-
-所有接口返回统一的响应格式：
-
-### 成功响应
+成功响应直接返回资源对象、数组或分页对象。错误响应结构如下：
 
 ```json
 {
-  "code": 200,
-  "message": "操作成功",
-  "data": {}
+  "code": "DIARY_NOT_FOUND",
+  "message": "日记不存在或无权访问",
+  "requestId": "request-id"
 }
 ```
 
-### 失败响应
+常见状态码：
 
-```json
-{
-  "code": 400,
-  "message": "错误描述",
-  "data": null
-}
-```
+| 状态码 | 含义 |
+| --- | --- |
+| `400` | 参数格式、校验或请求体错误 |
+| `401` | 缺少、过期或无效访问令牌 |
+| `403` | 当前账户或空间成员无权操作 |
+| `404` | 资源不存在，或为避免泄露而隐藏资源存在性 |
+| `409` | 唯一键、版本或幂等操作冲突 |
+| `413` | 上传或导入超过体积限制 |
+| `423` | 需要二次验证或资源已锁定 |
+| `429` | 触发登录、刷新、恢复或分享限流 |
+| `500` | 服务端错误；不会向客户端返回下游密钥或堆栈 |
 
-### 字段说明
+## 客户端与认证
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| code | Integer | 响应状态码，200表示成功，其他表示失败 |
-| message | String | 响应描述信息 |
-| data | Object | 响应数据，失败时为null |
+### 客户端启动检查
 
----
+`GET /api/v3/client/bootstrap`
 
-## 错误码说明
+无需登录。返回 API 版本、会话策略、原生来源要求和经过校验的 Android 更新信息。原生客户端只接受 HTTPS 根地址，开发模拟器可使用受限的本地 HTTP 调试开关。
 
-### HTTP状态码
-
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 请求成功 |
-| 400 | 请求参数错误 |
-| 401 | 未授权，请先登录 |
-| 403 | 无权限访问 |
-| 404 | 资源不存在 |
-| 405 | 请求方法不允许 |
-| 409 | 日记版本冲突 |
-| 423 | 锁定日记需要二次验证 |
-| 429 | 请求过于频繁 |
-| 500 | 服务器内部错误 |
-
-### 业务错误码
-
-| 错误码 | 说明 |
-|--------|------|
-| 1001 | 用户不存在 |
-| 1002 | 用户名已存在 |
-| 1003 | 密码不匹配 |
-| 1004 | 邀请码无效 |
-| 1005 | 登录失败，用户名或密码错误 |
-| 1006 | Token已过期 |
-| 1007 | Token无效 |
-| 1008 | 邮箱已被使用 |
-| 1009 | 找回凭证无效或已过期 |
-| 1501-1505 | 空间、成员或邀请错误 |
-| 2001 | 日记不存在 |
-| 2002 | 创建日记失败 |
-| 2003 | 更新日记失败 |
-| 2004 | 删除日记失败 |
-| 2005 | 日记版本冲突 |
-| 2006 | 日记需要重新验证后访问 |
-| 3001 | 文件上传失败 |
-| 3002 | 文件类型不支持 |
-| 3003 | 文件大小超出限制 |
-| 3004 | 文件不存在 |
-
----
-
-## 接口列表
-
-### 认证管理接口
-
-#### 1. 用户登录
-
-**接口说明：** 通过用户名和密码登录，返回JWT Token
-
-**请求信息：**
-- 方法：POST
-- 路径：`/api/auth/login`
-- 认证：不需要
-
-**请求参数：**
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "登录成功",
-  "data": {
-    "token": "example-jwt-token",
-    "expiresIn": 2592000000,
-    "userInfo": {
-      "userId": 1,
-      "username": "user1",
-      "avatarMedia": {"assetId": "asset-uuid", "contentUrl": "/api/v2/media/public/asset-uuid/original?...", "thumbnailUrl": "/api/v2/media/public/asset-uuid/thumbnail?..."}
-    }
-  }
-}
-```
-
----
-
-#### 2. 用户注册
-
-**接口说明：** 通过用户名、密码和邀请码注册新用户
-
-**请求信息：**
-- 方法：POST
-- 路径：`/api/auth/register`
-- 认证：不需要
-
-**请求参数：**
-```json
-{
-  "username": "string",
-  "password": "string",
-  "confirmPassword": "string",
-  "invitationCode": "string"
-}
-```
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "注册成功",
-  "data": null
-}
-```
-
----
-
-#### 3. 用户登出
-
-**接口说明：** 用户登出，清除认证信息
-
-**请求信息：**
-- 方法：POST
-- 路径：`/api/auth/logout`
-- 认证：需要
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "登出成功",
-  "data": null
-}
-```
-
----
-
-#### 4. 获取当前用户信息
-
-**接口说明：** 获取当前登录用户的详细信息
-
-**请求信息：**
-- 方法：GET
-- 路径：`/api/auth/info`
-- 认证：需要
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "userId": 1,
-    "username": "user1",
-    "avatarMedia": {"assetId": "asset-uuid", "contentUrl": "/api/v2/media/public/asset-uuid/original?...", "thumbnailUrl": "/api/v2/media/public/asset-uuid/thumbnail?..."}
-  }
-}
-```
-
----
-
-### 管理员邀请码接口
-
-以下接口仅允许系统角色为 `ADMIN` 的用户调用，并且必须携带通过 `/api/v2/auth/step-up` 获取的短期二次验证令牌。响应包含邀请码明文，因此统一返回 `Cache-Control: no-store`，前端不得写入持久缓存。
-
-#### 1. 查看当前邀请码
-
-- 方法：GET
-- 路径：`/api/admin/invitation-code`
-- 请求头：`Authorization: Bearer {token}`、`X-Step-Up-Token: {stepUpToken}`
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "invitationCode": "example-random-invitation-code",
-    "updatedAt": "2026-07-12T15:00:00+08:00"
-  }
-}
-```
-
-#### 2. 随机刷新邀请码
-
-- 方法：POST
-- 路径：`/api/admin/invitation-code/rotate`
-- 请求头：`Authorization: Bearer {token}`、`X-Step-Up-Token: {stepUpToken}`
-- 请求体：无
-
-后端使用安全随机数生成新的 Base64URL 邀请码。事务提交后旧邀请码立即失效，响应只向本次管理员请求返回新邀请码。
-
-普通用户调用返回 HTTP `403`；缺少或失效的二次验证令牌返回 HTTP `423`。
-
----
-
-### 日记管理接口
-
-#### 1. 获取日记列表
-
-**接口说明：** 分页获取日记列表，支持日期范围、关键字、标签和心情搜索。前端列表默认使用 `summary=true` 获取轻量摘要，详情页仍使用单篇接口获取完整正文。
-
-**请求信息：**
-- 方法：GET
-- 路径：`/api/diaries`
-- 认证：需要
-
-**请求参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| startDate | String | 否 | 开始日期，格式yyyy-MM-dd，默认2022-01-01 |
-| endDate | String | 否 | 结束日期，格式yyyy-MM-dd，默认当天 |
-| keyword | String | 否 | 搜索关键字，最多200个字符 |
-| tagId | Integer | 否 | 标签ID |
-| moodKey | String | 否 | 心情标识 |
-| page | Integer | 否 | 页码，从0开始，默认0 |
-| size | Integer | 否 | 每页大小，默认5，最大100 |
-| summary | Boolean | 否 | 是否返回轻量摘要，默认false；为true时正文只返回预览片段 |
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "content": [
-      {
-        "diaryId": 1,
-        "userId": 1,
-        "title": "第一次周末旅行",
-        "date": "2024-01-01",
-        "content": "今天一起去了江边散步...",
-        "media": [
-          {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."},
-          {"assetId": "asset-uuid-2", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-2/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-2/original?..."}
-        ],
-        "createdAt": "2024-01-01T12:00:00"
-      }
-    ],
-    "pageNumber": 0,
-    "pageSize": 5,
-    "totalElements": 10
-  }
-}
-```
-
----
-
-#### 2. 获取日记详情
-
-**接口说明：** 根据ID获取日记详细信息
-
-**请求信息：**
-- 方法：GET
-- 路径：`/api/diaries/{diaryId}`
-- 认证：需要
-
-**路径参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| diaryId | Integer | 是 | 日记ID |
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "diaryId": 1,
-    "userId": 1,
-    "title": "第一次周末旅行",
-    "date": "2024-01-01",
-    "content": "今天一起去了江边散步...",
-    "media": [
-      {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."}
-    ],
-    "createdAt": "2024-01-01T12:00:00"
-  }
-}
-```
-
----
-
-#### 3. 创建日记
-
-**接口说明：** 创建新日记，支持多图片上传
-
-**请求信息：**
-- 方法：POST
-- 路径：`/api/diaries`
-- 认证：需要
-- Content-Type：multipart/form-data
-
-**请求参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| title | String | 是 | 日记标题 |
-| content | String | 是 | 日记内容 |
-| date | String | 是 | 日记日期，格式yyyy-MM-dd |
-| contentFormat | String | 否 | `plain` 或 `html`，默认 `plain` |
-| moodKey | String | 否 | 心情标识，最多32个字符 |
-| tagIds | String | 否 | 逗号分隔的标签ID，最多50个 |
-| imageFiles | MultipartFile[] | 否 | 图片文件数组 |
-
-统一媒体上传校验图片25MB、音视频256MB，并在读取对象前校验真实文件签名；日记图片最终写入 `media_asset` 和 `diary_media`。
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "创建成功",
-  "data": {
-    "diaryId": 1,
-    "userId": 1,
-    "title": "第一次周末旅行",
-    "date": "2024-01-01",
-    "content": "今天一起去了江边散步...",
-    "media": [
-      {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."}
-    ],
-    "createdAt": "2024-01-01T12:00:00"
-  }
-}
-```
-
-**图片压缩说明：**
-- 仅支持 JPEG、PNG、GIF、WebP，后端同时校验文件签名
-- 单张图片最大25MB，单篇日记最多50张图片
-- 图片写入对象存储后异步生成 thumbnail 派生对象
-- 前端列表使用签名缩略图，详情预览使用签名原图
-
----
-
-#### 4. 更新日记（PUT方式）
-
-**接口说明：** 更新指定日记，支持更新图片
-
-**请求信息：**
-- 方法：PUT
-- 路径：`/api/diaries/{diaryId}`
-- 认证：需要
-- Content-Type：multipart/form-data
-
-**路径参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| diaryId | Integer | 是 | 日记ID |
-
-**请求参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| title | String | 是 | 日记标题 |
-| content | String | 是 | 日记内容 |
-| date | String | 是 | 日记日期，格式yyyy-MM-dd |
-| contentFormat | String | 否 | `plain` 或 `html`，默认 `plain` |
-| moodKey | String | 否 | 心情标识，最多32个字符 |
-| tagIds | String | 否 | 逗号分隔的标签ID，最多50个 |
-| imageFiles | MultipartFile[] | 否 | 图片文件数组 |
-| retainedAssetIds | String[] | 否 | 需要保留的旧媒体资产 ID，可重复提交 |
-| mediaOrder | String[] | 否 | 媒体排序，可重复提交；旧媒体使用 `existing:<assetId>`，新图片使用 `new:<index>` |
-| clearImages | Boolean | 否 | 是否解除全部原有媒体关系，默认false |
-
-**图片排序说明：**
-- 提交 `retainedAssetIds` 时，它是旧媒体保留白名单，未提交的旧媒体只解除日记关系，不删除媒体资产；完全省略该字段时保留现有媒体。
-- `mediaOrder` 用于持久化媒体展示顺序，支持旧媒体和本次新上传图片混排。
-- `existing:<assetId>` 表示保留的旧媒体资产 ID。
-- `new:<index>` 表示本次请求中 `imageFiles` 的有效新图片序号，从 `0` 开始，例如 `new:0`。
-- `mediaOrder` 缺失时，后端按现有媒体和新媒体顺序追加；重复或无效项直接返回参数错误，避免客户端误删或产生不确定排序。
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "更新成功",
-  "data": {
-    "diaryId": 1,
-    "userId": 1,
-    "title": "第一次周末旅行（更新）",
-    "date": "2024-01-01",
-    "content": "今天一起去了江边散步...（已更新）",
-    "media": [
-      {"assetId": "asset-uuid-2", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-2/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-2/original?..."}
-    ],
-    "createdAt": "2024-01-01T12:00:00"
-  }
-}
-```
-
----
-
-#### 5. 更新日记（POST方式）
-
-**接口说明：** 使用POST方式更新日记，支持multipart/form-data
-
-**请求信息：**
-- 方法：POST
-- 路径：`/api/diaries/{diaryId}/update`
-- 认证：需要
-- Content-Type：multipart/form-data
-
-其他参数与[更新日记（PUT方式）](#4-更新日记put方式)相同。
-
----
-
-#### 6. 删除日记
-
-**接口说明：** 删除指定日记及其关联图片记录，并尽量清理服务器图片文件。单个历史图片文件清理失败不会阻断日记删除，后端会记录日志。
-
-**请求信息：**
-- 方法：DELETE
-- 路径：`/api/diaries/{diaryId}`
-- 认证：需要
-
-**路径参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| diaryId | Integer | 是 | 日记ID |
-
-**响应示例：**
-```json
-{
-  "code": 200,
-  "message": "删除成功",
-  "data": null
-}
-```
-
----
-
-#### 7. 导出图片
-
-**接口说明：** 导出指定日期范围内的图片为ZIP文件
-
-**请求信息：**
-- 方法：GET
-- 路径：`/api/diaries/export`
-- 认证：需要
-
-**请求参数：**
-
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| startDate | String | 是 | 开始日期，格式yyyy-MM-dd |
-| endDate | String | 是 | 结束日期，格式yyyy-MM-dd |
-
-**响应：**
-返回ZIP文件流，Content-Disposition为attachment。服务端导出临时文件会在响应流关闭后自动删除。
-
----
-
-### 图片读取与生命周期
-
-图片不提供独立上传或删除 API。日记、头像和纪念日封面上传统一使用随机服务端文件名；删除或替换由对应业务事务管理。原图和缩略图的静态读取方式见下文“图片读取”。
-
----
-
-### 体验增强接口
-
-以下接口均需要 JWT 认证。
-
-#### 标签
-
-- `GET /api/tags`：获取当前用户标签列表
-- `POST /api/tags`：创建标签，请求体：`{"name":"约会","color":"#ff7a90"}`；名称最多32个字符，颜色使用6位或8位十六进制格式
-
-#### 日记筛选和聚合
-
-- `GET /api/diaries?tagId=&moodKey=`：日记列表支持标签和心情筛选
-- `GET /api/diaries?summary=true`：列表轻量模式，只返回正文预览片段，适合首页和列表页
-- `GET /api/diaries/timeline?year=&month=&tagId=&moodKey=`：按月份返回时间轴
-- `GET /api/diaries/calendar?year=2026&month=6`：返回指定月份每天日记数量
-
-创建和更新日记的 `multipart/form-data` 新增字段：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| contentFormat | String | `plain` 或 `html` |
-| moodKey | String | 固定心情标识 |
-| tagIds | String | 逗号分隔的标签ID，如 `1,2,3` |
-
-#### 纪念日
-
-- `GET /api/anniversaries`
-- `POST /api/anniversaries/cover`：上传纪念日封面图片，`multipart/form-data` 字段名为 `coverFile`
-- `POST /api/anniversaries`
-- `PUT /api/anniversaries/{anniversaryId}`
-- `DELETE /api/anniversaries/{anniversaryId}`
-
-请求体：
-
-```json
-{
-  "title": "第一次旅行",
-  "date": "2025-07-13",
-  "description": "夏天的旅行",
-  "coverAssetId": "asset-uuid",
-  "sort": 0
-}
-```
-
-封面上传响应：
-
-```json
-{
-  "coverAssetId": "asset-uuid"
-}
-```
-
-#### 相册和收藏
-
-- `GET /api/photos?startDate=&endDate=&tagId=&moodKey=&favoriteOnly=false`
-- `GET /api/photos/page?startDate=&endDate=&tagId=&moodKey=&favoriteOnly=false&page=0&size=24`：分页读取照片，前端首页和大图集优先使用该接口；每页最多100张。
-- `POST /api/photos/{imageId}/favorite`
-- `DELETE /api/photos/{imageId}/favorite`
-- `GET /api/albums/groups`
-- `GET /api/albums/system/all/photos`
-- `GET /api/albums/system/favorites/photos`
-- `GET /api/albums/system/year/{year}/photos`
-- `GET /api/albums/system/all/photos/page?page=0&size=24`
-- `GET /api/albums/system/favorites/photos/page?page=0&size=24`
-- `GET /api/albums/system/year/{year}/photos/page?page=0&size=24`
-- `GET /api/albums/{albumId}/photos/page?page=0&size=24`：分页读取手动或 AI 相册照片，并校验相册和照片属于当前用户。
-
-分页照片接口统一返回 `PageResult<PhotoVO>`，包含 `content`、`pageNumber`、`pageSize`、`totalElements`、`totalPages`、`first` 和 `last`。未带 `/page` 的照片接口保留用于兼容已有调用，新页面应优先使用分页接口。
-
-#### 草稿
-
-- `GET /api/diary-drafts`
-- `GET /api/diary-drafts/{draftKey}`
-- `PUT /api/diary-drafts`
-- `DELETE /api/diary-drafts/{draftId}`
-- `DELETE /api/diary-drafts/key/{draftKey}`
-
-草稿请求体：
-
-```json
-{
-  "draftKey": "create",
-  "diaryId": null,
-  "title": "草稿标题",
-  "date": "2026-06-08",
-  "content": "<p>内容</p>",
-  "contentFormat": "html",
-  "moodKey": "happy",
-  "tagIds": [1, 2]
-}
-```
-
-#### AI 报告
-
-- `GET /api/ai/config`：读取 AI 配置，API Key 只返回脱敏状态。
-- `PUT /api/ai/config`：保存 AI 配置，请求体如下；`apiKey` 为空时保留旧 Key。
-- `POST /api/ai/config/test`：使用当前配置发起一次短连接测试。
-- `GET /api/ai/models`：使用已保存的 Base URL 和 API Key 通过后端加载模型 ID 列表。
-- `POST /api/ai/reports/generate`：生成并保存周报/月报。
-- `GET /api/ai/reports?type=&page=&size=`：分页查看历史报告，每页最多100条。
-- `GET /api/ai/reports/{reportId}`：查看报告详情。
-- `DELETE /api/ai/reports/{reportId}`：删除自己的报告。
-
-AI 配置请求体：
-
-```json
-{
-  "enabled": true,
-  "baseUrl": "https://api.openai.com/v1",
-  "model": "gpt-4o-mini",
-  "apiKey": "sk-...",
-  "timeoutSeconds": 30
-}
-```
-
-报告生成请求体：
-
-```json
-{
-  "type": "WEEKLY",
-  "period": "2026-W27"
-}
-```
-
-`type` 支持 `WEEKLY`、`MONTHLY` 和 `ANNUAL`；周报周期格式为 `yyyy-Www`，月报为 `yyyy-MM`，年报为 `yyyy`。AI 输入只包含允许参与总结的日记日期、标题、文字内容、心情和标签，不发送图片内容，锁定日记不会进入 AI 输入。
-
-AI `baseUrl` 只接受 HTTP/HTTPS 地址，必须包含主机，且不能带账号信息、查询参数或片段；`timeoutSeconds` 范围为5到120秒。AI 下游错误不会把响应正文或客户端内部异常详情返回给浏览器。
-
-前端对模型列表、连接测试和报告生成使用“配置超时时间 + 10秒传输余量”的请求超时，避免后端允许等待120秒但浏览器固定30秒提前报网络错误。历史报告页面默认每次读取10份并支持继续加载。
-
-AI 相册提案编辑后，确认阶段会重新校验全部照片属于当前用户；单次提案最多确认1000张去重照片。
-
-图片不再提供独立的旧版上传/删除接口。日记创建/更新接口上传图片，后端写入 `media_asset` 和 `diary_media`；移除图片只解除日记关系，资产继续保留在媒体库，只有显式媒体删除才会软删除资产和对象。
-
-**统一媒体读取：**
-- 方法：GET
-- 路径：`/api/v2/media/public/{assetId}/{variant}?expires=&signature=`
-- 认证：签名地址本身无需 JWT，但签发前必须通过业务权限检查
-- `variant`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`
-- 返回结构：日记、相册、照片、头像和封面返回 `media`/`coverMedia`，其中包含短时 `contentUrl`、`thumbnailUrl` 等地址；前端不得拼接 `/images/` 旧路径。
-- 旧版 `/images/**` 仅在 V15 完成后的 14 天回滚窗口内保留，之后移除。
-
-**编辑日记时保留旧图片：**
-
-`POST /api/diaries/{diaryId}/update` 和 `PUT /api/diaries/{diaryId}` 支持在 `multipart/form-data` 中重复提交 `retainedAssetIds` 字段。提交该字段时，未出现在白名单中的旧媒体只会解除 `diary_media` 关系；省略该字段时保留现有媒体。如需清空全部旧媒体，提交 `clearImages=true`。编辑页同时提交 `mediaOrder` 字段保存最终顺序，格式为 `existing:<assetId>` 或 `new:<index>`。所有资产 ID、空间归属和排序参数都会在服务端重新校验。
-
----
-
-## V2空间协作与安全接口
-
-V2 接口仍使用统一 `Result<T>` 响应；文件下载和签名媒体读取直接返回二进制内容。空间、日记、媒体、搜索、AI 和导入导出接口都会校验当前用户的空间成员关系。
-
-### 原生客户端兼容
-
-| 方法 | 路径 | 认证 | 说明 |
-|------|------|------|------|
-| GET | `/api/v2/client/bootstrap` | 不需要 | 原生客户端验证 API、会话、上传能力以及经过校验的 Android 更新信息 |
-
-响应禁止缓存，当前结构如下：
-
-```json
-{
-  "code": 200,
-  "data": {
-    "apiVersion": 2,
-    "nativeSessionMode": "COOKIE",
-    "serverVersion": "1.0.0",
-    "upload": {
-      "maxImageBytes": 10485760,
-      "maxDiaryImages": 50,
-      "acceptedImageTypes": ["image/gif", "image/jpeg", "image/png", "image/webp"]
-    },
-    "androidUpdate": {
-      "enabled": true,
-      "distribution": "DIRECT",
-      "latestVersionCode": 3,
-      "latestVersionName": "1.0.0-beta.3",
-      "minimumVersionCode": 1,
-      "downloadUrl": "/downloads/android/BabyDiary-1.0.0-beta.3.apk",
-      "sha256": "64位十六进制SHA-256",
-      "releaseNotes": "修复应用信息页小字号对比度。",
-      "mandatory": false
-    }
-  }
-}
-```
-
-更新配置默认关闭。`DIRECT` 分发只有在版本号合法、`latestVersionCode >= minimumVersionCode`、下载地址为 HTTPS 或无路径穿越的同源绝对路径、且 SHA-256 完整时才会返回 `enabled=true`；`PLAY` 分发允许省略 APK 校验值。客户端仍会二次拒绝非 HTTPS 下载地址。`mandatory=true` 或当前构建号低于 `minimumVersionCode` 时页面显示“需要更新”，但普通 Android 应用仍不能绕过系统安装确认。
-
-客户端只接受 HTTPS 根地址；仅显式设置 `VITE_NATIVE_ALLOW_HTTP=true` 的 Android Debug 包可连接 localhost、模拟器 `10.0.2.2` 或私有局域网 HTTP，Release Manifest 始终禁止明文流量。Android 原生来源为 `https://localhost`，iOS 为 `capacitor://localhost`。刷新 Cookie 仍由服务端管理，客户端不得读取或持久化刷新令牌明文。
-
-### V2认证与账户
+### 注册与登录
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v2/auth/login` | 登录，返回访问令牌并设置旋转刷新 Cookie |
-| POST | `/api/v2/auth/refresh` | 使用 Cookie 轮换刷新会话并获取新访问令牌 |
-| POST | `/api/v2/auth/logout` | 撤销当前刷新会话并清除 Cookie |
-| GET | `/api/v2/auth/sessions` | 查看有效设备会话 |
-| DELETE | `/api/v2/auth/sessions/{sessionId}` | 撤销指定设备会话 |
-| DELETE | `/api/v2/auth/sessions` | 撤销全部设备会话 |
-| POST | `/api/v2/auth/step-up` | 使用当前密码获取日记锁短期令牌 |
-| PUT | `/api/v2/auth/email` | 保存邮箱并发送验证邮件 |
-| POST | `/api/v2/auth/email/confirm` | 使用邮件 Token 验证邮箱，无需登录 |
-| POST | `/api/v2/auth/password/reset-request` | 请求密码重置邮件，始终返回相同结果 |
-| POST | `/api/v2/auth/password/reset` | 使用邮件 Token 重置密码 |
-| POST | `/api/v2/auth/recovery-codes` | 校验当前密码并重新生成8个一次性恢复码 |
-| POST | `/api/v2/auth/password/recover` | 使用用户名、恢复码和新密码找回账户 |
+| --- | --- | --- |
+| `POST` | `/api/v3/auth/register` | 使用邀请码注册；首个账户自动为 `ADMIN` |
+| `POST` | `/api/v3/auth/login` | 登录并创建刷新会话 |
+| `POST` | `/api/v3/auth/refresh` | 轮换刷新 Cookie，返回新的访问令牌 |
+| `POST` | `/api/v3/auth/logout` | 撤销当前刷新会话并清除 Cookie |
+| `POST` | `/api/v3/auth/step-up` | 使用当前密码取得短期二次验证令牌 |
+| `GET` | `/api/v3/auth/sessions` | 查看当前账户有效设备会话 |
+| `DELETE` | `/api/v3/auth/sessions/{sessionId}` | 撤销指定会话 |
+| `DELETE` | `/api/v3/auth/sessions` | 撤销当前账户全部会话 |
 
-刷新 Cookie 名为 `baby_diary_refresh`，路径为 `/api/v2/auth`，生产环境使用 `Secure`、`HttpOnly`、`SameSite=Lax`。密码修改、邮件找回或恢复码找回会撤销全部刷新会话。
+密码与邮箱恢复：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v3/account/profile` | 当前账户资料 |
+| `PUT` | `/api/v3/account/profile` | 更新昵称、邮箱、时区等资料 |
+| `PUT` | `/api/v3/account/avatar` | 绑定已上传的媒体资产为头像 |
+| `DELETE` | `/api/v3/account/avatar` | 删除头像关系 |
+| `POST` | `/api/v3/account/password` | 修改密码并撤销其他会话 |
+| `PUT` | `/api/v3/account/email` | 保存邮箱并发送验证邮件 |
+| `POST` | `/api/v3/auth/email/confirm` | 确认邮箱 Token |
+| `POST` | `/api/v3/auth/password/reset-request` | 请求密码重置邮件，响应不泄露账户是否存在 |
+| `POST` | `/api/v3/auth/password/reset` | 使用邮件 Token 重置密码 |
+| `POST` | `/api/v3/auth/recovery-codes` | 重新生成一次性恢复码 |
+| `POST` | `/api/v3/auth/password/recover` | 使用用户名、恢复码和新密码恢复账户 |
+
+### 管理员邀请码
+
+仅 `ADMIN` 可调用，且每次查看或刷新都必须携带有效 `X-Step-Up-Token`：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/v3/admin/invitation-code/view` | 查看当前邀请码，响应 `no-store` |
+| `POST` | `/api/v3/admin/invitation-code/rotate` | 随机刷新邀请码并返回新值 |
+
+邀请码只以 `v1:` AES-GCM 密文存储，明文不写入日志、缓存或持久化前端状态。
+
+## 空间、日记与协作
 
 ### 空间与成员
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/api/v2/spaces` | 列出空间或创建共同空间 |
-| PUT | `/api/v2/spaces/{spaceId}` | 所有者修改空间名称 |
-| GET | `/api/v2/spaces/{spaceId}/members` | 查看成员 |
-| POST | `/api/v2/spaces/{spaceId}/invitations` | 创建限时邀请 |
-| POST | `/api/v2/spaces/invitations/{token}/accept` | 接受邀请 |
-| PUT | `/api/v2/spaces/{spaceId}/members/{userId}/role?role=OWNER|MEMBER` | 修改成员角色 |
-| DELETE | `/api/v2/spaces/{spaceId}/members/{userId}` | 移除成员 |
-| GET/POST | `/api/v2/spaces/{spaceId}/tags` | 列出或创建空间标签 |
+| --- | --- | --- |
+| `GET` / `POST` | `/api/v3/spaces` | 列出空间或创建共同空间 |
+| `PUT` | `/api/v3/spaces/{spaceId}` | 所有者修改空间名称 |
+| `GET` | `/api/v3/spaces/{spaceId}/members` | 查看成员 |
+| `POST` | `/api/v3/spaces/{spaceId}/invitations` | 创建限时空间邀请 |
+| `POST` | `/api/v3/invitations/{token}/accept` | 接受空间邀请 |
+| `PUT` | `/api/v3/spaces/{spaceId}/members/{accountId}/role` | 修改成员角色 |
+| `DELETE` | `/api/v3/spaces/{spaceId}/members/{accountId}` | 移除成员 |
+| `GET` / `POST` | `/api/v3/spaces/{spaceId}/tags` | 列出或创建标签 |
 
-### V2日记、历史与互动
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/api/v2/spaces/{spaceId}/diaries` | 分页查询或创建日记 |
-| GET/PUT/DELETE | `/api/v2/spaces/{spaceId}/diaries/{diaryId}` | 详情、更新或移入回收站 |
-| POST | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/restore` | 从回收站恢复 |
-| GET | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/revisions` | 查看修订历史 |
-| POST | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/revisions/{revisionId}/restore` | 恢复指定版本 |
-| GET/POST | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/comments` | 查看或新增评论 |
-| PUT/DELETE | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/comments/{commentId}` | 编辑或删除自己的评论 |
-| GET/PUT | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/reactions` | 查看或设置 Emoji 回应 |
-
-创建/更新请求使用 `DiaryWriteDTO`，包含 `clientId`、`title`、`date`、`content`、`contentFormat`、`moodKey`、`visibility`、`locked`、`baseVersion` 和 `tagIds`。更新、删除、恢复和恢复历史版本必须带当前版本号；版本不一致返回 HTTP 409。锁定内容未完成二次验证时返回 HTTP 423，并且列表仅返回脱敏占位。
-
-### 搜索、模板、洞察与同步
+### 日记
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v2/spaces/{spaceId}/search?query=&limit=` | 中文全文搜索，最多返回受限结果 |
-| GET/POST | `/api/v2/spaces/{spaceId}/templates` | 列出或创建日记模板 |
-| PUT/DELETE | `/api/v2/spaces/{spaceId}/templates/{templateId}` | 更新或删除模板 |
-| GET | `/api/v2/spaces/{spaceId}/insights/yearly?year=` | 年度日历、月份和心情统计 |
-| GET | `/api/v2/spaces/{spaceId}/sync/pull?cursor=&limit=` | 按游标拉取增量变更 |
-| POST | `/api/v2/spaces/{spaceId}/sync/push` | 批量提交幂等离线操作 |
+| --- | --- | --- |
+| `GET` / `POST` | `/api/v3/spaces/{spaceId}/diaries` | 游标分页查询或创建日记 |
+| `GET` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}` | 获取完整日记详情 |
+| `PUT` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}` | 按 `If-Match` 版本更新日记 |
+| `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}` | 移入回收站 |
+| `POST` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/restore` | 从回收站恢复 |
+| `GET` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions` | 查看修订历史 |
+| `POST` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions/{revisionId}/restore` | 恢复指定版本 |
+| `GET` | `/api/v3/spaces/{spaceId}/diaries/calendar?month=YYYY-MM` | 月历粗略摘要 |
+| `GET` | `/api/v3/spaces/{spaceId}/diaries/timeline` | 时间轴月份聚合 |
+| `GET` | `/api/v3/spaces/{spaceId}/diaries/timeline/weeks` | 时间轴周聚合 |
+| `GET` | `/api/v3/spaces/{spaceId}/search?query=&limit=` | 空间全文搜索 |
+| `GET` | `/api/v3/spaces/{spaceId}/insights/yearly?year=` | 年度洞察和心情统计 |
 
-同步操作携带唯一 `operationId`、实体类型、动作、实体 ID、基础版本和载荷。服务端返回 `APPLIED`、`CONFLICT`、`RETRYABLE` 等状态；锁定日记的 pull 结果不包含明文。
+创建或更新日记的媒体顺序由请求中的 `mediaIds` 决定；服务端在一次事务中更新关系，删除旧媒体关系不会延迟到下一次编辑。
 
-### 富媒体
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v2/spaces/{spaceId}/media` | 上传图片、音频或视频，可绑定日记 |
-| GET/PUT/DELETE | `/api/v2/spaces/{spaceId}/media/{assetId}` | 查看、修改元数据或软删除媒体 |
-| GET | `/api/v2/media/public/{assetId}/{variant}?expires=&signature=` | 读取短时签名媒体，无需 JWT |
-
-上传使用 `multipart/form-data`，字段包括 `file`、可选 `diaryId`、`caption`、`takenAt`、`locationName`、`latitude`、`longitude`。图片最大25MB，音视频最大256MB；绑定锁定日记时必须提供 `X-Step-Up-Token`。`variant` 支持 `original`、`thumbnail`、`poster`、`waveform`、`transcoded`。
-
-### 通知、提醒、AI、分享与迁移
+### 互动、草稿与模板
 
 | 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/PUT | `/api/v2/notifications...` | 通知列表、未读数、单条/全部已读 |
-| GET/POST/DELETE | `/api/v2/notifications/push...` | 获取 VAPID 公钥、订阅或取消 Web Push |
-| GET/PUT | `/api/v2/spaces/{spaceId}/reminders...` | 查询并设置 DAILY/WEEKLY 写作提醒 |
-| POST/GET | `/api/v2/spaces/{spaceId}/ai/reports...` | 生成、分页和查看空间 AI 报告 |
-| GET/PUT | `/api/v2/spaces/{spaceId}/ai/schedule` | 查询或由所有者设置 AI 定时任务 |
-| POST/GET | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/shares` | 创建或列出活动私密分享 |
-| DELETE | `/api/v2/shares/{shareId}` | 撤销自己创建的分享 |
-| POST | `/api/v2/public/shares/{token}/open` | 使用可选密码打开公开分享 |
-| GET/POST | `/api/v2/spaces/{spaceId}/transfer/export|import` | ZIP v3 导出或导入，兼容读取 V1/V2 |
-| GET | `/api/v2/spaces/{spaceId}/books?format=PDF|EPUB...` | 导出日记书 |
+| --- | --- | --- |
+| `GET` / `POST` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/comments` | 查看或新增评论 |
+| `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/comments/{commentId}` | 编辑或删除自己的评论 |
+| `GET` / `PUT` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/reactions` | 查看或设置 Emoji 回应 |
+| `GET` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/drafts/{draftKey}` | 草稿读写和删除 |
+| `GET` / `POST` | `/api/v3/spaces/{spaceId}/templates` | 模板列表和创建 |
+| `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/templates/{templateId}` | 模板更新和删除 |
 
-ZIP 导入限制文件数量、单项大小和总解压大小，并阻止目录穿越。导出、导入、日记书和锁定日记分享使用 `X-Step-Up-Token` 保护敏感内容；V3 导入把媒体写入统一 `media_asset`，V1/V2 输入只作为兼容格式读取。
+## 媒体、相册与纪念日
 
----
+### 统一媒体
 
-## 附录
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/v3/spaces/{spaceId}/media` | 上传图片、音频或视频 |
+| `GET` | `/api/v3/spaces/{spaceId}/media` | 分页查询空间媒体 |
+| `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 查看媒体资产元数据 |
+| `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}/variants/{variant}` | 获取受保护派生资源 |
+| `PUT` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 更新媒体元数据 |
+| `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
+| `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
-### Swagger文档
+### 相册与收藏
 
-系统已集成 Swagger/OpenAPI 文档。生产配置默认设置 `SPRINGDOC_ENABLED=false`，需要临时启用并限制到管理网络后才能访问：
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v3/spaces/{spaceId}/album-groups` | 相册分组首页，只返回相册卡片和封面 |
+| `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/album-groups[/{groupId}]` | 管理相册分组 |
+| `GET` | `/api/v3/spaces/{spaceId}/albums/system/{key}?page=&size=` | 查看所有图片或收藏相册详情，服务端分页 |
+| `GET` | `/api/v3/spaces/{spaceId}/albums/{albumId}?page=&size=` | 查看自建相册详情和分页媒体 |
+| `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/albums[/{albumId}]` | 管理自建相册 |
+| `POST` | `/api/v3/spaces/{spaceId}/albums/{albumId}/media` | 加入媒体到相册 |
+| `DELETE` | `/api/v3/spaces/{spaceId}/albums/{albumId}/media/{assetId}` | 从相册移除媒体 |
+| `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}/favorite` | 设置或取消收藏 |
+| `POST` / `GET` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/ai-album-proposals[/{proposalId}]` | AI 相册提案及确认 |
+| `GET` / `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/anniversaries[/{anniversaryId}]` | 纪念日及封面资产 |
 
-- Swagger UI：`http://localhost:10002/swagger-ui.html`
-- OpenAPI JSON：`http://localhost:10002/v3/api-docs`
+### 导入导出
 
-### 测试建议
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v3/spaces/{spaceId}/transfer/export` | 导出 V3 便携 ZIP 归档 |
+| `POST` | `/api/v3/spaces/{spaceId}/transfer/import` | 校验并导入 V3 ZIP 归档 |
+| `GET` | `/api/v3/spaces/{spaceId}/books?format=PDF|EPUB` | 导出 PDF 或 EPUB 日记书 |
 
-1. 使用Postman或类似工具进行接口测试
-2. 先通过登录接口获取Token
-3. 在后续请求的Header中添加Authorization: Bearer {token}
-4. 注意图片上传接口需要使用multipart/form-data格式
+ZIP 导入会拒绝路径穿越、重复路径、未知版本、超大条目、超大总量和媒体校验失败；临时文件在完成后清理。
+
+## AI、通知与同步
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` / `POST` | `/api/v3/admin/ai` | 管理员读取脱敏配置或保存 OpenAI 兼容配置 |
+| `POST` | `/api/v3/admin/ai/test` | 测试当前 AI 连接 |
+| `GET` | `/api/v3/admin/ai/models` | 加载模型列表 |
+| `GET` / `POST` / `DELETE` | `/api/v3/spaces/{spaceId}/ai-reports[/{reportId}]` | 生成、查看、删除周报/月报/年报 |
+| `GET` / `PUT` | `/api/v3/spaces/{spaceId}/ai/schedule` | 查询或设置 AI 定时任务 |
+| `GET` / `PUT` | `/api/v3/notifications`、`/api/v3/notifications/{id}/read` | 通知和已读状态 |
+| `GET` / `POST` / `DELETE` | `/api/v3/notifications/push/*` | Web Push 公钥、订阅和取消订阅 |
+| `GET` / `PUT` | `/api/v3/spaces/{spaceId}/reminders[/{type}]` | 写作提醒 |
+| `GET` / `POST` | `/api/v3/spaces/{spaceId}/sync/pull|push` | 离线增量同步 |
+| `POST` / `GET` / `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares`、`/api/v3/shares/{shareId}` | 私密分享 |
+| `POST` | `/api/v3/public/shares/{token}/open` | 打开公开分享 |
+
+AI 报告从第三方观察视角生成，可使用“你”或“你们”，不会以模型第一人称冒充用户；锁定日记不会进入 AI 输入，API Key 永不回显。
+
+## OpenAPI 与调试
+
+生产默认关闭 Swagger/OpenAPI。开发环境可通过 `SPRINGDOC_ENABLED=true` 启用 `/v3/api-docs` 和 `/swagger-ui.html`。自动化测试必须使用合成数据和回环 AI Mock，不得连接真实 AI、邮件、对象存储或生产数据库。

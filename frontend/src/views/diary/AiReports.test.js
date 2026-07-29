@@ -41,7 +41,7 @@ test('ai generation shows elapsed progress and respects configured request timeo
   assert.match(source, /startGenerationTimer/)
   assert.match(source, /aiApi\.generateReport\([\s\S]*?configForm\.timeoutSeconds\)/)
   assert.match(apiSource, /const aiRequestTimeout/)
-  assert.match(apiSource, /\(seconds \+ 10\) \* 1000/)
+  assert.match(apiSource, /Math\.max\(5, Math\.min\(Number\(timeoutSeconds\) \|\| 30, 120\)\) \+ 10/)
 })
 
 test('ai history is progressively paged and report deletion requires confirmation', () => {

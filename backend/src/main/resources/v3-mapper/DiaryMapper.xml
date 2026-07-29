@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper">
+    <resultMap id="diaryRow" type="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$DiaryRow">
+        <id column="diary_id" property="diaryId"/>
+        <result column="public_id" property="publicId"/>
+        <result column="space_public_id" property="spacePublicId"/>
+        <result column="author_id" property="authorId"/>
+        <result column="title" property="title"/>
+        <result column="diary_date" property="diaryDate"/>
+        <result column="content_html" property="contentHtml"/>
+        <result column="content_text" property="contentText"/>
+        <result column="mood_key" property="moodKey"/>
+        <result column="visibility" property="visibility"/>
+        <result column="locked" property="locked"/>
+        <result column="version" property="version"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deleted_at" property="deletedAt"/>
+    </resultMap>
+
+    <sql id="visibleDiary">
+        d.space_id=#{query.spaceId}
+        AND (d.visibility='SHARED' OR d.author_id=#{query.accountId})
+        <choose>
+            <when test="query.trash">AND d.deleted_at IS NOT NULL</when>
+            <otherwise>AND d.deleted_at IS NULL</otherwise>
+        </choose>
+    </sql>
+
+    <select id="findPage" resultMap="diaryRow">
+        SELECT d.diary_id,d.public_id,s.public_id AS space_public_id,d.author_id,d.title,d.diary_date,
+               NULL AS content_html,LEFT(d.content_text,600) AS content_text,d.mood_key,d.visibility,d.locked,
+               d.version,d.created_at,d.updated_at,d.deleted_at
+        FROM diary d JOIN diary_space s ON s.space_id=d.space_id
+        WHERE <include refid="visibleDiary"/>
+        <if test="query.startDate != null">AND d.diary_date&gt;=#{query.startDate}</if>
+        <if test="query.endDate != null">AND d.diary_date&lt;=#{query.endDate}</if>
+        <if test="query.mood != null">AND d.mood_key=#{query.mood}</if>
+        <if test="query.keyword != null">
+            AND MATCH(d.title,d.content_text) AGAINST(#{query.keyword} IN NATURAL LANGUAGE MODE)
+        </if>
+        <if test="tagPublicId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt JOIN tag t ON t.tag_id=dt.tag_id
+                        WHERE dt.diary_id=d.diary_id AND t.public_id=#{tagPublicId})
+        </if>
+        <if test="query.cursorDate != null">
+            AND (d.diary_date&lt;#{query.cursorDate} OR (d.diary_date=#{query.cursorDate} AND d.diary_id&lt;#{query.cursorId}))
+        </if>
+        ORDER BY d.diary_date DESC,d.diary_id DESC
+        LIMIT #{query.limit}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM diary d
+        WHERE <include refid="visibleDiary"/>
+        <if test="query.startDate != null">AND d.diary_date&gt;=#{query.startDate}</if>
+        <if test="query.endDate != null">AND d.diary_date&lt;=#{query.endDate}</if>
+        <if test="query.mood != null">AND d.mood_key=#{query.mood}</if>
+        <if test="query.keyword != null">
+            AND MATCH(d.title,d.content_text) AGAINST(#{query.keyword} IN NATURAL LANGUAGE MODE)
+        </if>
+        <if test="tagPublicId != null">
+            AND EXISTS (SELECT 1 FROM diary_tag dt JOIN tag t ON t.tag_id=dt.tag_id
+                        WHERE dt.diary_id=d.diary_id AND t.public_id=#{tagPublicId})
+        </if>
+    </select>
+
+    <select id="findByPublicId" resultMap="diaryRow">
+        SELECT d.diary_id,d.public_id,s.public_id AS space_public_id,d.author_id,d.title,d.diary_date,
+               d.content_html,d.content_text,d.mood_key,d.visibility,d.locked,d.version,
+               d.created_at,d.updated_at,d.deleted_at
+        FROM diary d JOIN diary_space s ON s.space_id=d.space_id
+        WHERE d.space_id=#{spaceId} AND d.public_id=#{publicId}
+          AND (d.visibility='SHARED' OR d.author_id=#{accountId})
+        <if test="!includeDeleted">AND d.deleted_at IS NULL</if>
+    </select>
+
+    <select id="findTags" resultType="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$TagRow">
+        SELECT dt.diary_id,t.tag_id,t.public_id,t.name,t.color
+        FROM diary_tag dt JOIN tag t ON t.tag_id=dt.tag_id
+        WHERE dt.diary_id IN
+        <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY dt.diary_id,t.name,t.tag_id
+    </select>
+
+    <select id="findMedia" resultType="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$MediaRow">
+        SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,a.caption,a.taken_at,dm.position,a.status
+        FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
+        WHERE dm.diary_id IN
+        <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY dm.diary_id,dm.position,a.asset_id
+    </select>
+
+    <select id="resolveTagIds" resultType="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$IdRow">
+        SELECT tag_id AS internal_id,public_id FROM tag WHERE space_id=#{spaceId} AND public_id IN
+        <foreach collection="publicIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <select id="resolveMediaIds" resultType="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$IdRow">
+        SELECT asset_id AS internal_id,public_id FROM media_asset
+        WHERE space_id=#{spaceId} AND deleted_at IS NULL AND status='READY' AND public_id IN
+        <foreach collection="publicIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>

@@ -9,14 +9,14 @@ test('administrator invitation panel requires step-up and stays responsive', asy
   await expect(panel.getByText('仅管理员', { exact: true })).toBeVisible()
 
   const responsePromise = page.waitForResponse(response =>
-    response.request().method() === 'GET'
-    && response.url().endsWith('/api/admin/invitation-code'))
+    response.request().method() === 'POST'
+    && response.url().endsWith('/api/v3/admin/invitation-code/view'))
   await panel.getByRole('button', { name: '查看邀请码' }).click()
   const stepUpDialog = page.getByRole('dialog', { name: '验证身份' })
   await expect(stepUpDialog).toBeVisible()
   await stepUpDialog.locator('input[type="password"]').fill('wrong-password')
   await stepUpDialog.getByRole('button', { name: '确认验证', exact: true }).click()
-  await expect(stepUpDialog.getByRole('alert')).toHaveText('当前密码不正确')
+  await expect(stepUpDialog.getByRole('alert')).toHaveText('二次验证失败')
   await expect(page.locator('.el-message--error')).toHaveCount(0)
   const assertQuality = watchPageQuality(page)
   await stepUpDialog.locator('input[type="password"]').fill('e2e_password_123')
@@ -61,19 +61,18 @@ test('administrator invitation panel requires step-up and stays responsive', asy
 })
 
 test('regular users do not render administrator invitation controls', async ({ page }) => {
-  const loginResponse = await page.request.post('/api/v2/auth/login', {
+  const loginResponse = await page.request.post('/api/v3/auth/login', {
     headers: { 'X-Device-Name': 'Playwright regular user' },
     data: { username: 'e2e_user_b', password: 'e2e_password_123' }
   })
   const login = await loginResponse.json()
   expect(loginResponse.ok()).toBe(true)
-  expect(login.code).toBe(200)
 
   await page.goto('/')
   await page.evaluate(({ token, userInfo }) => {
     localStorage.setItem('token', token)
     localStorage.setItem('userInfo', JSON.stringify(userInfo))
-  }, login.data)
+  }, { token: login.token, userInfo: login.userInfo })
   await page.reload()
   await page.goto('/profile')
 

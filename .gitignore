@@ -9,6 +9,7 @@ frontend/test-results/
 frontend/e2e/.auth/
 backend/target/
 artifacts/
+deploy/
 .env.staging
 deploy/frontend/
 deploy/backend/*.jar

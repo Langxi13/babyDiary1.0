@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
-      MYSQL_DATABASE: baby-diary
+      MYSQL_DATABASE: baby_diary_v3
       MYSQL_USER: ${DB_USERNAME:?set DB_USERNAME in the staging env file}
       MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the staging env file}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in the staging env file}
@@ -48,11 +48,11 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: v3
       SERVER_ADDRESS: 0.0.0.0
-      DB_URL: jdbc:mysql://mysql:3306/baby-diary?connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true
-      DB_USERNAME: ${DB_USERNAME:?set DB_USERNAME in the staging env file}
-      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the staging env file}
+      V3_DB_URL: jdbc:mysql://mysql:3306/baby_diary_v3?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true
+      V3_DB_USERNAME: ${DB_USERNAME:?set DB_USERNAME in the staging env file}
+      V3_DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the staging env file}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CACHE_PREFIX: "baby-diary:staging:"

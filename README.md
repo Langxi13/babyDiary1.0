@@ -15,8 +15,8 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - Android 原生相册、拍照、HTTPS 私有服务器切换、原生刷新会话和应用更新检测
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
-- 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
-- Redis 缓存、Flyway V1-V15 迁移、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
+- 私密限时分享、ZIP v3 便携归档导入导出、PDF/EPUB 日记书导出
+- Redis 缓存、V3 UUID 数据模型、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
 
 完整功能、接口与质量门禁见 [document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
 
@@ -63,7 +63,7 @@ npm --prefix frontend ci
 npm --prefix frontend run dev
 ```
 
-访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，Flyway 会自动创建和升级数据库结构。JDBC URL 必须保留 `connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true`，以固定 MySQL 会话为东八区并避免依赖命名时区表。
+访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，V3 Flyway 会在 `baby_diary_v3` 空库中创建统一结构。JDBC URL 必须保留时区参数，以固定 MySQL 会话并避免依赖命名时区表。已有旧库应先按 [V3 统一架构与迁移运行手册](document/V3统一架构与迁移运行手册.md) 完成受控迁移，不要让 V3 应用直接连接旧库。
 
 ## Android 客户端
 
@@ -123,15 +123,15 @@ Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`sc
 
 ## 生产部署
 
-生产配置模板位于 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、原生媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证原生兼容接口并读取 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产覆盖配置使用 `config/application-v3-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产服务只连接 `V3_DB_URL` 指定的 V3 数据库。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、V3 媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证 `/api/v3/client/bootstrap`、未登录账户响应和 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
 ## 统一媒体模型
 
-V15 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入 `diary_image`、`album_photo`、`favorite_photo` 的业务数据，也不再依赖旧文件名拼接 URL；图片统一返回带有效期的签名 `contentUrl/thumbnailUrl`。
+V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；图片统一返回带有效期的签名 `contentUrl/thumbnailUrl`。
 
-旧表和旧目录仅作为回滚隔离保留 14 天。生产升级必须先备份，再停止后端，执行 `scripts/migrate-media.sh dry-run`、`apply`、`verify`，确认校验和、关系数量和页面访问正常后才能将旧目录改名隔离；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向 V15。
+旧库、旧表和旧目录仅作为回滚隔离保留至少 14 天。生产升级必须先备份、停写，再执行 `scripts/v3-migrate.sh preflight`、`migrate`、`verify`，确认校验和、关系数量和页面访问正常后再完成切换；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向迁移。
 
-`DIARY_FILE_PATH` 只用于受控迁移期间读取旧版图片；新媒体写入 `DIARY_OBJECT_PATH` 或后续配置的 S3/COS 对象存储，两者必须是不同目录。新媒体通过短时签名 URL 访问。旧版 `/images/**` 兼容路由只在 14 天回滚窗口内保留，确认迁移完成后应从 Web/Nginx 配置中移除。
+迁移期间旧媒体目录只由迁移工具读取；新媒体写入 `DIARY_OBJECT_PATH` 或后续配置的 S3/COS 对象存储。新媒体通过 `/api/v3/public/media/**` 的短时签名 URL 访问。旧版 `/images/**` 路由不属于 V3 运行时，完成回滚窗口后应保持移除。
 
 项目不会跟踪以下私有内容：
 

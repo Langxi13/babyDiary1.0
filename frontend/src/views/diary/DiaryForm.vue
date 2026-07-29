@@ -588,7 +588,7 @@ const saveDraft = async () => {
 
   await draftApi.save({
     draftKey: draftKey.value,
-    diaryId: isEdit.value ? Number(diaryId.value) : null,
+    diaryId: isEdit.value ? diaryId.value : null,
     title: form.title,
     date: form.date,
     content: form.content,

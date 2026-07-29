@@ -159,7 +159,7 @@ test('phone diary list keeps filters collapsed, actions aligned, and detail rout
   })
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
   await card.evaluate(element => element.click())
-  await page.waitForURL(/\/diaries\/\d+$/)
+  await page.waitForURL(/\/diaries\/[0-9a-f-]{36}$/i)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
   await expect(page.getByRole('button', { name: '编辑' })).toBeVisible()
   await expect(page.getByRole('button', { name: '删除' })).toBeVisible()

@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
-      MYSQL_DATABASE: baby-diary
+      MYSQL_DATABASE: baby_diary_v3
       MYSQL_USER: ${DB_USERNAME:-baby_diary}
       MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}

@@ -180,8 +180,8 @@ const firstDiaryImage = diary => diary?.media?.find(item => item.mediaType === '
 const draftTypeLabel = (draft) => draft.draftKey === 'create' ? '新日记草稿' : '编辑草稿'
 const draftDiaryId = (draft) => {
   if (draft.diaryId) return draft.diaryId
-  const match = String(draft.draftKey || '').match(/^edit-(\d+)$/)
-  return match ? Number(match[1]) : null
+  const match = String(draft.draftKey || '').match(/^edit-(.+)$/)
+  return match ? match[1] : null
 }
 const openDraft = (draft) => {
   if (draft.draftKey === 'create') {

@@ -239,7 +239,7 @@ const addComment = async () => {
   } finally { commenting.value = false }
 }
 
-const isOwnComment = comment => Number(comment.userId) === Number(authStore.userInfo?.userId)
+const isOwnComment = comment => String(comment.userId || '') === String(authStore.userInfo?.userId || '')
 const beginCommentEdit = comment => {
   editingCommentId.value = comment.publicId
   editingCommentText.value = comment.content

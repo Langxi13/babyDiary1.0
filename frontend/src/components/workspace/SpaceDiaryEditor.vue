@@ -219,8 +219,10 @@ const save = async () => {
     visibility: form.visibility,
     locked: form.locked,
     baseVersion: props.diary?.version,
-    tagIds: form.tagIds
+    tagIds: form.tagIds,
+    mediaIds: props.diary?.media?.map(item => item.assetId || item.id).filter(Boolean) || []
   }
+  const uploadedAssetIds = []
   try {
     let saved
     if (offline.value) {
@@ -228,6 +230,13 @@ const save = async () => {
       saved = { ...props.diary, ...payload, publicId: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
     } else {
       try {
+        for (const item of files.value) {
+          const formData = new FormData()
+          formData.append('file', item.raw, item.raw.name)
+          const upload = await workspaceApi.media.upload(props.spaceId, formData)
+          uploadedAssetIds.push(upload.data.assetId)
+        }
+        payload.mediaIds = [...payload.mediaIds, ...uploadedAssetIds]
         const response = await withStepUpRetry(token => creating
           ? workspaceApi.diaries.create(props.spaceId, payload, token || props.stepUpToken)
           : workspaceApi.diaries.update(props.spaceId, entityId, payload, token || props.stepUpToken))
@@ -237,11 +246,12 @@ const save = async () => {
           await queueDiary(entityId, payload)
           saved = { ...props.diary, ...payload, publicId: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
         } else {
+          await Promise.allSettled(uploadedAssetIds.map(assetId => workspaceApi.media.remove(props.spaceId, assetId)))
           throw error
         }
       }
     }
-    await saveMedia(entityId, saved.pending)
+    if (offline.value || saved.pending) await queueMedia(entityId)
     ElMessage.success(offline.value || saved.pending ? '已保存到本机，联网后自动同步' : '日记已保存')
     emit('saved', saved)
     emit('update:modelValue', false)
@@ -261,35 +271,16 @@ const queueDiary = (entityId, payload) => queueOfflineDiaryOperation({
   localSnapshot: { ...props.diary, ...payload, publicId: entityId }
 })
 
-const saveMedia = async (diaryId, forceQueue = false) => {
+const queueMedia = async diaryId => {
   for (const item of files.value) {
-    if (offline.value || forceQueue) {
-      await queueOfflineOperation({
-        id: crypto.randomUUID(),
-        kind: 'media',
-        spaceId: props.spaceId,
-        diaryId,
-        filename: item.raw.name,
-        file: item.raw
-      })
-      continue
-    }
-    try {
-      const formData = new FormData()
-      formData.append('file', item.raw, item.raw.name)
-      formData.append('diaryId', diaryId)
-      await withStepUpRetry(token => workspaceApi.media.upload(
-        props.spaceId,
-        formData,
-        token || props.stepUpToken
-      ))
-    } catch (error) {
-      if (!error.response) {
-        await queueOfflineOperation({ id: crypto.randomUUID(), kind: 'media', spaceId: props.spaceId, diaryId, filename: item.raw.name, file: item.raw })
-      } else {
-        ElMessage.error(`${item.raw.name} 上传失败`)
-      }
-    }
+    await queueOfflineOperation({
+      id: crypto.randomUUID(),
+      kind: 'media',
+      spaceId: props.spaceId,
+      diaryId,
+      filename: item.raw.name,
+      file: item.raw
+    })
   }
 }
 

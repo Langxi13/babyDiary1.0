@@ -40,25 +40,41 @@ class AlbumPathCollationMigrationTest {
     @Test
     void versionTwelveSchemaWithProductionCollationDriftMigratesAndComparesPaths() throws Exception {
         resetSchema();
+
+        Flyway.configure()
+                .dataSource(jdbcUrl("legacy_schema"), MYSQL.getUsername(), MYSQL.getPassword())
+                .locations("classpath:db/migration")
+                .target("8")
+                .load()
+                .migrate();
+
         try (Connection connection = connection("legacy_schema"); Statement statement = connection.createStatement()) {
-            statement.execute("CREATE TABLE diary_image ("
-                    + "image_id INT PRIMARY KEY AUTO_INCREMENT,"
-                    + "diary_id INT NOT NULL,"
-                    + "image_path VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,"
-                    + "sort INT NOT NULL) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci");
-            statement.execute("CREATE TABLE album ("
-                    + "album_id INT PRIMARY KEY AUTO_INCREMENT,"
-                    + "cover_image_path VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL) "
-                    + "DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+            statement.execute("INSERT INTO user (username, password) VALUES ('migration-user', 'hash')");
+            statement.execute("INSERT INTO diary (user_id, title, date, content) "
+                    + "VALUES (1, 'Migration diary', '2026-07-29', 'Body')");
             statement.execute("INSERT INTO diary_image (diary_id, image_path, sort) VALUES (1, 'cover-001.jpg', 0)");
-            statement.execute("INSERT INTO album (cover_image_path) VALUES ('cover-001.jpg')");
+            statement.execute("INSERT INTO album_group (user_id, name, type) VALUES (1, 'Trips', 'CUSTOM')");
+            statement.execute("INSERT INTO album (group_id, user_id, name, type, cover_image_path) "
+                    + "VALUES (1, 1, 'Europe', 'CUSTOM', 'cover-001.jpg')");
         }
 
         Flyway.configure()
                 .dataSource(jdbcUrl("legacy_schema"), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
-                .baselineOnMigrate(true)
-                .baselineVersion("12")
+                .target("12")
+                .load()
+                .migrate();
+
+        try (Connection connection = connection("legacy_schema"); Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE diary_image MODIFY COLUMN image_path VARCHAR(255) "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL");
+            statement.execute("ALTER TABLE album MODIFY COLUMN cover_image_path VARCHAR(255) "
+                    + "CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL");
+        }
+
+        Flyway.configure()
+                .dataSource(jdbcUrl("legacy_schema"), MYSQL.getUsername(), MYSQL.getPassword())
+                .locations("classpath:db/migration")
                 .load()
                 .migrate();
 

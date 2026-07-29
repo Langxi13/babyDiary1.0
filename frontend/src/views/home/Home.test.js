@@ -9,6 +9,7 @@ test('home requests only the favorite photos needed for its preview strip', () =
   assert.match(source, /photoApi\.page\(\{ favoriteOnly: true, page: 0, size: 6 \}\)/)
   assert.match(source, /response\.data\?\.content/)
   assert.doesNotMatch(source, /photoApi\.list\(\{ favoriteOnly: true \}\)/)
-  assert.match(apiSource, /request\.get\('\/api\/photos\/page'/)
+  assert.match(apiSource, /albums\/system\/favorites`/)
+  assert.match(apiSource, /params: \{ page, size \}/)
   assert.match(source, /Promise\.allSettled/)
 })

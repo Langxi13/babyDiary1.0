@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SERVICE_NAME="${SERVICE_NAME:-diary-backend}"
 JAR_NAME="${JAR_NAME:-Baby-Diary-0.0.1-SNAPSHOT.jar}"
+SYSTEMD_V3_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-v3.conf"
 
 cd "$PROJECT_ROOT"
 
@@ -30,6 +31,15 @@ install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
 install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf
 install -D -m 0644 config/diary-backend-update.conf /etc/systemd/system/diary-backend.service.d/20-baby-diary-update.conf
+java_bin="$(command -v java)"
+escaped_java_bin="${java_bin//&/\&}"
+escaped_project_root="${PROJECT_ROOT//&/\&}"
+escaped_jar_name="${JAR_NAME//&/\&}"
+sed \
+  -e "s|@JAVA_BIN@|$escaped_java_bin|g" \
+  -e "s|@PROJECT_ROOT@|$escaped_project_root|g" \
+  -e "s|@JAR_NAME@|$escaped_jar_name|g" \
+  config/diary-backend-v3.conf | install -D -m 0644 /dev/stdin "$SYSTEMD_V3_OVERRIDE"
 
 systemctl daemon-reload
 
@@ -37,6 +47,9 @@ scripts/runtime-governance-check.sh
 nginx -t
 
 systemctl stop "$SERVICE_NAME"
+if [ -f "deploy/backend/$JAR_NAME" ]; then
+  cp "deploy/backend/$JAR_NAME" "deploy/backend/$JAR_NAME.previous"
+fi
 cp "backend/target/$JAR_NAME" "deploy/backend/$JAR_NAME"
 rsync -a --delete --exclude downloads/ frontend/dist/ deploy/frontend/
 systemctl start "$SERVICE_NAME"

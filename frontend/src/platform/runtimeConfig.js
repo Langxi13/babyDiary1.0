@@ -72,7 +72,7 @@ export const testServerConnection = async (value) => {
   let response
   try {
     response = await CapacitorHttp.get({
-      url: `${origin}/api/v2/client/bootstrap`,
+      url: `${origin}/api/v3/client/bootstrap`,
       connectTimeout: 10000,
       readTimeout: 10000,
       headers: { Accept: 'application/json' }
@@ -86,13 +86,13 @@ export const testServerConnection = async (value) => {
   } catch {
     throw new Error('该地址没有返回兼容的 Baby Diary 服务信息')
   }
-  if (response.status !== 200 || payload?.code !== 200 || payload?.data?.apiVersion !== 2) {
+  if (response.status !== 200 || payload?.apiVersion !== 3) {
     throw new Error('该地址不是兼容的 Baby Diary 服务')
   }
-  if (payload.data.nativeSessionMode !== 'COOKIE') {
+  if (payload.nativeSessionMode !== 'BEARER_REFRESH_COOKIE') {
     throw new Error('服务器暂不支持当前原生会话方式')
   }
-  return { origin, capabilities: payload.data }
+  return { origin, capabilities: payload }
 }
 
 export const saveServerOrigin = async (value) => {

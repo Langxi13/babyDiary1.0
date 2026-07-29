@@ -236,7 +236,7 @@ const passwordRules = {
   oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, max: 64, message: '新密码长度需在6到64位之间', trigger: 'blur' }
+    { min: 8, max: 200, message: '新密码长度需在8到200位之间', trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: '请确认新密码', trigger: 'blur' },
@@ -289,7 +289,7 @@ const withAdminStepUp = async action => {
 }
 
 const applyInvitationResponse = response => {
-  invitationCode.value = response.data.invitationCode
+  invitationCode.value = response.data.code
   invitationUpdatedAt.value = response.data.updatedAt
   invitationVisible.value = true
   scheduleInvitationMask()

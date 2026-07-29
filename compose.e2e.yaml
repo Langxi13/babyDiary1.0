@@ -3,7 +3,7 @@ services:
     image: mysql:8.4
     environment:
       TZ: Asia/Shanghai
-      MYSQL_DATABASE: baby-diary
+      MYSQL_DATABASE: baby_diary_v3
       MYSQL_USER: baby_diary_e2e
       MYSQL_PASSWORD: baby_diary_e2e
       MYSQL_ROOT_PASSWORD: baby_diary_e2e_root

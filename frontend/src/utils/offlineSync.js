@@ -39,16 +39,32 @@ export async function syncWorkspace(spaceId) {
     }
 
     const mediaOperations = (await listOfflineOperations(spaceId)).filter(item => item.kind === 'media')
-    for (const media of mediaOperations) {
+    const mediaByDiary = new Map()
+    for (const item of mediaOperations) {
+      const group = mediaByDiary.get(item.diaryId) || []
+      group.push(item)
+      mediaByDiary.set(item.diaryId, group)
+    }
+    for (const [diaryId, items] of mediaByDiary) {
+      const uploaded = []
       try {
-        const formData = new FormData()
-        formData.append('file', media.file, media.filename || 'media')
-        formData.append('diaryId', media.diaryId)
-        if (media.caption) formData.append('caption', media.caption)
-        await workspaceApi.media.upload(spaceId, formData)
-        await removeOfflineOperations([media.id])
-        synced += 1
+        for (const media of items) {
+          const formData = new FormData()
+          formData.append('file', media.file, media.filename || 'media')
+          if (media.caption) formData.append('caption', media.caption)
+          const response = await workspaceApi.media.upload(spaceId, formData)
+          uploaded.push(response.data.assetId)
+        }
+        const current = (await workspaceApi.diaries.get(spaceId, diaryId)).data
+        const mediaIds = [
+          ...(current.media || []).map(item => item.assetId).filter(Boolean),
+          ...uploaded
+        ]
+        await workspaceApi.diaries.update(spaceId, diaryId, { ...current, mediaIds })
+        await removeOfflineOperations(items.map(item => item.id))
+        synced += items.length
       } catch {
+        await Promise.allSettled(uploaded.map(assetId => workspaceApi.media.remove(spaceId, assetId)))
         break
       }
     }

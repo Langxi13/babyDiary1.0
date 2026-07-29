@@ -27,7 +27,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="至少 6 位"
+            placeholder="至少 8 位"
             size="large"
             :prefix-icon="Lock"
             show-password
@@ -125,7 +125,7 @@ const rules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在6到20个字符', trigger: 'blur' }
+    { min: 8, max: 200, message: '密码长度在8到200个字符', trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, validator: validateConfirmPassword, trigger: 'blur' }

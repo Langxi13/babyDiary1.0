@@ -39,9 +39,9 @@ const getRefreshRequest = () => {
     cancelRefreshRequest()
     const controller = new AbortController()
     const pendingRequest = isNativeApp()
-      ? nativeAuthRawRequest('POST', '/api/v2/auth/refresh', null)
+      ? nativeAuthRawRequest('POST', '/api/v3/auth/refresh', null)
       : axios.post(
-          `${request.defaults.baseURL || ''}/api/v2/auth/refresh`,
+          `${request.defaults.baseURL || ''}/api/v3/auth/refresh`,
           null,
           { withCredentials: true, timeout: 15000, signal: controller.signal }
         )
@@ -133,6 +133,9 @@ request.interceptors.response.use(
       return response.data
     }
     const { data } = response
+    if (response.config.url?.startsWith('/api/v3/')) {
+      return { code: 200, message: 'success', data }
+    }
     if (data?.code === 200) {
       return data
     }
@@ -151,9 +154,9 @@ request.interceptors.response.use(
         if (originalRequest.__skipAuthRecovery) {
           return Promise.reject(error)
         }
-        const isRefreshRequest = originalRequest.url?.includes('/api/v2/auth/refresh')
-        const isPublicAuthRequest = /\/api\/v2\/auth\/(login|password|email\/confirm)/.test(originalRequest.url || '')
-        const isPublicShareRequest = originalRequest.url?.includes('/api/v2/public/shares/')
+        const isRefreshRequest = originalRequest.url?.includes('/api/v3/auth/refresh')
+        const isPublicAuthRequest = /\/api\/v3\/auth\/login/.test(originalRequest.url || '')
+        const isPublicShareRequest = originalRequest.url?.includes('/api/v3/public/shares/')
         if (isPublicShareRequest) {
           ElMessage.error(await parseMessage(data, '访问密码不正确'))
           return Promise.reject(error)
@@ -167,12 +170,18 @@ request.interceptors.response.use(
               return Promise.reject(staleSessionError(originalRequest))
             }
             const payload = refreshResponse.data
-            if (payload?.code === 200 && payload.data?.token) {
-              localStorage.setItem('userInfo', JSON.stringify(payload.data.userInfo || null))
-              localStorage.setItem('token', payload.data.token)
-              window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: payload.data }))
+            const refreshed = payload?.data || payload
+            if (refreshed?.token) {
+              const refreshedUser = refreshed.userInfo ? {
+                ...refreshed.userInfo,
+                userId: refreshed.userInfo.id || refreshed.userInfo.accountId,
+                systemRole: refreshed.userInfo.systemRole || refreshed.userInfo.role
+              } : null
+              localStorage.setItem('userInfo', JSON.stringify(refreshedUser))
+              localStorage.setItem('token', refreshed.token)
+              window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: { ...refreshed, userInfo: refreshedUser } }))
               originalRequest.headers = originalRequest.headers || {}
-              originalRequest.headers.Authorization = `Bearer ${payload.data.token}`
+              originalRequest.headers.Authorization = `Bearer ${refreshed.token}`
               return request(originalRequest)
             }
           } catch {

@@ -42,8 +42,7 @@ NGINX
 cat > "$NGINX_RESOURCE_POLICY_MAP_FILE" <<'NGINX'
 map $request_uri $baby_diary_resource_policy {
   default "same-origin";
-  ~^/images/ "cross-origin";
-  ~^/api/v2/media/ "cross-origin";
+  ~^/api/v3/public/media/ "cross-origin";
 }
 NGINX
 

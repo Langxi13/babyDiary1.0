@@ -144,8 +144,8 @@ if [ -f "$NGINX_SITE_FILE" ]; then
     echo "nginx native resource policy map is missing" >&2
     exit 1
   }
-  grep -q '~\^/images/ "cross-origin"' "$NGINX_RESOURCE_POLICY_MAP_FILE" || {
-    echo "nginx image resource policy must allow native clients" >&2
+  grep -q '~\^/api/v3/public/media/ "cross-origin"' "$NGINX_RESOURCE_POLICY_MAP_FILE" || {
+    echo "nginx V3 media resource policy must allow native clients" >&2
     exit 1
   }
   echo "nginx native resource policy included"

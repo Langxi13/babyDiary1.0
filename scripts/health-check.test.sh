@@ -68,7 +68,7 @@ case "$path" in
     content_type="text/html"
     body='<html></html>'
     ;;
-  /api/v2/client/bootstrap)
+  /api/v3/client/bootstrap)
     code=200
     content_type="application/json"
     body='{"code":200,"data":{"apiVersion":2,"nativeSessionMode":"COOKIE"}}'
@@ -82,7 +82,7 @@ case "$path" in
       body='{"status":"UP"}'
     fi
     ;;
-  /api/auth/info)
+  /api/v3/account/profile)
     code="${AUTH_INFO_CODE:-401}"
     content_type="application/json"
     body='{"code":401}'
@@ -124,10 +124,10 @@ grep -q "service nginx active" <<<"$OUTPUT"
 grep -q "GET / 200" <<<"$OUTPUT"
 grep -q "GET /album 200" <<<"$OUTPUT"
 grep -q "GET /diaries 200" <<<"$OUTPUT"
-grep -q "GET /api/v2/client/bootstrap 200" <<<"$OUTPUT"
+grep -q "GET /api/v3/client/bootstrap 200" <<<"$OUTPUT"
 grep -q "GET /actuator/health 200 application/vnd.spring-boot.actuator.v3+json" <<<"$OUTPUT"
 grep -q "actuator status UP" <<<"$OUTPUT"
-grep -q "GET /api/auth/info 401" <<<"$OUTPUT"
+grep -q "GET /api/v3/account/profile 401" <<<"$OUTPUT"
 grep -q "GET /manifest.webmanifest 200 application/manifest+json" <<<"$OUTPUT"
 
 set +e
@@ -146,7 +146,7 @@ if [ "$FAIL_STATUS" -eq 0 ]; then
   exit 1
 fi
 
-grep -q "expected /api/auth/info to return 401, got 502" <<<"$FAIL_OUTPUT"
+grep -q "expected /api/v3/account/profile to return 401, got 502" <<<"$FAIL_OUTPUT"
 
 set +e
 DOWN_OUTPUT="$(

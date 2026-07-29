@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    url: ${V3_DB_URL:jdbc:mysql://127.0.0.1:3306/baby_diary_v3?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${V3_DB_USERNAME:${DB_USERNAME:baby_diary}}
+    password: ${V3_DB_PASSWORD:${DB_PASSWORD}}
+    hikari:
+      maximum-pool-size: ${V3_DB_POOL_MAX:8}
+      minimum-idle: ${V3_DB_POOL_MIN:2}
+      connection-timeout: 5000
+      validation-timeout: 2000
+  flyway:
+    locations: classpath:db/v3/migration
+    clean-disabled: true
+    baseline-on-migrate: false
+  task:
+    execution:
+      pool:
+        core-size: 1
+        max-size: 2
+        queue-capacity: 20
+
+mybatis:
+  mapper-locations: classpath:v3-mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+app:
+  v3:
+    media:
+      url-signing-key: ${V3_MEDIA_URL_SIGNING_KEY:${JWT_SECRET}}
+      url-lifetime-seconds: ${V3_MEDIA_URL_LIFETIME_SECONDS:3600}
+    jobs:
+      enabled: ${V3_JOBS_ENABLED:true}
+      worker-id: ${V3_WORKER_ID:${HOSTNAME:single-node}}
+      poll-delay-ms: ${V3_JOB_POLL_DELAY_MS:2000}
+      stale-after-minutes: ${V3_JOB_STALE_MINUTES:30}
+      recovery-delay-ms: ${V3_JOB_RECOVERY_DELAY_MS:300000}
+    rate-limit:
+      enabled: ${V3_RATE_LIMIT_ENABLED:true}
+      redis-enabled: ${V3_RATE_LIMIT_REDIS_ENABLED:false}

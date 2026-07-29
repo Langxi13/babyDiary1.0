@@ -45,7 +45,7 @@ test('new anniversaries default to the local calendar day', () => {
 test('anniversary api exposes multipart cover upload endpoint', () => {
   assert.match(apiSource, /uploadCover\(file\)/)
   assert.match(apiSource, /const formData = new FormData\(\)/)
-  assert.match(apiSource, /formData\.append\('coverFile', file\)/)
-  assert.match(apiSource, /request\.post\('\/api\/anniversaries\/cover', formData/)
-  assert.match(apiSource, /invalidateApiCache\('anniversaries:'\)/)
+  assert.match(apiSource, /formData\.append\('file', file\)/)
+  assert.match(apiSource, /request\.post\(`\/api\/v3\/spaces\/\$\{spaceId\}\/media`, formData/)
+  assert.match(apiSource, /coverAssetId: media\.assetId/)
 })

@@ -70,8 +70,8 @@ const previewText = (draft) => {
 }
 const draftDiaryId = (draft) => {
   if (draft.diaryId) return draft.diaryId
-  const match = String(draft.draftKey || '').match(/^edit-(\d+)$/)
-  return match ? Number(match[1]) : null
+  const match = String(draft.draftKey || '').match(/^edit-(.+)$/)
+  return match ? match[1] : null
 }
 
 const loadDrafts = async () => {
