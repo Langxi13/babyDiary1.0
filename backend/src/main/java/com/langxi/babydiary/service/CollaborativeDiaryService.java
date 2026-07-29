@@ -9,7 +9,6 @@ import com.langxi.babydiary.dto.*;
 import com.langxi.babydiary.entity.*;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.CollaborationMapper;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,11 +28,8 @@ public class CollaborativeDiaryService {
     private final CollaborationMapper mapper;
     private final SpaceService spaceService;
     private final TagService tagService;
-    private final DiaryImageService diaryImageService;
-    private final DiaryImageMapper diaryImageMapper;
     private final HtmlSanitizer htmlSanitizer;
     private final AccountSecurityService accountSecurityService;
-    private final ImageStorageService imageStorageService;
     private final NotificationService notificationService;
     private final SyncJournalService syncJournalService;
     private final SearchService searchService;
@@ -43,11 +39,8 @@ public class CollaborativeDiaryService {
     public CollaborativeDiaryService(CollaborationMapper mapper,
                                      SpaceService spaceService,
                                      TagService tagService,
-                                     DiaryImageService diaryImageService,
-                                     DiaryImageMapper diaryImageMapper,
                                      HtmlSanitizer htmlSanitizer,
                                      AccountSecurityService accountSecurityService,
-                                     ImageStorageService imageStorageService,
                                      NotificationService notificationService,
                                      SyncJournalService syncJournalService,
                                      SearchService searchService,
@@ -56,11 +49,8 @@ public class CollaborativeDiaryService {
         this.mapper = mapper;
         this.spaceService = spaceService;
         this.tagService = tagService;
-        this.diaryImageService = diaryImageService;
-        this.diaryImageMapper = diaryImageMapper;
         this.htmlSanitizer = htmlSanitizer;
         this.accountSecurityService = accountSecurityService;
-        this.imageStorageService = imageStorageService;
         this.notificationService = notificationService;
         this.syncJournalService = syncJournalService;
         this.searchService = searchService;
@@ -86,7 +76,6 @@ public class CollaborativeDiaryService {
                 vo.setContent("");
                 vo.setMoodKey(null);
                 vo.setTags(Collections.emptyList());
-                vo.setImagePathList(Collections.emptyList());
                 vo.setMedia(Collections.emptyList());
             }
             return vo;
@@ -258,12 +247,7 @@ public class CollaborativeDiaryService {
             List<Diary> expired = mapper.findExpiredTrash(cutoff, 100);
             if (expired.isEmpty()) break;
             for (Diary diary : expired) {
-                List<MediaAsset> media = mediaService.findAssetsByDiary(diary.getDiaryId());
-                for (String path : diaryImageMapper.findImagePathsByDiaryId(diary.getDiaryId())) {
-                    imageStorageService.deleteAfterCommit(path);
-                }
                 mapper.hardDelete(diary.getDiaryId());
-                mediaService.deleteOrphanedAfterDiaryPurge(media);
             }
         }
     }
@@ -352,7 +336,6 @@ public class CollaborativeDiaryService {
 
     private void enrich(Diary diary) {
         diary.setTagList(tagService.findTagsByDiaryId(diary.getDiaryId()));
-        diary.setImagePathList(diaryImageService.findImagePathsByDiaryId(diary.getDiaryId()));
         diary.setMediaList(mediaService.findByDiary(diary.getDiaryId()));
     }
 
@@ -364,26 +347,19 @@ public class CollaborativeDiaryService {
         if (visibleDiaryIds.isEmpty()) {
             diaries.forEach(diary -> {
                 diary.setTagList(Collections.emptyList());
-                diary.setImagePathList(Collections.emptyList());
                 diary.setMediaList(Collections.emptyList());
             });
             return;
         }
         Map<Integer, List<Tag>> tags = tagService.findTagsByDiaryIds(visibleDiaryIds);
-        Map<Integer, List<String>> images = diaryImageMapper.findDiaryImagesByDiaryIds(
-                        visibleDiaryIds).stream()
-                .collect(Collectors.groupingBy(DiaryImage::getDiaryId, LinkedHashMap::new,
-                        Collectors.mapping(DiaryImage::getImagePath, Collectors.toList())));
         Map<Integer, List<MediaAssetVO>> media = mediaService.findByDiaries(visibleDiaryIds);
         diaries.forEach(diary -> {
             if (Boolean.TRUE.equals(diary.getLocked())) {
                 diary.setTagList(Collections.emptyList());
-                diary.setImagePathList(Collections.emptyList());
                 diary.setMediaList(Collections.emptyList());
                 return;
             }
             diary.setTagList(tags.getOrDefault(diary.getDiaryId(), Collections.emptyList()));
-            diary.setImagePathList(images.getOrDefault(diary.getDiaryId(), Collections.emptyList()));
             diary.setMediaList(media.getOrDefault(diary.getDiaryId(), Collections.emptyList()));
         });
     }

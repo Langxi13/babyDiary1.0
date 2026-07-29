@@ -32,7 +32,7 @@ public class LoginService implements UserDetailsService {
     private InvitationCodeService invitationCodeService;
 
     @Autowired
-    private ImageStorageService imageStorageService;
+    private MediaService mediaService;
 
     @Autowired
     private SpaceService spaceService;
@@ -86,7 +86,7 @@ public class LoginService implements UserDetailsService {
     }
 
     public User findByUsername(String username) {
-        return userMapper.findByUsername(username);
+        return enrichAvatar(userMapper.findByUsername(username));
     }
 
     @Transactional
@@ -119,19 +119,23 @@ public class LoginService implements UserDetailsService {
         }
 
         try {
-            String prefix = avatarPrefix(userId);
-            String fileName = imageStorageService.storeImage(avatarFile, prefix, false);
-            userMapper.updateAvatarPath(userId, fileName);
-            if (imageStorageService.isOwnedPath(user.getAvatarPath(), prefix)) {
-                imageStorageService.deleteAfterCommit(user.getAvatarPath());
-            }
-            return userMapper.findById(userId);
+            String spaceId = spaceService.requirePersonalSpace(userId).getPublicId();
+            String assetPublicId = mediaService.upload(spaceId, userId, avatarFile, null,
+                    "用户头像", null, null, null, null, null).getAssetId();
+            var asset = mediaService.requireOwnedAsset(spaceId, assetPublicId, userId);
+            mediaService.updateUsage(spaceId, assetPublicId, userId, "PROFILE", false);
+            userMapper.updateAvatarAsset(userId, asset.getAssetId());
+            return enrichAvatar(userMapper.findById(userId));
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "头像上传失败");
         }
     }
 
-    private String avatarPrefix(Integer userId) {
-        return "avatar_" + userId + "_";
+    private User enrichAvatar(User user) {
+        if (user != null && user.getAvatarAssetId() != null) {
+            var asset = mediaService.findByPublicId(user.getAvatarAssetId());
+            if (asset != null) user.setAvatarMedia(mediaService.toVO(asset));
+        }
+        return user;
     }
 }

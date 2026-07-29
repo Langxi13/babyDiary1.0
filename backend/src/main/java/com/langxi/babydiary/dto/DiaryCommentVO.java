@@ -10,7 +10,8 @@ public class DiaryCommentVO {
     private String publicId;
     private Integer userId;
     private String username;
-    private String avatarPath;
+    private MediaAssetVO avatarMedia;
+    private String avatarAssetId;
     private String content;
     private Timestamp createdAt;
     private Timestamp updatedAt;
@@ -20,7 +21,7 @@ public class DiaryCommentVO {
         vo.setPublicId(comment.getPublicId());
         vo.setUserId(comment.getUserId());
         vo.setUsername(comment.getUsername());
-        vo.setAvatarPath(comment.getAvatarPath());
+        vo.setAvatarAssetId(comment.getAvatarAssetId());
         vo.setContent(comment.getContent());
         vo.setCreatedAt(comment.getCreatedAt());
         vo.setUpdatedAt(comment.getUpdatedAt());

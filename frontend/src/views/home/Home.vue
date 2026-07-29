@@ -36,7 +36,7 @@
                 v-for="diary in recentDiaries"
                 :key="diary.diaryId"
                 class="recent-item"
-                :class="{ 'has-image': diary.imagePathList?.length }"
+                :class="{ 'has-image': firstDiaryImage(diary) }"
                 @click="router.push(`/diaries/${diary.diaryId}`)"
               >
                 <div class="recent-copy">
@@ -50,8 +50,8 @@
                   <p>{{ previewText(diary, 120) }}</p>
                 </div>
                 <img
-                  v-if="diary.imagePathList?.length"
-                  :src="thumbnailImageUrl(diary.imagePathList[0])"
+                  v-if="firstDiaryImage(diary)"
+                  :src="firstDiaryImage(diary).thumbnailUrl || firstDiaryImage(diary).contentUrl"
                   alt=""
                   loading="lazy"
                   decoding="async"
@@ -72,11 +72,11 @@
               <el-empty v-if="favoritePhotos.length === 0" description="暂无收藏照片" />
               <button
                 v-for="photo in favoritePhotos"
-                :key="photo.imageId"
+                :key="photo.assetId"
                 class="photo-tile"
                 @click="router.push(`/diaries/${photo.diaryId}`)"
               >
-                <img :src="thumbnailImageUrl(photo.imagePath)" alt="" loading="lazy" decoding="async" />
+                <img :src="photo.media?.thumbnailUrl || photo.media?.contentUrl" alt="" loading="lazy" decoding="async" />
                 <span>{{ formatChineseDate(photo.diaryDate) }}</span>
               </button>
             </div>
@@ -138,7 +138,6 @@ import { useDiaryStore } from '@/stores/diary'
 import { anniversaryApi, draftApi, photoApi } from '@/api/experience'
 import { moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
-import { thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
@@ -176,6 +175,7 @@ const previewText = (diary, limit = 100) => {
   const text = diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
   return `${(text || '').slice(0, limit)}${text?.length > limit ? '...' : ''}`
 }
+const firstDiaryImage = diary => diary?.media?.find(item => item.mediaType === 'IMAGE')
 
 const draftTypeLabel = (draft) => draft.draftKey === 'create' ? '新日记草稿' : '编辑草稿'
 const draftDiaryId = (draft) => {

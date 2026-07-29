@@ -52,10 +52,7 @@ public class DiaryVO {
     @Schema(description = "标签列表")
     private List<TagVO> tags;
 
-    @Schema(description = "图片路径列表")
-    private List<String> imagePathList;
-
-    @Schema(description = "音视频及新对象存储媒体")
+    @Schema(description = "统一媒体列表")
     private List<MediaAssetVO> media;
 
     @Schema(description = "创建时间")
@@ -82,7 +79,6 @@ public class DiaryVO {
         if (diary.getTagList() != null) {
             vo.setTags(diary.getTagList().stream().map(TagVO::fromEntity).collect(java.util.stream.Collectors.toList()));
         }
-        vo.setImagePathList(diary.getImagePathList());
         vo.setMedia(diary.getMediaList());
         vo.setCreatedAt(diary.getCreatedAt());
         vo.setUpdatedAt(diary.getUpdatedAt());

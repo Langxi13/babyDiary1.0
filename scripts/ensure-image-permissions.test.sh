@@ -37,12 +37,12 @@ FILE_GROUP="$(stat -c '%G' "$IMAGE_DIR/photo.jpg")"
 OBJECT_MODE="$(stat -c '%a' "$OBJECT_DIR")"
 OBJECT_FILE_MODE="$(stat -c '%a' "$OBJECT_DIR/private.bin")"
 
-[ "$DATA_MODE" = "2750" ]
-[ "$IMAGE_MODE" = "2750" ]
-[ "$FILE_MODE" = "640" ]
-[ "$DATA_GROUP" = "$NGINX_GROUP" ]
-[ "$IMAGE_GROUP" = "$NGINX_GROUP" ]
-[ "$FILE_GROUP" = "$NGINX_GROUP" ]
+[ "$DATA_MODE" = "700" ]
+[ "$IMAGE_MODE" = "700" ]
+[ "$FILE_MODE" = "600" ]
+[ "$DATA_GROUP" = "$SERVICE_GROUP" ]
+[ "$IMAGE_GROUP" = "$SERVICE_GROUP" ]
+[ "$FILE_GROUP" = "$SERVICE_GROUP" ]
 [ "$OBJECT_MODE" = "700" ]
 [ "$OBJECT_FILE_MODE" = "600" ]
 

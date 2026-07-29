@@ -30,7 +30,7 @@ public class AiAlbumCandidateVO {
     private List<@NotNull @Positive Integer> diaryIds = new ArrayList<>();
 
     @Size(max = 500, message = "单个相册照片过多")
-    private List<@NotNull @Positive Integer> imageIds = new ArrayList<>();
+    private List<@NotNull @Pattern(regexp = "[0-9a-fA-F-]{36}", message = "媒体资源ID无效") String> assetIds = new ArrayList<>();
 
     private List<PhotoVO> photos = new ArrayList<>();
     private Boolean discarded = false;

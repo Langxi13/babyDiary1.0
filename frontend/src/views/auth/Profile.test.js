@@ -13,10 +13,9 @@ test('profile joined date uses Chinese date display helper', () => {
   assert.doesNotMatch(source, /toLocaleDateString\('zh-CN'\)/)
 })
 
-test('profile avatar uses shared original image url helper', () => {
-  assert.match(source, /import\s*\{\s*originalImageUrl\s*\}\s*from '@\/utils\/imageUrl'/)
-  assert.match(source, /const avatarUrl = computed\(\(\) => originalImageUrl\(authStore\.userInfo\?\.avatarPath\)\)/)
-  assert.doesNotMatch(source, /`\/images\/\$\{authStore\.userInfo\.avatarPath\}`/)
+test('profile avatar uses the signed media asset url', () => {
+  assert.match(source, /const avatarUrl = computed\(\(\) => authStore\.userInfo\?\.avatarMedia\?\.contentUrl \|\| ''\)/)
+  assert.doesNotMatch(source, /avatarPath|\/images\//)
 })
 
 test('profile avatar upload supports drag and click replacement', () => {

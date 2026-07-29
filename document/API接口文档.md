@@ -162,7 +162,7 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
     "userInfo": {
       "userId": 1,
       "username": "user1",
-      "avatarPath": "/images/avatar.jpg"
+      "avatarMedia": {"assetId": "asset-uuid", "contentUrl": "/api/v2/media/public/asset-uuid/original?...", "thumbnailUrl": "/api/v2/media/public/asset-uuid/thumbnail?..."}
     }
   }
 }
@@ -237,7 +237,7 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
   "data": {
     "userId": 1,
     "username": "user1",
-    "avatarPath": "/images/avatar.jpg"
+    "avatarMedia": {"assetId": "asset-uuid", "contentUrl": "/api/v2/media/public/asset-uuid/original?...", "thumbnailUrl": "/api/v2/media/public/asset-uuid/thumbnail?..."}
   }
 }
 ```
@@ -315,9 +315,9 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
         "title": "第一次周末旅行",
         "date": "2024-01-01",
         "content": "今天一起去了江边散步...",
-        "imagePathList": [
-          "diary_1_4f7f89d2a45f4e3199138e8784af8821.jpg",
-          "diary_1_7b6e34de91c84cb68cd77b6dc01a6320.jpg"
+        "media": [
+          {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."},
+          {"assetId": "asset-uuid-2", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-2/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-2/original?..."}
         ],
         "createdAt": "2024-01-01T12:00:00"
       }
@@ -357,8 +357,8 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
     "title": "第一次周末旅行",
     "date": "2024-01-01",
     "content": "今天一起去了江边散步...",
-    "imagePathList": [
-      "diary_1_4f7f89d2a45f4e3199138e8784af8821.jpg"
+    "media": [
+      {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."}
     ],
     "createdAt": "2024-01-01T12:00:00"
   }
@@ -389,7 +389,7 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
 | tagIds | String | 否 | 逗号分隔的标签ID，最多50个 |
 | imageFiles | MultipartFile[] | 否 | 图片文件数组 |
 
-旧版日记图片接口保持单张10MB限制；该限制在读取图片到内存前执行。图片、音频和视频的大文件上传请使用 V2 富媒体接口。
+统一媒体上传校验图片25MB、音视频256MB，并在读取对象前校验真实文件签名；日记图片最终写入 `media_asset` 和 `diary_media`。
 
 **响应示例：**
 ```json
@@ -402,8 +402,8 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
     "title": "第一次周末旅行",
     "date": "2024-01-01",
     "content": "今天一起去了江边散步...",
-    "imagePathList": [
-      "diary_1_4f7f89d2a45f4e3199138e8784af8821.jpg"
+    "media": [
+      {"assetId": "asset-uuid-1", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-1/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-1/original?..."}
     ],
     "createdAt": "2024-01-01T12:00:00"
   }
@@ -412,10 +412,9 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
 
 **图片压缩说明：**
 - 仅支持 JPEG、PNG、GIF、WebP，后端同时校验文件签名
-- 单张最大10MB，单篇日记最多50张图片
-- 超过300KB的图片会自动压缩
-- 最大尺寸限制为1920px
-- 压缩质量为0.85
+- 单张图片最大25MB，单篇日记最多50张图片
+- 图片写入对象存储后异步生成 thumbnail 派生对象
+- 前端列表使用签名缩略图，详情预览使用签名原图
 
 ---
 
@@ -446,16 +445,16 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
 | moodKey | String | 否 | 心情标识，最多32个字符 |
 | tagIds | String | 否 | 逗号分隔的标签ID，最多50个 |
 | imageFiles | MultipartFile[] | 否 | 图片文件数组 |
-| retainedImagePaths | String[] | 否 | 需要保留的旧图片文件名，可重复提交 |
-| imageOrder | String[] | 否 | 图片排序，可重复提交；旧图片使用 `existing:<filename>`，新图片使用 `new:<index>` |
-| clearImages | Boolean | 否 | 是否清除原有图片，默认false |
+| retainedAssetIds | String[] | 否 | 需要保留的旧媒体资产 ID，可重复提交 |
+| mediaOrder | String[] | 否 | 媒体排序，可重复提交；旧媒体使用 `existing:<assetId>`，新图片使用 `new:<index>` |
+| clearImages | Boolean | 否 | 是否解除全部原有媒体关系，默认false |
 
 **图片排序说明：**
-- 提交 `retainedImagePaths` 时，它是旧图片保留白名单，未提交的旧图片会在更新时删除；完全省略该字段时会保留现有图片，兼容只追加新图的客户端。
-- `imageOrder` 用于持久化图片展示顺序，支持旧图片和本次新上传图片混排。
-- `existing:<filename>` 表示保留的旧图片文件名，例如 `existing:diary_1_4f7f89d2a45f4e3199138e8784af8821.jpg`。
+- 提交 `retainedAssetIds` 时，它是旧媒体保留白名单，未提交的旧媒体只解除日记关系，不删除媒体资产；完全省略该字段时保留现有媒体。
+- `mediaOrder` 用于持久化媒体展示顺序，支持旧媒体和本次新上传图片混排。
+- `existing:<assetId>` 表示保留的旧媒体资产 ID。
 - `new:<index>` 表示本次请求中 `imageFiles` 的有效新图片序号，从 `0` 开始，例如 `new:0`。
-- `imageOrder` 缺失、重复或包含无效项时，后端会忽略无效项，并把未覆盖的保留旧图和新图追加到末尾，兼容旧客户端。
+- `mediaOrder` 缺失时，后端按现有媒体和新媒体顺序追加；重复或无效项直接返回参数错误，避免客户端误删或产生不确定排序。
 
 **响应示例：**
 ```json
@@ -468,8 +467,8 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
     "title": "第一次周末旅行（更新）",
     "date": "2024-01-01",
     "content": "今天一起去了江边散步...（已更新）",
-    "imagePathList": [
-      "diary_1_7b6e34de91c84cb68cd77b6dc01a6320.jpg"
+    "media": [
+      {"assetId": "asset-uuid-2", "mediaType": "IMAGE", "thumbnailUrl": "/api/v2/media/public/asset-uuid-2/thumbnail?...", "contentUrl": "/api/v2/media/public/asset-uuid-2/original?..."}
     ],
     "createdAt": "2024-01-01T12:00:00"
   }
@@ -584,7 +583,7 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
   "title": "第一次旅行",
   "date": "2025-07-13",
   "description": "夏天的旅行",
-  "coverImagePath": "optional.jpg",
+  "coverAssetId": "asset-uuid",
   "sort": 0
 }
 ```
@@ -593,7 +592,7 @@ X-Step-Up-Token: {通过 /api/v2/auth/step-up 获取的短期令牌}
 
 ```json
 {
-  "coverImagePath": "anniversary_3_44f4575d0d964498907ca13d1dc31c4e.jpg"
+  "coverAssetId": "asset-uuid"
 }
 ```
 
@@ -677,20 +676,19 @@ AI `baseUrl` 只接受 HTTP/HTTPS 地址，必须包含主机，且不能带账�
 
 AI 相册提案编辑后，确认阶段会重新校验全部照片属于当前用户；单次提案最多确认1000张去重照片。
 
-图片不再提供独立的 `/api/images/upload`、`/api/images/{filename}` 删除接口。图片随日记创建/更新接口上传和删除，后端负责压缩、写入 `diary_image` 记录，并在删除日记或移除图片时清理文件。
+图片不再提供独立的旧版上传/删除接口。日记创建/更新接口上传图片，后端写入 `media_asset` 和 `diary_media`；移除图片只解除日记关系，资产继续保留在媒体库，只有显式媒体删除才会软删除资产和对象。
 
-**图片读取：**
+**统一媒体读取：**
 - 方法：GET
-- 路径：`/images/{filename}`
-- 缩略图路径：`/images/thumbs/480/{filename}`
-- 认证：不需要
-- 服务方式：Nginx 直接读取 `DIARY_FILE_PATH` 指定的图片目录
-- 权限要求：`data` 和 `data/images` 目录需允许 Nginx 组 `www-data` 进入读取；生产环境由 `scripts/ensure-image-permissions.sh` 维护权限
-- 返回结构：日记、相册和图片接口仍只返回原始 `imagePath` 文件名；前端根据文件名自行拼接缩略图路径，图片预览和导出仍使用原图。
+- 路径：`/api/v2/media/public/{assetId}/{variant}?expires=&signature=`
+- 认证：签名地址本身无需 JWT，但签发前必须通过业务权限检查
+- `variant`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`
+- 返回结构：日记、相册、照片、头像和封面返回 `media`/`coverMedia`，其中包含短时 `contentUrl`、`thumbnailUrl` 等地址；前端不得拼接 `/images/` 旧路径。
+- 旧版 `/images/**` 仅在 V15 完成后的 14 天回滚窗口内保留，之后移除。
 
 **编辑日记时保留旧图片：**
 
-`POST /api/diaries/{diaryId}/update` 和 `PUT /api/diaries/{diaryId}` 支持在 `multipart/form-data` 中重复提交 `retainedImagePaths` 字段。提交该字段时，未出现在白名单中的旧图片会被删除；省略该字段时保留现有图片。如需清空全部旧图，提交 `clearImages=true`。编辑页同时提交 `imageOrder` 字段来保存最终图片顺序，格式为 `existing:<filename>` 或 `new:<index>`。
+`POST /api/diaries/{diaryId}/update` 和 `PUT /api/diaries/{diaryId}` 支持在 `multipart/form-data` 中重复提交 `retainedAssetIds` 字段。提交该字段时，未出现在白名单中的旧媒体只会解除 `diary_media` 关系；省略该字段时保留现有媒体。如需清空全部旧媒体，提交 `clearImages=true`。编辑页同时提交 `mediaOrder` 字段保存最终顺序，格式为 `existing:<assetId>` 或 `new:<index>`。所有资产 ID、空间归属和排序参数都会在服务端重新校验。
 
 ---
 
@@ -820,10 +818,10 @@ V2 接口仍使用统一 `Result<T>` 响应；文件下载和签名媒体读取�
 | POST/GET | `/api/v2/spaces/{spaceId}/diaries/{diaryId}/shares` | 创建或列出活动私密分享 |
 | DELETE | `/api/v2/shares/{shareId}` | 撤销自己创建的分享 |
 | POST | `/api/v2/public/shares/{token}/open` | 使用可选密码打开公开分享 |
-| GET/POST | `/api/v2/spaces/{spaceId}/transfer/export|import` | ZIP v2 导出或导入 |
+| GET/POST | `/api/v2/spaces/{spaceId}/transfer/export|import` | ZIP v3 导出或导入，兼容读取 V1/V2 |
 | GET | `/api/v2/spaces/{spaceId}/books?format=PDF|EPUB...` | 导出日记书 |
 
-ZIP 导入限制文件数量、单项大小和总解压大小，并阻止目录穿越。导出、导入、日记书和锁定日记分享使用 `X-Step-Up-Token` 保护敏感内容；锁定日记中的旧版图片在导入时转存到私有 V2 媒体存储。
+ZIP 导入限制文件数量、单项大小和总解压大小，并阻止目录穿越。导出、导入、日记书和锁定日记分享使用 `X-Step-Up-Token` 保护敏感内容；V3 导入把媒体写入统一 `media_asset`，V1/V2 输入只作为兼容格式读取。
 
 ---
 

@@ -13,7 +13,8 @@ public class AnniversaryVO {
     private String title;
     private String date;
     private String description;
-    private String coverImagePath;
+    private MediaAssetVO coverMedia;
+    private String coverAssetId;
     private Integer sort;
     private Long daysPassed;
     private Long daysUntil;
@@ -31,7 +32,8 @@ public class AnniversaryVO {
             vo.setDaysUntil(ChronoUnit.DAYS.between(today, anniversaryDate));
         }
         vo.setDescription(anniversary.getDescription());
-        vo.setCoverImagePath(anniversary.getCoverImagePath());
+        vo.setCoverAssetId(anniversary.getCoverAssetPublicId());
+        vo.setCoverMedia(anniversary.getCoverMedia());
         vo.setSort(anniversary.getSort());
         return vo;
     }

@@ -22,15 +22,15 @@ public interface PhotoMapper {
 
     int countPhotos(@Param("userId") Integer userId, @Param("startDate") String startDate, @Param("endDate") String endDate, @Param("tagId") Integer tagId, @Param("moodKey") String moodKey, @Param("favoriteOnly") Boolean favoriteOnly);
 
-    String findCoverImagePath(@Param("userId") Integer userId, @Param("startDate") String startDate, @Param("endDate") String endDate, @Param("favoriteOnly") Boolean favoriteOnly);
+    String findCoverAssetPublicId(@Param("userId") Integer userId, @Param("startDate") String startDate, @Param("endDate") String endDate, @Param("favoriteOnly") Boolean favoriteOnly);
 
     List<Integer> findPhotoYears(@Param("userId") Integer userId);
 
-    List<Photo> findPhotosByIds(@Param("userId") Integer userId, @Param("imageIds") List<Integer> imageIds);
+    List<Photo> findPhotosByIds(@Param("userId") Integer userId, @Param("assetIds") List<?> assetIds);
 
-    Photo findPhotoById(@Param("userId") Integer userId, @Param("imageId") Integer imageId);
+    Photo findPhotoById(@Param("userId") Integer userId, @Param("assetId") Object assetId);
 
-    void insertFavorite(@Param("userId") Integer userId, @Param("imageId") Integer imageId);
+    void insertFavorite(@Param("userId") Integer userId, @Param("assetId") Object assetId);
 
-    void deleteFavorite(@Param("userId") Integer userId, @Param("imageId") Integer imageId);
+    void deleteFavorite(@Param("userId") Integer userId, @Param("assetId") Object assetId);
 }

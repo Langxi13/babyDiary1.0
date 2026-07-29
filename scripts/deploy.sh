@@ -25,11 +25,6 @@ scripts/ensure-redis.sh
 chmod +x scripts/ensure-image-permissions.sh
 scripts/ensure-image-permissions.sh
 
-chmod +x scripts/generate-thumbnails.sh
-scripts/generate-thumbnails.sh
-
-scripts/ensure-image-permissions.sh
-
 install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
 install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf

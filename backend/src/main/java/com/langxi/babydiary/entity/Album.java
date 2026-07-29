@@ -13,7 +13,8 @@ public class Album {
     private String name;
     private String description;
     private String type;
-    private String coverImagePath;
+    private Long coverAssetId;
+    private String coverAssetPublicId;
     private Integer sort;
     private Integer photoCount;
     private Timestamp createdAt;

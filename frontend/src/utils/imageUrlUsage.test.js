@@ -12,22 +12,23 @@ const homeSource = read('../views/home/Home.vue')
 const timelineSource = read('../views/diary/Timeline.vue')
 const anniversariesSource = read('../views/diary/Anniversaries.vue')
 
-test('album and diary grids use thumbnails for rendered tiles and originals for previews', () => {
+test('album and diary grids use signed media urls for rendered tiles and previews', () => {
   for (const source of [albumDetailSource, diaryListSource, diaryDetailSource]) {
-    assert.match(source, /import\s*\{\s*originalImageUrl,\s*thumbnailImageUrl\s*\}/)
-    assert.match(source, /:src="thumbnailImageUrl\(/)
-    assert.match(source, /originalImageUrl/)
+    assert.match(source, /thumbnailUrl/)
+    assert.match(source, /contentUrl/)
     assert.match(source, /preview-src-list/)
     assert.match(source, /\slazy(\s|>)/)
+    assert.doesNotMatch(source, /imagePathList/)
   }
 })
 
-test('album covers and lightweight image strips use thumbnail urls', () => {
+test('album covers and lightweight image strips use media asset urls', () => {
   for (const source of [albumSource, homeSource, timelineSource, anniversariesSource]) {
-    assert.match(source, /thumbnailImageUrl/)
+    assert.match(source, /thumbnailUrl/)
     assert.doesNotMatch(source, /`\/images\/\$\{/)
+    assert.doesNotMatch(source, /coverImagePath|imagePathList/)
   }
-  assert.match(albumSource, /backgroundImage:\s*`url\(\$\{thumbnailImageUrl\(album\.coverImagePath\)\}\)`/)
+  assert.match(albumSource, /album\.coverMedia\.thumbnailUrl\s*\|\|\s*album\.coverMedia\.contentUrl/)
   assert.match(homeSource, /loading="lazy"/)
   assert.match(timelineSource, /loading="lazy"/)
 })

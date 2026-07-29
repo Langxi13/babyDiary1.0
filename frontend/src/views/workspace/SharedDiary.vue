@@ -10,7 +10,6 @@
       <article v-else class="shared-article">
         <time>{{ formatChineseDate(diary.date) }}</time><h1>{{ diary.title }}</h1>
         <div v-if="diary.contentFormat === 'html'" class="shared-content" v-html="diary.content" /><p v-else class="shared-content plain">{{ diary.content }}</p>
-        <div v-if="diary.imagePathList?.length" class="shared-images"><el-image v-for="image in diary.imagePathList" :key="image" :src="originalImageUrl(image)" fit="cover" /></div>
         <div v-if="diary.media?.length" class="shared-media"><template v-for="media in diary.media" :key="media.assetId"><img v-if="media.mediaType === 'IMAGE'" :src="media.thumbnailUrl || media.contentUrl" /><audio v-else-if="media.mediaType === 'AUDIO'" controls :src="media.contentUrl" /><video v-else controls playsinline :poster="media.posterUrl" :src="media.transcodedUrl || media.contentUrl" /></template></div>
       </article>
     </main>
@@ -26,7 +25,6 @@ import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { Notebook } from '@element-plus/icons-vue'
 import { workspaceApi } from '@/api/workspace'
 import { formatChineseDate } from '@/utils/dateDisplay'
-import { originalImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'; import 'element-plus/es/components/icon/style/css.mjs'; import 'element-plus/es/components/image/style/css.mjs'; import 'element-plus/es/components/input/style/css.mjs'
 const route = useRoute(); const password = ref(''); const diary = ref(null); const loading = ref(false)
 const openShare = async () => { loading.value = true; try { diary.value = (await workspaceApi.shares.open(route.params.token, password.value || null)).data } finally { loading.value = false } }

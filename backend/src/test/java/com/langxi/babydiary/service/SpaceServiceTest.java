@@ -30,7 +30,7 @@ class SpaceServiceTest {
 
     @Test
     void sharedSpaceInitializesStorageUsageAndReturnsPersistedTimestamps() {
-        SpaceService service = new SpaceService(spaceMapper, userMapper, tagService);
+        SpaceService service = new SpaceService(spaceMapper, userMapper, tagService, null);
         doAnswer(invocation -> {
             invocation.<DiarySpace>getArgument(0).setSpaceId(7L);
             return null;
@@ -55,7 +55,7 @@ class SpaceServiceTest {
 
     @Test
     void removingTheLastOwnerLocksTheSpaceBeforeCountingOwners() {
-        SpaceService service = new SpaceService(spaceMapper, userMapper, tagService);
+        SpaceService service = new SpaceService(spaceMapper, userMapper, tagService, null);
         DiarySpace space = new DiarySpace();
         space.setSpaceId(7L);
         space.setPublicId("space-one");

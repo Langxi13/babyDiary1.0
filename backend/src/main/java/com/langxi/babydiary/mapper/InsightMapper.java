@@ -35,7 +35,9 @@ public interface InsightMapper {
                                  @Param("startDate") String startDate,
                                  @Param("endDate") String endDate);
 
-    @Select("SELECT COUNT(*) FROM diary_image i INNER JOIN diary d ON d.diary_id=i.diary_id WHERE " + VISIBLE)
+    @Select("SELECT COUNT(DISTINCT dm.asset_id) FROM diary_media dm " +
+            "INNER JOIN media_asset a ON a.asset_id=dm.asset_id AND a.media_type='IMAGE' AND a.deleted_at IS NULL " +
+            "INNER JOIN diary d ON d.diary_id=dm.diary_id WHERE " + VISIBLE)
     int countPhotos(@Param("spaceId") Long spaceId,
                     @Param("userId") Integer userId,
                     @Param("startDate") String startDate,

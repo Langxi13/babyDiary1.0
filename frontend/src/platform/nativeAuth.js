@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
+import { getClientRequestHeaders } from '@/platform/appRelease'
 
 const parsePayload = (data) => {
   if (typeof data !== 'string') return data
@@ -29,6 +30,7 @@ export const nativeAuthRawRequest = async (method, path, data, headers = {}) => 
       Accept: 'application/json',
       'Content-Type': 'application/json',
       'X-Device-Name': `Baby Diary ${Capacitor.getPlatform()}`,
+      ...await getClientRequestHeaders(),
       ...headers
     },
     connectTimeout: 15000,

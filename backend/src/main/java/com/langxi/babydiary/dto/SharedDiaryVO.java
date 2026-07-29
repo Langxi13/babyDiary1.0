@@ -11,6 +11,5 @@ public class SharedDiaryVO {
     private String content;
     private String contentFormat;
     private String moodKey;
-    private List<String> imagePathList;
     private List<MediaAssetVO> media;
 }

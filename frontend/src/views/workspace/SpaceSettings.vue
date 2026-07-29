@@ -16,7 +16,7 @@
         <header><div><h2>成员</h2><p>共同空间的访问成员</p></div><el-button v-if="isOwner && !isPersonal" type="primary" @click="inviteOpen = true"><el-icon><Plus /></el-icon>邀请</el-button></header>
         <div class="member-list">
           <article v-for="member in members" :key="member.userId">
-            <el-avatar :size="42" :src="originalImageUrl(member.avatarPath)">{{ member.username?.slice(0, 1) }}</el-avatar>
+            <el-avatar :size="42" :src="member.avatarMedia?.contentUrl">{{ member.username?.slice(0, 1) }}</el-avatar>
             <div><strong>{{ member.username }}</strong><span>{{ member.role === 'OWNER' ? '所有者' : '成员' }}</span></div>
             <el-dropdown v-if="isOwner && !isPersonal && member.userId !== authStore.userInfo?.userId" @command="command => memberCommand(command, member)">
               <el-button :icon="MoreFilled" circle text aria-label="成员操作" />
@@ -124,7 +124,6 @@ import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import { workspaceApi } from '@/api/workspace'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { originalImageUrl } from '@/utils/imageUrl'
 import { withStepUpRetry } from '@/utils/stepUp'
 import { copyText } from '@/utils/copyText'
 

@@ -27,21 +27,24 @@ public class DiaryInteractionService {
     private final SpaceService spaceService;
     private final AccountSecurityService accountSecurityService;
     private final NotificationService notificationService;
+    private final MediaAccessTokenService mediaTokenService;
 
     public DiaryInteractionService(CollaborationMapper mapper,
                                    SpaceService spaceService,
                                    AccountSecurityService accountSecurityService,
-                                   NotificationService notificationService) {
+                                   NotificationService notificationService,
+                                   MediaAccessTokenService mediaTokenService) {
         this.mapper = mapper;
         this.spaceService = spaceService;
         this.accountSecurityService = accountSecurityService;
         this.notificationService = notificationService;
+        this.mediaTokenService = mediaTokenService;
     }
 
     public List<DiaryCommentVO> comments(String spacePublicId, String diaryPublicId, Integer userId,
                                          String stepUpToken) {
         Diary diary = requireAccessible(spacePublicId, diaryPublicId, userId, stepUpToken);
-        return mapper.findComments(diary.getDiaryId()).stream().map(DiaryCommentVO::from).toList();
+        return mapper.findComments(diary.getDiaryId()).stream().map(this::commentVO).toList();
     }
 
     @Transactional
@@ -60,7 +63,7 @@ public class DiaryInteractionService {
         }
         return mapper.findComments(diary.getDiaryId()).stream()
                 .filter(item -> item.getPublicId().equals(comment.getPublicId()))
-                .findFirst().map(DiaryCommentVO::from)
+                .findFirst().map(this::commentVO)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
     }
 
@@ -128,5 +131,17 @@ public class DiaryInteractionService {
 
     private String diaryTarget(String spacePublicId, String diaryPublicId) {
         return "/spaces/" + spacePublicId + "/diaries/" + diaryPublicId;
+    }
+
+    private DiaryCommentVO commentVO(DiaryComment comment) {
+        DiaryCommentVO vo = DiaryCommentVO.from(comment);
+        if (comment.getAvatarAssetId() != null) {
+            var media = new com.langxi.babydiary.dto.MediaAssetVO();
+            media.setAssetId(comment.getAvatarAssetId());
+            media.setMediaType("IMAGE");
+            media.setContentUrl(mediaTokenService.sign(comment.getAvatarAssetId(), "original").url());
+            vo.setAvatarMedia(media);
+        }
+        return vo;
     }
 }

@@ -29,8 +29,9 @@ test('album page exposes an inline retry state when group loading fails', () => 
 })
 
 test('album cards use photo covers instead of text initials', () => {
-  assert.match(source, /coverImagePath/)
-  assert.match(source, /class="\{ empty: !album\.coverImagePath \}"/)
+  assert.match(source, /album\.coverMedia/)
+  assert.match(source, /class="\{ empty: !album\.coverMedia \}"/)
+  assert.match(source, /album\.coverMedia\.thumbnailUrl\s*\|\|\s*album\.coverMedia\.contentUrl/)
   assert.match(source, /<Picture/)
   assert.doesNotMatch(source, /album\.name\.slice/)
 })

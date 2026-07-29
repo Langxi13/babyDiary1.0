@@ -16,7 +16,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v2 导入导出、PDF/EPUB 日记书导出
-- Redis 缓存、Flyway V1-V14 迁移、真实 Actuator 健康检查和部署前治理脚本
+- Redis 缓存、Flyway V1-V15 迁移、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
 
 完整功能、接口与质量门禁见 [document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
 
@@ -86,7 +86,7 @@ scripts/sync-android-signing-secrets.sh
 scripts/build-android-release.sh
 ```
 
-正式版本由 `config/android-release-version.properties` 跟踪，每次发布先提交递增的 `VERSION_CODE` 和新的 `VERSION_NAME`，不在工作流界面临时填写。`.github/workflows/android-release.yml` 会校验证书指纹和版本信息，生成具名 APK、AAB 与 `SHA256SUMS`，并发布不可覆盖的 GitHub Beta Release。Debug 包使用临时调试证书，首次切换到正式签名 Beta 时需要卸载 Debug 包一次；此后只要版本号递增即可覆盖升级。分支项目必须生成自己的密钥并更新公开证书指纹，不能复用本项目私钥。
+正式版本由 `config/android-release-version.properties` 跟踪，每次发布先提交递增的 `VERSION_CODE` 和新的 `VERSION_NAME`，不在工作流界面临时填写。当前基线为 Android `1.0.0-beta.4`、`versionCode=4`；服务端可将低于最低版本的原生请求拒绝为 HTTP 426。`.github/workflows/android-release.yml` 会校验证书指纹和版本信息，生成具名 APK、AAB 与 `SHA256SUMS`，并发布不可覆盖的 GitHub Beta Release。Debug 包使用临时调试证书，首次切换到正式签名 Beta 时需要卸载 Debug 包一次；此后只要版本号递增即可覆盖升级。分支项目必须生成自己的密钥并更新公开证书指纹，不能复用本项目私钥。
 
 登录后的“关于与更新”页面显示当前安装包版本、构建号、服务器/API 版本，并读取服务器发布的 Android 更新清单。原生端启动后会进行一次非阻断检查；发现新版本时显示窄提示条。直接分发版本只打开经过后端校验的 HTTPS 或同源 APK 地址，下载完成后仍由 Android 系统确认安装，不申请静默安装权限。为避免国内网络依赖 GitHub，可在签名构建后把 APK 发布到当前 Baby Diary 服务器：
 
@@ -125,7 +125,13 @@ Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`sc
 
 生产配置模板位于 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、原生媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证原生兼容接口并读取 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
-`DIARY_FILE_PATH` 只保存旧版兼容图片，`DIARY_OBJECT_PATH` 保存 V2 富媒体，两者必须是不同目录。V2 富媒体通过短时签名 URL 访问；旧版 `/images/**` 为兼容现有客户端仍可公开读取，因此文件名不可视为访问控制，建议新功能统一使用 V2 媒体接口。
+## 统一媒体模型
+
+V15 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入 `diary_image`、`album_photo`、`favorite_photo` 的业务数据，也不再依赖旧文件名拼接 URL；图片统一返回带有效期的签名 `contentUrl/thumbnailUrl`。
+
+旧表和旧目录仅作为回滚隔离保留 14 天。生产升级必须先备份，再停止后端，执行 `scripts/migrate-media.sh dry-run`、`apply`、`verify`，确认校验和、关系数量和页面访问正常后才能将旧目录改名隔离；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向 V15。
+
+`DIARY_FILE_PATH` 只用于受控迁移期间读取旧版图片；新媒体写入 `DIARY_OBJECT_PATH` 或后续配置的 S3/COS 对象存储，两者必须是不同目录。新媒体通过短时签名 URL 访问。旧版 `/images/**` 兼容路由只在 14 天回滚窗口内保留，确认迁移完成后应从 Web/Nginx 配置中移除。
 
 项目不会跟踪以下私有内容：
 

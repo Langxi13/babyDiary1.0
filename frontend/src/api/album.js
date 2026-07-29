@@ -74,8 +74,8 @@ export const albumApi = {
     invalidateApiCache('albums:')
     return response
   },
-  async removeAlbumPhoto(albumId, imageId) {
-    const response = await request.delete(`/api/albums/${albumId}/photos/${imageId}`)
+  async removeAlbumPhoto(albumId, assetId) {
+    const response = await request.delete(`/api/albums/${albumId}/photos/${assetId}`)
     invalidateApiCache('albums:')
     return response
   },

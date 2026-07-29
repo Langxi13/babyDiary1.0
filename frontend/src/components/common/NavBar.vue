@@ -110,7 +110,6 @@ import { ElMenu, ElMenuItem, ElSubMenu } from 'element-plus/es/components/menu/i
 import { Notebook, HomeFilled, Document, Edit, ArrowDown, User, SwitchButton, Menu, Clock, Calendar, Star, Picture, Tickets, MagicStick, Connection, MoreFilled, InfoFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { preloadRouteComponent } from '@/router'
-import { originalImageUrl } from '@/utils/imageUrl'
 import { DESKTOP_COMPACT_NAVIGATION, DESKTOP_MORE_NAVIGATION, DESKTOP_PRIMARY_NAVIGATION } from '@/config/navigation'
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import 'element-plus/es/components/avatar/style/css.mjs'
@@ -137,7 +136,7 @@ const activeMenu = computed(() => {
   return route.path
 })
 const username = computed(() => authStore.username)
-const avatarUrl = computed(() => originalImageUrl(authStore.userInfo?.avatarPath))
+const avatarUrl = computed(() => authStore.userInfo?.avatarMedia?.contentUrl || '')
 const moreMenuActive = computed(() => desktopMoreNavigation.some(item => item.path === activeMenu.value))
 const preload = (path) => preloadRouteComponent(path)
 

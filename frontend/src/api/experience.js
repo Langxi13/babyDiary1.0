@@ -65,14 +65,14 @@ export const photoApi = {
       { ttl: options.ttl ?? 30000, force: options.force }
     )
   },
-  async favorite(imageId) {
-    const response = await request.post(`/api/photos/${imageId}/favorite`)
+  async favorite(assetId) {
+    const response = await request.post(`/api/photos/${assetId}/favorite`)
     invalidateApiCache('photos:')
     invalidateApiCache('albums:')
     return response
   },
-  async unfavorite(imageId) {
-    const response = await request.delete(`/api/photos/${imageId}/favorite`)
+  async unfavorite(assetId) {
+    const response = await request.delete(`/api/photos/${assetId}/favorite`)
     invalidateApiCache('photos:')
     invalidateApiCache('albums:')
     return response

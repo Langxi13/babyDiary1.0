@@ -8,7 +8,6 @@ import com.langxi.babydiary.entity.Diary;
 import com.langxi.babydiary.entity.DiarySpace;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.CollaborationMapper;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,10 +38,8 @@ import static org.mockito.ArgumentMatchers.isNull;
 class PortableArchiveServiceTest {
     @Mock private SpaceService spaceService;
     @Mock private CollaborationMapper collaborationMapper;
-    @Mock private DiaryImageMapper imageMapper;
     @Mock private TagService tagService;
     @Mock private CollaborativeDiaryService diaryService;
-    @Mock private ImageStorageService imageStorageService;
     @Mock private AccountSecurityService accountSecurityService;
     @Mock private MediaService mediaService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
@@ -121,8 +118,7 @@ class PortableArchiveServiceTest {
 
         verify(mediaService).upload(eq("target-space"), eq(2), any(PathMultipartFile.class),
                 eq(archivedId), isNull(), isNull(), isNull(), isNull(), isNull(), eq("step-up"));
-        verify(imageStorageService, never()).storeImageBytes(any(), any(), any(), any(Boolean.class));
-        assertThat(result.getImportedImages()).isZero();
+        assertThat(result.getImportedImages()).isEqualTo(1);
         assertThat(result.getImportedMedia()).isEqualTo(1);
     }
 

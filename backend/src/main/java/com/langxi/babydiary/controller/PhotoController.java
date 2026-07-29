@@ -74,14 +74,14 @@ public class PhotoController {
         return Result.success(photos.map(PhotoVO::fromEntity));
     }
 
-    @PostMapping("/{imageId}/favorite")
-    public Result<PhotoVO> favoritePhoto(@PathVariable Integer imageId) {
-        return Result.success("已收藏", PhotoVO.fromEntity(photoService.favorite(currentUser.getUserId(), imageId)));
+    @PostMapping("/{assetId}/favorite")
+    public Result<PhotoVO> favoritePhoto(@PathVariable String assetId) {
+        return Result.success("已收藏", PhotoVO.fromEntity(photoService.favorite(currentUser.getUserId(), assetId)));
     }
 
-    @DeleteMapping("/{imageId}/favorite")
-    public Result<Void> unfavoritePhoto(@PathVariable Integer imageId) {
-        photoService.unfavorite(currentUser.getUserId(), imageId);
+    @DeleteMapping("/{assetId}/favorite")
+    public Result<Void> unfavoritePhoto(@PathVariable String assetId) {
+        photoService.unfavorite(currentUser.getUserId(), assetId);
         return Result.success("已取消收藏", null);
     }
 }

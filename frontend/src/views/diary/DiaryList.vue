@@ -146,20 +146,20 @@
 
             <p class="diary-text">{{ previewContent(diary) }}</p>
 
-            <div class="diary-images" v-if="diary.imagePathList?.length > 0" @click.stop>
+            <div class="diary-images" v-if="diaryImages(diary).length > 0" @click.stop>
               <el-image
-                v-for="(img, index) in diary.imagePathList.slice(0, 4)"
-                :key="index"
-                :src="thumbnailImageUrl(img)"
-                :preview-src-list="diary.imagePathList.map(originalImageUrl)"
+                v-for="(img, index) in diaryImages(diary).slice(0, 4)"
+                :key="img.assetId"
+                :src="img.thumbnailUrl || img.contentUrl"
+                :preview-src-list="diaryImages(diary).map(item => item.contentUrl)"
                 :initial-index="index"
                 fit="cover"
                 class="diary-image"
                 :preview-teleported="true"
                 lazy
               />
-              <span v-if="diary.imagePathList.length > 4" class="more-images">
-                +{{ diary.imagePathList.length - 4 }}
+              <span v-if="diaryImages(diary).length > 4" class="more-images">
+                +{{ diaryImages(diary).length - 4 }}
               </span>
             </div>
 
@@ -205,7 +205,6 @@ import { useDiaryStore } from '@/stores/diary'
 import { tagApi } from '@/api/experience'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
-import { originalImageUrl, thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
@@ -261,6 +260,7 @@ const previewContent = (diary) => {
   if (!diary?.content) return ''
   return diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
 }
+const diaryImages = diary => diary?.media?.filter(item => item.mediaType === 'IMAGE') || []
 
 const fetchTags = async () => {
   const response = await tagApi.list()

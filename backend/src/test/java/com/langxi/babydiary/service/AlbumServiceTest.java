@@ -51,10 +51,10 @@ class AlbumServiceTest {
         when(photoMapper.countPhotos(3, null, null, null, null, true)).thenReturn(3);
         when(photoMapper.countPhotos(3, "2026-01-01", "2026-12-31", null, null, null)).thenReturn(8);
         when(photoMapper.countPhotos(3, "2025-01-01", "2025-12-31", null, null, null)).thenReturn(4);
-        when(photoMapper.findCoverImagePath(3, null, null, null)).thenReturn("all-cover.jpg");
-        when(photoMapper.findCoverImagePath(3, null, null, true)).thenReturn("favorite-cover.jpg");
-        when(photoMapper.findCoverImagePath(3, "2026-01-01", "2026-12-31", null)).thenReturn("year-2026.jpg");
-        when(photoMapper.findCoverImagePath(3, "2025-01-01", "2025-12-31", null)).thenReturn("year-2025.jpg");
+        when(photoMapper.findCoverAssetPublicId(3, null, null, null)).thenReturn("all-cover.jpg");
+        when(photoMapper.findCoverAssetPublicId(3, null, null, true)).thenReturn("favorite-cover.jpg");
+        when(photoMapper.findCoverAssetPublicId(3, "2026-01-01", "2026-12-31", null)).thenReturn("year-2026.jpg");
+        when(photoMapper.findCoverAssetPublicId(3, "2025-01-01", "2025-12-31", null)).thenReturn("year-2025.jpg");
         when(albumMapper.ensureAiGroup(3)).thenReturn(aiGroup);
         when(albumMapper.findGroupsByUserId(3)).thenReturn(Collections.singletonList(aiGroup));
         when(albumMapper.findAlbumsByGroupIds(Collections.singletonList(8))).thenReturn(Collections.emptyList());
@@ -66,7 +66,7 @@ class AlbumServiceTest {
         assertThat(groups.get(0).getEditable()).isFalse();
         assertThat(groups.get(0).getAlbums()).extracting("systemKey")
                 .containsExactly("all", "favorites", "year:2026", "year:2025");
-        assertThat(groups.get(0).getAlbums()).extracting("coverImagePath")
+        assertThat(groups.get(0).getAlbums()).extracting("coverAssetId")
                 .containsExactly("all-cover.jpg", "favorite-cover.jpg", "year-2026.jpg", "year-2025.jpg");
         assertThat(groups.get(0).getAlbums()).extracting("editable")
                 .containsExactly(false, false, false, false);
@@ -78,7 +78,7 @@ class AlbumServiceTest {
     void favoriteSystemAlbumReturnsOnlyFavoritePhotos() {
         albumService.findSystemPhotos(3, "favorites");
 
-        verify(photoMapper).findPhotos(3, null, null, null, null, true);
+        verify(photoService).findPhotos(3, null, null, null, null, true);
     }
 
     @Test
@@ -102,6 +102,7 @@ class AlbumServiceTest {
         when(albumMapper.findAlbumById(3, 11)).thenReturn(editableAlbum(11, 3));
         when(albumMapper.countAlbumPhotos(3, 11)).thenReturn(25);
         when(albumMapper.findAlbumPhotoPage(3, 11, 20, 20)).thenReturn(Collections.singletonList(photo));
+        when(photoService.enrichMedia(Collections.singletonList(photo))).thenReturn(Collections.singletonList(photo));
 
         PageResult<Photo> result = albumService.findAlbumPhotoPage(3, 11, 1, 20);
 
@@ -117,15 +118,17 @@ class AlbumServiceTest {
         when(albumMapper.findAlbumById(3, 11)).thenReturn(first);
         when(albumMapper.findAlbumById(3, 12)).thenReturn(second);
         Photo ownedPhoto = new Photo();
-        ownedPhoto.setImageId(50);
+        ownedPhoto.setAssetId("50");
         ownedPhoto.setUserId(3);
         when(photoMapper.findPhotosByIds(3, Collections.singletonList(50))).thenReturn(Collections.singletonList(ownedPhoto));
+        when(albumMapper.nextAlbumPhotoSort(11)).thenReturn(4);
+        when(albumMapper.nextAlbumPhotoSort(12)).thenReturn(2);
 
         albumService.addPhotos(3, 11, Collections.singletonList(50));
         albumService.addPhotos(3, 12, Collections.singletonList(50));
 
-        verify(albumMapper).insertAlbumPhotos(11, Collections.singletonList(50));
-        verify(albumMapper).insertAlbumPhotos(12, Collections.singletonList(50));
+        verify(albumMapper).insertAlbumPhoto(11, 3, 50, 4);
+        verify(albumMapper).insertAlbumPhoto(12, 3, 50, 2);
     }
 
     @Test
@@ -162,7 +165,7 @@ class AlbumServiceTest {
 
     private Photo ownedPhoto(Integer imageId, Integer userId) {
         Photo photo = new Photo();
-        photo.setImageId(imageId);
+        photo.setAssetId(String.valueOf(imageId));
         photo.setUserId(userId);
         return photo;
     }

@@ -520,7 +520,7 @@ const excerpt = (value, limit = 220) => {
   return text.length > limit ? `${text.slice(0, limit)}...` : text
 }
 const moodEmoji = key => ({ happy: '😊', calm: '😌', loved: '🥰', excited: '🤩', tired: '😴', sad: '🥺' }[key] || '🙂')
-const mediaCount = diary => (diary.imagePathList?.length || 0) + (diary.media?.length || 0)
+const mediaCount = diary => diary.media?.length || 0
 const dayOf = value => String(Number(value?.slice(8, 10) || 0)).padStart(2, '0')
 const monthOf = value => `${Number(value?.slice(5, 7) || 0)}月`
 const monthHeight = count => `${Math.max(5, Math.min(100, count * 10))}%`

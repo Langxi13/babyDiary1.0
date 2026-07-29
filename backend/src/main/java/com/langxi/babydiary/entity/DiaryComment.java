@@ -11,7 +11,7 @@ public class DiaryComment {
     private Integer diaryId;
     private Integer userId;
     private String username;
-    private String avatarPath;
+    private String avatarAssetId;
     private String content;
     private Timestamp createdAt;
     private Timestamp updatedAt;

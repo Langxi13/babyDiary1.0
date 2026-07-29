@@ -51,12 +51,12 @@
           <p v-else class="plain-content">{{ diary.content }}</p>
         </section>
 
-        <section v-if="diary.imagePathList?.length" class="image-grid">
+        <section v-if="images.length" class="image-grid">
           <el-image
-            v-for="(img, index) in diary.imagePathList"
-            :key="img"
-            :src="thumbnailImageUrl(img)"
-            :preview-src-list="diary.imagePathList.map(originalImageUrl)"
+            v-for="(img, index) in images"
+            :key="img.assetId"
+            :src="img.thumbnailUrl || img.contentUrl"
+            :preview-src-list="images.map(item => item.contentUrl)"
             :initial-index="index"
             :preview-teleported="true"
             fit="cover"
@@ -87,7 +87,6 @@ import { ArrowLeft, Delete, Edit } from '@element-plus/icons-vue'
 import { diaryApi } from '@/api/diary'
 import { moodColor, moodLabel } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
-import { originalImageUrl, thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
@@ -102,6 +101,7 @@ const diaryId = computed(() => route.params.id)
 const loading = ref(false)
 const deleting = ref(false)
 const diary = ref(null)
+const images = computed(() => diary.value?.media?.filter(item => item.mediaType === 'IMAGE') || [])
 
 const loadDiary = async () => {
   loading.value = true

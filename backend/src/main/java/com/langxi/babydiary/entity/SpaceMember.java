@@ -11,6 +11,6 @@ public class SpaceMember {
     private String role;
     private String status;
     private String username;
-    private String avatarPath;
+    private String avatarAssetId;
     private Timestamp joinedAt;
 }

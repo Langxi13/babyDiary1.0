@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -99,6 +100,9 @@ public class MediaService {
         asset.setStorageKey(key);
         asset.setContentType(contentType);
         asset.setSizeBytes(file.getSize());
+        asset.setChecksumSha256(checksum(file));
+        asset.setAccessScope("LINKED");
+        asset.setLibraryVisible(true);
         asset.setCaption(blankToNull(caption));
         asset.setTakenAt(parseTimestamp(takenAt));
         asset.setLocationName(blankToNull(locationName));
@@ -129,6 +133,84 @@ public class MediaService {
         return result;
     }
 
+    @Transactional
+    public void replaceDiaryMedia(String spacePublicId, Integer diaryId, Integer userId,
+                                  List<String> retainedAssetIds, List<String> newAssetIds,
+                                  List<String> mediaOrder) {
+        DiarySpace space = spaceService.requireSpace(spacePublicId);
+        spaceService.requireMember(space, userId);
+        if (mapper.countDiaryInSpace(diaryId, space.getSpaceId()) != 1) {
+            throw new BusinessException(ErrorCode.DIARY_NOT_FOUND);
+        }
+
+        List<MediaAsset> current = mapper.findByDiaryId(diaryId);
+        LinkedHashMap<String, MediaAsset> currentByPublicId = new LinkedHashMap<>();
+        current.forEach(asset -> currentByPublicId.put(asset.getPublicId(), asset));
+
+        LinkedHashMap<String, MediaAsset> retained = new LinkedHashMap<>();
+        if (retainedAssetIds == null) {
+            retained.putAll(currentByPublicId);
+        } else {
+            for (String publicId : retainedAssetIds) {
+                MediaAsset asset = currentByPublicId.get(publicId);
+                if (asset == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "保留的媒体资源无效");
+                retained.putIfAbsent(publicId, asset);
+            }
+        }
+
+        List<String> normalizedNewIds = newAssetIds == null ? List.of() : newAssetIds;
+        LinkedHashMap<String, MediaAsset> added = new LinkedHashMap<>();
+        if (!normalizedNewIds.isEmpty()) {
+            Map<String, MediaAsset> found = mapper.findByPublicIds(normalizedNewIds).stream()
+                    .collect(java.util.stream.Collectors.toMap(MediaAsset::getPublicId, asset -> asset));
+            for (String publicId : normalizedNewIds) {
+                MediaAsset asset = found.get(publicId);
+                if (asset == null || !space.getSpaceId().equals(asset.getSpaceId())
+                        || !userId.equals(asset.getOwnerUserId())) {
+                    throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+                }
+                added.putIfAbsent(publicId, asset);
+            }
+        }
+
+        List<MediaAsset> ordered = orderDiaryMedia(retained, added, mediaOrder);
+        mapper.deleteDiaryMedia(diaryId);
+        for (int index = 0; index < ordered.size(); index++) {
+            mapper.attachToDiary(diaryId, ordered.get(index).getAssetId(), index);
+        }
+    }
+
+    private List<MediaAsset> orderDiaryMedia(LinkedHashMap<String, MediaAsset> retained,
+                                             LinkedHashMap<String, MediaAsset> added,
+                                             List<String> mediaOrder) {
+        LinkedHashMap<String, MediaAsset> ordered = new LinkedHashMap<>();
+        List<MediaAsset> newAssets = new ArrayList<>(added.values());
+        if (mediaOrder != null) {
+            for (String entry : mediaOrder) {
+                if (entry == null) continue;
+                if (entry.startsWith("existing:")) {
+                    String publicId = entry.substring("existing:".length());
+                    MediaAsset asset = retained.get(publicId);
+                    if (asset == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "媒体排序参数无效");
+                    ordered.putIfAbsent(publicId, asset);
+                } else if (entry.startsWith("new:")) {
+                    try {
+                        int index = Integer.parseInt(entry.substring("new:".length()));
+                        MediaAsset asset = newAssets.get(index);
+                        ordered.putIfAbsent(asset.getPublicId(), asset);
+                    } catch (NumberFormatException | IndexOutOfBoundsException exception) {
+                        throw new BusinessException(ErrorCode.BAD_REQUEST, "媒体排序参数无效");
+                    }
+                } else {
+                    throw new BusinessException(ErrorCode.BAD_REQUEST, "媒体排序参数无效");
+                }
+            }
+        }
+        retained.forEach(ordered::putIfAbsent);
+        added.forEach(ordered::putIfAbsent);
+        return new ArrayList<>(ordered.values());
+    }
+
     public MediaAsset requireAccessible(String spacePublicId, String assetPublicId, Integer userId,
                                         String stepUpToken) {
         DiarySpace space = spaceService.requireSpace(spacePublicId);
@@ -137,6 +219,7 @@ public class MediaService {
         if (asset == null || !space.getSpaceId().equals(asset.getSpaceId())) {
             throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
         }
+        if ("PROFILE".equals(asset.getAccessScope())) return asset;
         if (asset.getOwnerUserId().equals(userId)) {
             if (mapper.countLockedLinks(asset.getAssetId()) > 0) {
                 accountSecurityService.requireStepUp(userId, stepUpToken);
@@ -147,6 +230,37 @@ public class MediaService {
             throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
         }
         return asset;
+    }
+
+    public MediaAsset requireOwnedAsset(String spacePublicId, String assetPublicId, Integer userId) {
+        DiarySpace space = spaceService.requireSpace(spacePublicId);
+        spaceService.requireMember(space, userId);
+        MediaAsset asset = mapper.findByPublicId(assetPublicId);
+        if (asset == null || !space.getSpaceId().equals(asset.getSpaceId())
+                || !userId.equals(asset.getOwnerUserId())) {
+            throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+        }
+        return asset;
+    }
+
+    public MediaAsset findByPublicId(String assetPublicId) {
+        return mapper.findByPublicId(assetPublicId);
+    }
+
+    public List<MediaAsset> findByPublicIds(List<String> assetPublicIds) {
+        if (assetPublicIds == null || assetPublicIds.isEmpty()) return List.of();
+        return mapper.findByPublicIds(assetPublicIds);
+    }
+
+    public MediaAsset findById(Long assetId) {
+        return mapper.findById(assetId);
+    }
+
+    @Transactional
+    public void updateUsage(String spacePublicId, String assetPublicId, Integer userId,
+                            String accessScope, boolean libraryVisible) {
+        MediaAsset asset = requireOwnedAsset(spacePublicId, assetPublicId, userId);
+        mapper.updateUsage(asset.getAssetId(), accessScope, libraryVisible);
     }
 
     @Transactional
@@ -170,17 +284,6 @@ public class MediaService {
         if (mapper.softDelete(asset.getAssetId()) == 1) {
             mapper.addUsedBytes(space.getSpaceId(), -asset.getSizeBytes());
             deleteAfterCommit(asset);
-        }
-    }
-
-    @Transactional
-    public void deleteOrphanedAfterDiaryPurge(List<MediaAsset> candidates) {
-        if (candidates == null || candidates.isEmpty()) return;
-        for (MediaAsset asset : candidates) {
-            if (mapper.countDiaryLinks(asset.getAssetId()) == 0 && mapper.softDelete(asset.getAssetId()) == 1) {
-                mapper.addUsedBytes(asset.getSpaceId(), -asset.getSizeBytes());
-                deleteAfterCommit(asset);
-            }
         }
     }
 
@@ -300,6 +403,22 @@ public class MediaService {
         if (value == null) return "";
         int separator = value.indexOf(';');
         return (separator < 0 ? value : value.substring(0, separator)).trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String checksum(MultipartFile file) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = file.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read > 0) digest.update(buffer, 0, read);
+                }
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
     }
 
     private String mediaType(String contentType) {

@@ -35,7 +35,7 @@ class InvitationCodeServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new InvitationCodeService(configMapper, crypto, stepUpTokenVerifier, "bootstrap-code");
+        service = new InvitationCodeService(configMapper, crypto, stepUpTokenVerifier, "bootstrap-code", "");
     }
 
     @Test
@@ -66,7 +66,7 @@ class InvitationCodeServiceTest {
 
     @Test
     void missingBootstrapCodeFailsFreshStartupClearly() {
-        service = new InvitationCodeService(configMapper, crypto, stepUpTokenVerifier, " ");
+        service = new InvitationCodeService(configMapper, crypto, stepUpTokenVerifier, " ", "");
         when(configMapper.findConfig()).thenReturn(null);
 
         assertThatThrownBy(service::initializeFromBootstrap)

@@ -21,5 +21,9 @@ class PhotoMapperXmlTest {
         assertThat(xml).contains("<select id=\"findPhotoPage\"");
         assertThat(xml).contains("LIMIT #{limit} OFFSET #{offset}");
         assertThat(xml).contains("<include refid=\"photoSourceAndFilters\"/>");
+        assertThat(xml).contains("FROM media_asset", "favorite_media", "diary_media");
+        assertThat(xml).contains("a.library_visible = 1", "a.access_scope &lt;&gt; 'PROFILE'");
+        assertThat(xml).contains("dm.diary_id = (", "ORDER BY d_pick.date DESC");
+        assertThat(xml).doesNotContain("diary_image", "favorite_photo");
     }
 }

@@ -22,6 +22,9 @@ public class MediaAsset {
     private String transcodedKey;
     private String contentType;
     private Long sizeBytes;
+    private String checksumSha256;
+    private String accessScope;
+    private Boolean libraryVisible;
     private Integer durationSeconds;
     private Integer width;
     private Integer height;
@@ -37,4 +40,8 @@ public class MediaAsset {
     private Timestamp updatedAt;
     private Timestamp deletedAt;
     private Integer sort;
+    private Boolean favorite;
+    private String diaryPublicId;
+    private String diaryTitle;
+    private java.sql.Date diaryDate;
 }

@@ -25,7 +25,6 @@ public class PrivateShareService {
     private final PrivateShareMapper shareMapper;
     private final CollaborationMapper diaryMapper;
     private final SpaceService spaceService;
-    private final DiaryImageService imageService;
     private final AccountSecurityService accountSecurityService;
     private final MediaService mediaService;
     private final PasswordEncoder passwordEncoder;
@@ -33,14 +32,12 @@ public class PrivateShareService {
     public PrivateShareService(PrivateShareMapper shareMapper,
                                CollaborationMapper diaryMapper,
                                SpaceService spaceService,
-                               DiaryImageService imageService,
                                AccountSecurityService accountSecurityService,
                                MediaService mediaService,
                                PasswordEncoder passwordEncoder) {
         this.shareMapper = shareMapper;
         this.diaryMapper = diaryMapper;
         this.spaceService = spaceService;
-        this.imageService = imageService;
         this.accountSecurityService = accountSecurityService;
         this.mediaService = mediaService;
         this.passwordEncoder = passwordEncoder;
@@ -97,7 +94,6 @@ public class PrivateShareService {
         vo.setContent(diary.getContent());
         vo.setContentFormat(diary.getContentFormat());
         vo.setMoodKey(diary.getMoodKey());
-        vo.setImagePathList(imageService.findImagePathsByDiaryId(diary.getDiaryId()));
         vo.setMedia(mediaService.findByDiary(diary.getDiaryId()));
         return vo;
     }

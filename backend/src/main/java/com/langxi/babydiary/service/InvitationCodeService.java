@@ -23,19 +23,23 @@ public class InvitationCodeService implements ApplicationRunner {
     private final InvitationCodeCrypto crypto;
     private final StepUpTokenVerifier stepUpTokenVerifier;
     private final String bootstrapCode;
+    private final String mediaMigrationMode;
 
     public InvitationCodeService(SystemInvitationConfigMapper configMapper,
                                  InvitationCodeCrypto crypto,
                                  StepUpTokenVerifier stepUpTokenVerifier,
-                                 @Value("${app.invitation.bootstrap-code:}") String bootstrapCode) {
+                                 @Value("${app.invitation.bootstrap-code:}") String bootstrapCode,
+                                 @Value("${app.media.migration-mode:}") String mediaMigrationMode) {
         this.configMapper = configMapper;
         this.crypto = crypto;
         this.stepUpTokenVerifier = stepUpTokenVerifier;
         this.bootstrapCode = bootstrapCode == null ? "" : bootstrapCode.trim();
+        this.mediaMigrationMode = mediaMigrationMode == null ? "" : mediaMigrationMode.trim();
     }
 
     @Override
     public void run(ApplicationArguments arguments) {
+        if (!mediaMigrationMode.isBlank()) return;
         initializeFromBootstrap();
     }
 

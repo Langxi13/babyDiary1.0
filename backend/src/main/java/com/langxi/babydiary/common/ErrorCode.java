@@ -47,7 +47,8 @@ public enum ErrorCode {
     AI_REPORT_NOT_FOUND(4003, "AI报告不存在"),
     ALBUM_NOT_FOUND(5001, "相册不存在"),
     ALBUM_GROUP_NOT_FOUND(5002, "相册组不存在"),
-    AI_ALBUM_PROPOSAL_NOT_FOUND(5003, "AI相册提案不存在");
+    AI_ALBUM_PROPOSAL_NOT_FOUND(5003, "AI相册提案不存在"),
+    CLIENT_UPGRADE_REQUIRED(6001, "当前应用版本已停止服务，请更新后继续使用");
 
     private final Integer code;
     private final String message;

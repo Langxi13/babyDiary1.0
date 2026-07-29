@@ -13,7 +13,9 @@ public class Anniversary {
     private String title;
     private Date date;
     private String description;
-    private String coverImagePath;
+    private Long coverAssetId;
+    private String coverAssetPublicId;
+    private com.langxi.babydiary.dto.MediaAssetVO coverMedia;
     private Integer sort;
     private Timestamp createdAt;
     private Timestamp updatedAt;

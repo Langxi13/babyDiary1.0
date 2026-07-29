@@ -20,6 +20,5 @@ public class AlbumDTO {
     @Size(max = 5000, message = "相册说明不能超过5000个字符")
     private String description;
 
-    @Size(max = 255, message = "封面路径长度无效")
-    private String coverImagePath;
+    private String coverAssetId;
 }

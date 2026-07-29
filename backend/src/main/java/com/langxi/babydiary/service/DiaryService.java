@@ -7,8 +7,7 @@ import com.langxi.babydiary.dto.CalendarDayVO;
 import com.langxi.babydiary.dto.DiaryVO;
 import com.langxi.babydiary.dto.TimelineMonthVO;
 import com.langxi.babydiary.entity.Diary;
-import com.langxi.babydiary.entity.DiaryImage;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
+import com.langxi.babydiary.entity.DiarySpace;
 import com.langxi.babydiary.mapper.DiaryMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
@@ -19,11 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,16 +29,16 @@ public class DiaryService {
     private DiaryMapper diaryMapper;
 
     @Autowired
-    private DiaryImageMapper diaryImageMapper;
-
-    @Autowired
     private TagService tagService;
 
     @Autowired
     private HtmlSanitizer htmlSanitizer;
 
     @Autowired
-    private ImageStorageService imageStorageService;
+    private MediaService mediaService;
+
+    @Autowired
+    private SpaceService spaceService;
 
     private boolean hasUploadFiles(MultipartFile[] imageFiles) {
         if (imageFiles == null || imageFiles.length == 0) {
@@ -74,6 +70,7 @@ public class DiaryService {
     private void enrichDiary(Diary diary) {
         if (diary != null && diary.getDiaryId() != null) {
             diary.setTagList(tagService.findTagsByDiaryId(diary.getDiaryId()));
+            diary.setMediaList(mediaService.findByDiary(diary.getDiaryId()));
         }
     }
 
@@ -86,8 +83,10 @@ public class DiaryService {
                 .filter(id -> id != null)
                 .collect(Collectors.toList());
         Map<Integer, List<com.langxi.babydiary.entity.Tag>> tagsByDiaryId = tagService.findTagsByDiaryIds(diaryIds);
+        Map<Integer, List<com.langxi.babydiary.dto.MediaAssetVO>> mediaByDiaryId = mediaService.findByDiaries(diaryIds);
         for (Diary diary : diaries) {
             diary.setTagList(tagsByDiaryId.getOrDefault(diary.getDiaryId(), java.util.Collections.emptyList()));
+            diary.setMediaList(mediaByDiaryId.getOrDefault(diary.getDiaryId(), java.util.Collections.emptyList()));
         }
     }
 
@@ -96,91 +95,35 @@ public class DiaryService {
     public void saveDiary(Diary diary, MultipartFile[] imageFiles, List<Integer> tagIds) throws IOException {
         prepareDiaryContent(diary);
         diaryMapper.insertDiary(diary);
-        Integer diaryId = diary.getDiaryId();
-
-        if (hasUploadFiles(imageFiles)) {
-            List<DiaryImage> diaryImages = new ArrayList<>();
-            int sort = 1;
-            for (MultipartFile imageFile : imageFiles) {
-                if (imageFile != null && !imageFile.isEmpty()) {
-                    String fileName = imageStorageService.storeImage(imageFile, diaryImagePrefix(diary.getUserId()), true);
-                    DiaryImage diaryImage = new DiaryImage();
-                    diaryImage.setDiaryId(diaryId);
-                    diaryImage.setImagePath(fileName);
-                    diaryImage.setSort(sort++);
-                    diaryImages.add(diaryImage);
-                }
-            }
-            if (!diaryImages.isEmpty()) {
-                diaryImageMapper.insertDiaryImages(diaryImages.toArray(new DiaryImage[0]));
-            }
+        DiarySpace space = spaceService.requirePersonalSpace(diary.getUserId());
+        List<String> uploadedAssetIds = uploadImages(space, diary.getUserId(), imageFiles);
+        if (!uploadedAssetIds.isEmpty()) {
+            mediaService.replaceDiaryMedia(space.getPublicId(), diary.getDiaryId(), diary.getUserId(),
+                    List.of(), uploadedAssetIds, null);
         }
         if (tagIds != null) {
-            tagService.replaceDiaryTags(diary.getUserId(), diaryId, tagIds);
+            tagService.replaceDiaryTags(diary.getUserId(), diary.getDiaryId(), tagIds);
         }
     }
 
     @Transactional
     @CacheEvict(cacheNames = {CacheNames.DIARY_PAGE, CacheNames.DIARY_TIMELINE, CacheNames.DIARY_CALENDAR, CacheNames.PHOTOS}, allEntries = true)
-    public void updateDiary(Diary diary, MultipartFile[] imageFiles, boolean clearImages, List<String> retainedImagePaths, List<Integer> tagIds, List<String> imageOrder) throws IOException {
+    public void updateDiary(Diary diary, MultipartFile[] imageFiles, boolean clearImages,
+                            List<String> retainedAssetIds, List<Integer> tagIds,
+                            List<String> mediaOrder) throws IOException {
         prepareDiaryContent(diary);
         diaryMapper.updateDiary(diary);
-        Integer diaryId = diary.getDiaryId();
-
         boolean hasNewImages = hasUploadFiles(imageFiles);
-        boolean hasExplicitRetainedImages = retainedImagePaths != null;
-        boolean hasExplicitImageOrder = imageOrder != null && !imageOrder.isEmpty();
-        List<DiaryImage> nextImages = new ArrayList<>();
-
-        if (hasNewImages || clearImages || hasExplicitRetainedImages || hasExplicitImageOrder) {
-            List<String> existingImagePaths = diaryImageMapper.findImagePathsByDiaryId(diaryId);
-            List<String> newImagePaths = new ArrayList<>();
-            Set<String> existingSet = new LinkedHashSet<>(existingImagePaths);
-            Set<String> retainedSet = new LinkedHashSet<>();
-            if (!clearImages && retainedImagePaths != null) {
-                for (String retainedImagePath : retainedImagePaths) {
-                    if (existingSet.contains(retainedImagePath)) {
-                        retainedSet.add(retainedImagePath);
-                    }
-                }
-            } else if (!clearImages && retainedImagePaths == null) {
-                retainedSet.addAll(existingImagePaths);
-            }
-
-            for (String existingImagePath : existingImagePaths) {
-                if (!retainedSet.contains(existingImagePath)) {
-                    imageStorageService.deleteAfterCommit(existingImagePath);
-                }
-            }
-            diaryImageMapper.deleteDiaryImageByDiaryId(diaryId);
-
-            if (hasNewImages) {
-                for (MultipartFile imageFile : imageFiles) {
-                    if (imageFile != null && !imageFile.isEmpty()) {
-                        String fileName = imageStorageService.storeImage(imageFile, diaryImagePrefix(diary.getUserId()), true);
-                        newImagePaths.add(fileName);
-                    }
-                }
-            }
-
-            List<String> orderedImagePaths = DiaryImageOrderer.order(retainedSet, newImagePaths, imageOrder);
-            int sort = 1;
-            for (String imagePath : orderedImagePaths) {
-                DiaryImage diaryImage = new DiaryImage();
-                diaryImage.setDiaryId(diaryId);
-                diaryImage.setImagePath(imagePath);
-                diaryImage.setSort(sort++);
-                nextImages.add(diaryImage);
-            }
-        }
-
-        if (hasNewImages || clearImages || hasExplicitRetainedImages || hasExplicitImageOrder) {
-            if (!nextImages.isEmpty()) {
-                diaryImageMapper.insertDiaryImages(nextImages.toArray(new DiaryImage[0]));
-            }
+        boolean changesMedia = hasNewImages || clearImages || retainedAssetIds != null
+                || (mediaOrder != null && !mediaOrder.isEmpty());
+        if (changesMedia) {
+            DiarySpace space = spaceService.requirePersonalSpace(diary.getUserId());
+            List<String> uploadedAssetIds = uploadImages(space, diary.getUserId(), imageFiles);
+            mediaService.replaceDiaryMedia(space.getPublicId(), diary.getDiaryId(), diary.getUserId(),
+                    clearImages ? List.of() : retainedAssetIds, uploadedAssetIds, mediaOrder);
         }
         if (tagIds != null) {
-            tagService.replaceDiaryTags(diary.getUserId(), diaryId, tagIds);
+            tagService.replaceDiaryTags(diary.getUserId(), diary.getDiaryId(), tagIds);
         }
     }
 
@@ -221,7 +164,6 @@ public class DiaryService {
         DateRange dateRange = timelineDateRange(year, month);
         List<Diary> diaries = diaryMapper.findDiariesForTimeline(userId, dateRange.startDate, dateRange.endDate, tagId, moodKey);
         enrichDiaries(diaries);
-        setImagePathLists(diaries);
         Map<String, List<DiaryVO>> grouped = diaries.stream()
                 .collect(Collectors.groupingBy(diary -> diary.getDate().toString().substring(0, 7),
                         java.util.LinkedHashMap::new,
@@ -261,28 +203,15 @@ public class DiaryService {
         }
     }
 
-    public void setImagePathLists(List<Diary> diaries) {
-        if (diaries == null || diaries.isEmpty()) {
-            return;
+    private List<String> uploadImages(DiarySpace space, Integer userId, MultipartFile[] files) throws IOException {
+        if (!hasUploadFiles(files)) return List.of();
+        List<String> uploaded = new java.util.ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file != null && !file.isEmpty()) {
+                uploaded.add(mediaService.upload(space.getPublicId(), userId, file, null,
+                        null, null, null, null, null, null).getAssetId());
+            }
         }
-        List<Integer> diaryIds = diaries.stream()
-                .map(Diary::getDiaryId)
-                .filter(id -> id != null)
-                .collect(Collectors.toList());
-        if (diaryIds.isEmpty()) {
-            return;
-        }
-        Map<Integer, List<String>> imagesByDiaryId = diaryImageMapper.findDiaryImagesByDiaryIds(diaryIds)
-                .stream()
-                .collect(Collectors.groupingBy(DiaryImage::getDiaryId,
-                        java.util.LinkedHashMap::new,
-                        Collectors.mapping(DiaryImage::getImagePath, Collectors.toList())));
-        for (Diary diary : diaries) {
-            diary.setImagePathList(imagesByDiaryId.getOrDefault(diary.getDiaryId(), java.util.Collections.emptyList()));
-        }
-    }
-
-    private String diaryImagePrefix(Integer userId) {
-        return "diary_" + userId + "_";
+        return uploaded;
     }
 }

@@ -42,10 +42,10 @@ public interface SpaceMapper {
     @Select("SELECT space_id FROM diary_space WHERE space_id=#{spaceId} FOR UPDATE")
     Long lockSpace(@Param("spaceId") Long spaceId);
 
-    @Select("SELECT m.space_id spaceId,m.user_id userId,m.role,m.status,m.joined_at joinedAt,u.username,u.avatar_path avatarPath FROM space_member m JOIN user u ON u.user_id=m.user_id WHERE m.space_id=#{spaceId} AND m.user_id=#{userId} AND m.status='ACTIVE'")
+    @Select("SELECT m.space_id spaceId,m.user_id userId,m.role,m.status,m.joined_at joinedAt,u.username,a.public_id avatarAssetId FROM space_member m JOIN user u ON u.user_id=m.user_id LEFT JOIN user_avatar ua ON ua.user_id=u.user_id LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL WHERE m.space_id=#{spaceId} AND m.user_id=#{userId} AND m.status='ACTIVE'")
     SpaceMember findMember(@Param("spaceId") Long spaceId, @Param("userId") Integer userId);
 
-    @Select("SELECT m.space_id spaceId,m.user_id userId,m.role,m.status,m.joined_at joinedAt,u.username,u.avatar_path avatarPath FROM space_member m JOIN user u ON u.user_id=m.user_id WHERE m.space_id=#{spaceId} AND m.status='ACTIVE' ORDER BY m.role='OWNER' DESC,m.joined_at")
+    @Select("SELECT m.space_id spaceId,m.user_id userId,m.role,m.status,m.joined_at joinedAt,u.username,a.public_id avatarAssetId FROM space_member m JOIN user u ON u.user_id=m.user_id LEFT JOIN user_avatar ua ON ua.user_id=u.user_id LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL WHERE m.space_id=#{spaceId} AND m.status='ACTIVE' ORDER BY m.role='OWNER' DESC,m.joined_at")
     List<SpaceMember> listMembers(@Param("spaceId") Long spaceId);
 
     @Select("SELECT COUNT(*) FROM space_member WHERE space_id=#{spaceId} AND status='ACTIVE'")

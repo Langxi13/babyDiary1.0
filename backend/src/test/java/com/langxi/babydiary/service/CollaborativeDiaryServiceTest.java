@@ -10,7 +10,6 @@ import com.langxi.babydiary.entity.DiarySpace;
 import com.langxi.babydiary.entity.SpaceMember;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.CollaborationMapper;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,11 +31,8 @@ class CollaborativeDiaryServiceTest {
     @Mock private CollaborationMapper mapper;
     @Mock private SpaceService spaceService;
     @Mock private TagService tagService;
-    @Mock private DiaryImageService diaryImageService;
-    @Mock private DiaryImageMapper diaryImageMapper;
     @Mock private HtmlSanitizer htmlSanitizer;
     @Mock private AccountSecurityService accountSecurityService;
-    @Mock private ImageStorageService imageStorageService;
     @Mock private NotificationService notificationService;
     @Mock private SyncJournalService syncJournalService;
     @Mock private SearchService searchService;
@@ -62,9 +58,8 @@ class CollaborativeDiaryServiceTest {
         assertThat(value.getContent()).isEmpty();
         assertThat(value.getMoodKey()).isNull();
         assertThat(value.getTags()).isEmpty();
-        assertThat(value.getImagePathList()).isEmpty();
         assertThat(value.getMedia()).isEmpty();
-        verifyNoInteractions(tagService, diaryImageMapper, mediaService);
+        verifyNoInteractions(tagService, mediaService);
     }
 
     @Test
@@ -77,7 +72,6 @@ class CollaborativeDiaryServiceTest {
         when(mapper.updateDiary(any(Diary.class), eq(2))).thenReturn(1);
         when(mapper.findDiary(7L, "diary-one")).thenReturn(updated);
         when(tagService.findTagsByDiaryId(10)).thenReturn(Collections.emptyList());
-        when(diaryImageService.findImagePathsByDiaryId(10)).thenReturn(Collections.emptyList());
         when(mediaService.findByDiary(10)).thenReturn(Collections.emptyList());
 
         DiaryWriteDTO dto = writeDto();

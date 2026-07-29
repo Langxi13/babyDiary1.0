@@ -15,9 +15,7 @@ public interface UserMapper {
     //新增用户
     void insertUser(User user);
 
-    //通过用户id查找avatarPath
-    //更新avatarPath
-    void updateAvatarPath(@Param("userId") Integer userId, @Param("avatarPath") String avatarPath);
+    void updateAvatarAsset(@Param("userId") Integer userId, @Param("assetId") Long assetId);
 
     void updatePasswordAndIncrementTokenVersion(@Param("userId") Integer userId, @Param("password") String password);
 

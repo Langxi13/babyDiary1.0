@@ -11,7 +11,8 @@ public class User {
     private Boolean emailVerified;
     private String password;
     private Timestamp createdAt;
-    private String avatarPath;
+    private String avatarAssetId;
+    private com.langxi.babydiary.dto.MediaAssetVO avatarMedia;
     private Integer tokenVersion;
     private String systemRole;
     private String timezone;

@@ -10,32 +10,41 @@
         <result property="emailVerified" column="email_verified"/>
         <result property="password" column="password"/>
         <result property="createdAt" column="created_at"/>
-        <result property="avatarPath" column="avatar_path"/>
+        <result property="avatarAssetId" column="avatar_asset_public_id"/>
         <result property="tokenVersion" column="token_version"/>
         <result property="systemRole" column="system_role"/>
         <result property="timezone" column="timezone"/>
     </resultMap>
 
     <select id="findById" parameterType="Integer" resultMap="userResultMap">
-        SELECT * FROM user WHERE user_id = #{userId}
+        SELECT u.*,a.public_id AS avatar_asset_public_id FROM user u
+        LEFT JOIN user_avatar ua ON ua.user_id=u.user_id
+        LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL
+        WHERE u.user_id = #{userId}
     </select>
 
     <select id="findByUsername" parameterType="String" resultMap="userResultMap">
-        SELECT * FROM user WHERE username = #{username}
+        SELECT u.*,a.public_id AS avatar_asset_public_id FROM user u
+        LEFT JOIN user_avatar ua ON ua.user_id=u.user_id
+        LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL
+        WHERE u.username = #{username}
     </select>
 
     <select id="findByEmail" parameterType="String" resultMap="userResultMap">
-        SELECT * FROM user WHERE email = #{email}
+        SELECT u.*,a.public_id AS avatar_asset_public_id FROM user u
+        LEFT JOIN user_avatar ua ON ua.user_id=u.user_id
+        LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL
+        WHERE u.email = #{email}
     </select>
 
     <insert id="insertUser" parameterType="User" useGeneratedKeys="true" keyProperty="userId">
         INSERT INTO user (username, password) VALUES (#{username}, #{password})
     </insert>
 
-<!--通过用户id查找avatar_path-->
-    <update id="updateAvatarPath">
-        UPDATE user SET avatar_path = #{avatarPath} WHERE user_id = #{userId}
-    </update>
+    <insert id="updateAvatarAsset">
+        INSERT INTO user_avatar(user_id,asset_id) VALUES(#{userId},#{assetId})
+        ON DUPLICATE KEY UPDATE asset_id=VALUES(asset_id)
+    </insert>
 
     <update id="updatePasswordAndIncrementTokenVersion">
         UPDATE user

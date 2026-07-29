@@ -8,16 +8,15 @@ import com.langxi.babydiary.dto.AiAlbumCandidateVO;
 import com.langxi.babydiary.dto.AiAlbumProposalRequestDTO;
 import com.langxi.babydiary.dto.AiAlbumProposalVO;
 import com.langxi.babydiary.dto.PhotoVO;
+import com.langxi.babydiary.dto.MediaAssetVO;
 import com.langxi.babydiary.entity.AiAlbumProposal;
 import com.langxi.babydiary.entity.Album;
 import com.langxi.babydiary.entity.AlbumGroup;
 import com.langxi.babydiary.entity.Diary;
-import com.langxi.babydiary.entity.DiaryImage;
 import com.langxi.babydiary.entity.Photo;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.AiAlbumProposalMapper;
 import com.langxi.babydiary.mapper.AlbumMapper;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
 import com.langxi.babydiary.mapper.DiaryMapper;
 import com.langxi.babydiary.mapper.PhotoMapper;
 import org.jsoup.Jsoup;
@@ -36,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,7 +54,7 @@ public class AiAlbumProposalService {
     private DiaryMapper diaryMapper;
 
     @Autowired
-    private DiaryImageMapper diaryImageMapper;
+    private MediaService mediaService;
 
     @Autowired
     private AlbumMapper albumMapper;
@@ -80,13 +80,12 @@ public class AiAlbumProposalService {
             throw new BusinessException(ErrorCode.AI_CONFIG_INVALID, "该时间段没有日记，无法整理相册");
         }
         List<Integer> diaryIds = diaries.stream().map(Diary::getDiaryId).collect(Collectors.toList());
-        List<DiaryImage> images = diaryImageMapper.findDiaryImagesByDiaryIds(diaryIds);
-        if (images.isEmpty()) {
+        Map<Integer, List<MediaAssetVO>> mediaByDiary = mediaService.findByDiaries(diaryIds);
+        boolean hasImages = mediaByDiary.values().stream().flatMap(List::stream)
+                .anyMatch(media -> "IMAGE".equals(media.getMediaType()));
+        if (!hasImages) {
             throw new BusinessException(ErrorCode.AI_CONFIG_INVALID, "该时间段没有图片，无法整理相册");
         }
-
-        Map<Integer, List<DiaryImage>> imagesByDiary = images.stream()
-                .collect(Collectors.groupingBy(DiaryImage::getDiaryId, HashMap::new, Collectors.toList()));
         Map<Integer, Diary> diaryById = diaries.stream().collect(Collectors.toMap(Diary::getDiaryId, diary -> diary));
         List<Album> existingAiAlbums = albumMapper.findAiAlbumsByUserId(userId);
         Map<Integer, Album> aiAlbumById = existingAiAlbums.stream()
@@ -95,9 +94,9 @@ public class AiAlbumProposalService {
         AiRuntimeConfig config = aiConfigService.getRuntimeConfig();
         String aiResponse = aiClient.generate(config, Arrays.asList(
                 new AiChatMessage("system", systemPrompt()),
-                new AiChatMessage("user", userPrompt(startDate, endDate, request.getPrompt(), diaries, imagesByDiary, existingAiAlbums))
+                new AiChatMessage("user", userPrompt(startDate, endDate, request.getPrompt(), diaries, mediaByDiary, existingAiAlbums))
         ));
-        List<AiAlbumCandidateVO> candidates = parseCandidates(aiResponse, diaryById, imagesByDiary, aiAlbumById);
+        List<AiAlbumCandidateVO> candidates = parseCandidates(aiResponse, diaryById, mediaByDiary, aiAlbumById);
 
         AiAlbumProposal proposal = new AiAlbumProposal();
         proposal.setUserId(userId);
@@ -132,7 +131,7 @@ public class AiAlbumProposalService {
         validateOwnedImages(userId, candidates);
         AlbumGroup aiGroup = ensureAiGroup(userId);
         for (AiAlbumCandidateVO candidate : candidates) {
-            if (Boolean.TRUE.equals(candidate.getDiscarded()) || candidate.getImageIds() == null || candidate.getImageIds().isEmpty()) {
+            if (Boolean.TRUE.equals(candidate.getDiscarded()) || candidate.getAssetIds() == null || candidate.getAssetIds().isEmpty()) {
                 continue;
             }
             Integer albumId;
@@ -149,12 +148,12 @@ public class AiAlbumProposalService {
                 album.setType("AI");
                 album.setName(truncate(trimRequired(candidate.getTitle(), "AI 相册"), 100));
                 album.setDescription(trimToNull(truncate(candidate.getDescription(), 500)));
-                album.setCoverImagePath(null);
+                album.setCoverAssetId(null);
                 album.setSort(0);
                 albumMapper.insertAlbum(album);
                 albumId = album.getAlbumId();
             }
-            albumMapper.insertAlbumPhotos(albumId, candidate.getImageIds().stream().distinct().collect(Collectors.toList()));
+            addAssetsInOrder(userId, albumId, candidate.getAssetIds());
         }
         proposalMapper.updateStatus(userId, proposalId, "CONFIRMED");
         proposal.setStatus("CONFIRMED");
@@ -168,7 +167,7 @@ public class AiAlbumProposalService {
     }
 
     private List<AiAlbumCandidateVO> parseCandidates(String response, Map<Integer, Diary> diaryById,
-                                                     Map<Integer, List<DiaryImage>> imagesByDiary,
+                                                     Map<Integer, List<MediaAssetVO>> mediaByDiary,
                                                      Map<Integer, Album> aiAlbumById) {
         try {
             JsonNode albumsNode = objectMapper.readTree(response).path("albums");
@@ -191,8 +190,8 @@ public class AiAlbumProposalService {
                 candidate.setTitle(truncate(node.path("title").asText("AI 整理相册"), 100));
                 candidate.setDescription(truncate(node.path("description").asText(""), 500));
                 candidate.setDiaryIds(validDiaryIds(node.path("diaryIds"), diaryById.keySet()));
-                candidate.setImageIds(imageIdsForDiaries(candidate.getDiaryIds(), imagesByDiary));
-                if (!candidate.getImageIds().isEmpty()) {
+                candidate.setAssetIds(assetIdsForDiaries(candidate.getDiaryIds(), mediaByDiary));
+                if (!candidate.getAssetIds().isEmpty()) {
                     candidates.add(candidate);
                 }
             }
@@ -220,36 +219,40 @@ public class AiAlbumProposalService {
         return ids;
     }
 
-    private List<Integer> imageIdsForDiaries(List<Integer> diaryIds, Map<Integer, List<DiaryImage>> imagesByDiary) {
-        LinkedHashSet<Integer> imageIds = new LinkedHashSet<>();
+    private List<String> assetIdsForDiaries(List<Integer> diaryIds, Map<Integer, List<MediaAssetVO>> mediaByDiary) {
+        LinkedHashSet<String> assetIds = new LinkedHashSet<>();
         for (Integer diaryId : diaryIds) {
-            for (DiaryImage image : imagesByDiary.getOrDefault(diaryId, Collections.emptyList())) {
-                imageIds.add(image.getImageId());
+            for (MediaAssetVO media : mediaByDiary.getOrDefault(diaryId, Collections.emptyList())) {
+                if ("IMAGE".equals(media.getMediaType())) assetIds.add(media.getAssetId());
             }
         }
-        return new ArrayList<>(imageIds);
+        return new ArrayList<>(assetIds);
     }
 
     private List<AiAlbumCandidateVO> enrichPhotos(Integer userId, List<AiAlbumCandidateVO> candidates) {
-        Set<Integer> allImageIds = new LinkedHashSet<>();
+        Set<String> allAssetIds = new LinkedHashSet<>();
         for (AiAlbumCandidateVO candidate : candidates) {
-            if (candidate.getImageIds() != null) {
-                allImageIds.addAll(candidate.getImageIds());
+            if (candidate.getAssetIds() != null) {
+                allAssetIds.addAll(candidate.getAssetIds());
             }
         }
-        if (allImageIds.isEmpty()) {
+        if (allAssetIds.isEmpty()) {
             return candidates;
         }
-        List<Photo> photos = photoMapper.findPhotosByIds(userId, new ArrayList<>(allImageIds));
+        List<Photo> photos = photoMapper.findPhotosByIds(userId, new ArrayList<>(allAssetIds));
         if (photos == null) {
             photos = Collections.emptyList();
         }
-        Map<Integer, PhotoVO> photosById = photos.stream()
-                .collect(Collectors.toMap(Photo::getImageId, PhotoVO::fromEntity));
+        Map<String, com.langxi.babydiary.entity.MediaAsset> media = mediaService.findByPublicIds(new ArrayList<>(allAssetIds)).stream()
+                .collect(Collectors.toMap(com.langxi.babydiary.entity.MediaAsset::getPublicId, asset -> asset));
+        Map<String, PhotoVO> photosById = photos.stream().peek(photo -> {
+                    var asset = media.get(photo.getAssetId());
+                    if (asset != null) photo.setMedia(mediaService.toVO(asset));
+                }).collect(Collectors.toMap(Photo::getAssetId, PhotoVO::fromEntity));
         for (AiAlbumCandidateVO candidate : candidates) {
             List<PhotoVO> candidatePhotos = new ArrayList<>();
-            for (Integer imageId : candidate.getImageIds()) {
-                PhotoVO photo = photosById.get(imageId);
+            for (String assetId : candidate.getAssetIds()) {
+                PhotoVO photo = photosById.get(assetId);
                 if (photo != null) {
                     candidatePhotos.add(photo);
                 }
@@ -290,7 +293,7 @@ public class AiAlbumProposalService {
             copy.setTitle(truncate(candidate.getTitle(), 100));
             copy.setDescription(truncate(candidate.getDescription(), 500));
             copy.setDiaryIds(normalizeIds(candidate.getDiaryIds(), 500));
-            copy.setImageIds(normalizeIds(candidate.getImageIds(), 500));
+            copy.setAssetIds(normalizeAssetIds(candidate.getAssetIds(), 500));
             copy.setDiscarded(Boolean.TRUE.equals(candidate.getDiscarded()));
             sanitized.add(copy);
         }
@@ -308,26 +311,40 @@ public class AiAlbumProposalService {
                 .collect(Collectors.toList());
     }
 
+    private List<String> normalizeAssetIds(List<String> ids, int limit) {
+        if (ids == null || ids.isEmpty()) return Collections.emptyList();
+        return ids.stream().filter(java.util.Objects::nonNull).map(String::trim).filter(id -> {
+                    try { UUID.fromString(id); return true; } catch (IllegalArgumentException ignored) { return false; }
+                }).distinct().limit(limit).toList();
+    }
+
     private void validateOwnedImages(Integer userId, List<AiAlbumCandidateVO> candidates) {
-        Set<Integer> imageIds = candidates.stream()
+        Set<String> assetIds = candidates.stream()
                 .filter(candidate -> !Boolean.TRUE.equals(candidate.getDiscarded()))
-                .flatMap(candidate -> candidate.getImageIds() == null
+                .flatMap(candidate -> candidate.getAssetIds() == null
                         ? java.util.stream.Stream.empty()
-                        : candidate.getImageIds().stream())
+                        : candidate.getAssetIds().stream())
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (imageIds.isEmpty()) {
+        if (assetIds.isEmpty()) {
             return;
         }
-        if (imageIds.size() > 1000) {
+        if (assetIds.size() > 1000) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "单次最多确认1000张照片");
         }
-        List<Photo> ownedPhotos = photoMapper.findPhotosByIds(userId, new ArrayList<>(imageIds));
-        Set<Integer> ownedImageIds = ownedPhotos == null
+        List<Photo> ownedPhotos = photoMapper.findPhotosByIds(userId, new ArrayList<>(assetIds));
+        Set<String> ownedAssetIds = ownedPhotos == null
                 ? Collections.emptySet()
-                : ownedPhotos.stream().map(Photo::getImageId).collect(Collectors.toSet());
-        if (!ownedImageIds.containsAll(imageIds)) {
+                : ownedPhotos.stream().map(Photo::getAssetId).collect(Collectors.toSet());
+        if (!ownedAssetIds.containsAll(assetIds)) {
             throw new BusinessException(ErrorCode.FILE_NOT_FOUND, "部分照片不存在或不属于当前用户");
+        }
+    }
+
+    private void addAssetsInOrder(Integer userId, Integer albumId, List<String> assetIds) {
+        int sort = albumMapper.nextAlbumPhotoSort(albumId);
+        for (String assetId : assetIds.stream().distinct().toList()) {
+            albumMapper.insertAlbumPhoto(albumId, userId, assetId, sort++);
         }
     }
 
@@ -376,7 +393,7 @@ public class AiAlbumProposalService {
     }
 
     private String userPrompt(Date startDate, Date endDate, String prompt, List<Diary> diaries,
-                              Map<Integer, List<DiaryImage>> imagesByDiary, List<Album> existingAiAlbums) {
+                              Map<Integer, List<MediaAssetVO>> mediaByDiary, List<Album> existingAiAlbums) {
         StringBuilder builder = new StringBuilder();
         builder.append("整理时间段：").append(startDate).append(" 至 ").append(endDate).append("\n");
         if (prompt != null && !prompt.trim().isEmpty()) {
@@ -392,7 +409,8 @@ public class AiAlbumProposalService {
                     + "，日期=" + diary.getDate()
                     + "，标题=" + nullToEmpty(diary.getTitle())
                     + "，心情=" + nullToEmpty(diary.getMoodKey())
-                    + "，图片数量=" + imagesByDiary.getOrDefault(diary.getDiaryId(), Collections.emptyList()).size()
+                    + "，图片数量=" + mediaByDiary.getOrDefault(diary.getDiaryId(), Collections.emptyList()).stream()
+                    .filter(media -> "IMAGE".equals(media.getMediaType())).count()
                     + "\n  内容=" + truncate(toPlainText(diary.getContent()), MAX_CONTENT_PER_DIARY)
                     + "\n";
             if (builder.length() + item.length() > MAX_INPUT_CHARS) {

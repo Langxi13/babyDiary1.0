@@ -10,7 +10,8 @@ public class AlbumVO {
     private String type;
     private String name;
     private String description;
-    private String coverImagePath;
+    private MediaAssetVO coverMedia;
+    private String coverAssetId;
     private Integer photoCount;
     private Boolean editable;
 
@@ -20,18 +21,18 @@ public class AlbumVO {
         vo.setType(album.getType());
         vo.setName(album.getName());
         vo.setDescription(album.getDescription());
-        vo.setCoverImagePath(album.getCoverImagePath());
+        vo.setCoverAssetId(album.getCoverAssetPublicId());
         vo.setPhotoCount(album.getPhotoCount() == null ? 0 : album.getPhotoCount());
         vo.setEditable(!"SYSTEM".equals(album.getType()));
         return vo;
     }
 
-    public static AlbumVO system(String systemKey, String name, Integer photoCount, String coverImagePath) {
+    public static AlbumVO system(String systemKey, String name, Integer photoCount, String coverAssetId) {
         AlbumVO vo = new AlbumVO();
         vo.setSystemKey(systemKey);
         vo.setType("SYSTEM");
         vo.setName(name);
-        vo.setCoverImagePath(coverImagePath);
+        vo.setCoverAssetId(coverAssetId);
         vo.setPhotoCount(photoCount == null ? 0 : photoCount);
         vo.setEditable(false);
         return vo;

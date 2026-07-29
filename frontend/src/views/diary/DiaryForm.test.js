@@ -61,7 +61,7 @@ test('diary update submits image order for existing and new images', () => {
   assert.match(source, /`existing:\$\{file\.name\}`/)
   assert.match(source, /`new:\$\{newImageIndex\}`/)
   assert.match(source, /newImageIndex \+= 1/)
-  assert.match(source, /formData\.append\('imageOrder', orderEntry\)/)
+  assert.match(source, /formData\.append\('mediaOrder', orderEntry\)/)
 })
 
 test('diary update clears every old image even when replacement images are uploaded', () => {

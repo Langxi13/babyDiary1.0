@@ -20,7 +20,6 @@ public class Diary {
     private String visibility;
     private Boolean locked;
     private Integer version;
-    private List<String> imagePathList;
     private List<Tag> tagList;
     private List<com.langxi.babydiary.dto.MediaAssetVO> mediaList;
     private Timestamp createdAt;

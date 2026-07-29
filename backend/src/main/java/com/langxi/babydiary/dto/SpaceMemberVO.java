@@ -9,7 +9,8 @@ import java.sql.Timestamp;
 public class SpaceMemberVO {
     private Integer userId;
     private String username;
-    private String avatarPath;
+    private MediaAssetVO avatarMedia;
+    private String avatarAssetId;
     private String role;
     private Timestamp joinedAt;
 
@@ -17,7 +18,7 @@ public class SpaceMemberVO {
         SpaceMemberVO vo = new SpaceMemberVO();
         vo.setUserId(member.getUserId());
         vo.setUsername(member.getUsername());
-        vo.setAvatarPath(member.getAvatarPath());
+        vo.setAvatarAssetId(member.getAvatarAssetId());
         vo.setRole(member.getRole());
         vo.setJoinedAt(member.getJoinedAt());
         return vo;

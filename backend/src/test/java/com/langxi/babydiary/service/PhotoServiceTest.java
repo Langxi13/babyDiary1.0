@@ -27,7 +27,7 @@ class PhotoServiceTest {
     @Test
     void photoPageNormalizesBoundsAndQueriesOnlyRequestedSlice() {
         Photo photo = new Photo();
-        photo.setImageId(88);
+        photo.setAssetId("11111111-1111-1111-1111-111111111111");
         when(photoMapper.countPhotos(3, null, null, null, null, true)).thenReturn(125);
         when(photoMapper.findPhotoPage(3, null, null, null, null, true, 100, 0))
                 .thenReturn(Collections.singletonList(photo));

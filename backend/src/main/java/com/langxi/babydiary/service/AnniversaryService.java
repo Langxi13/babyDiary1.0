@@ -22,11 +22,14 @@ public class AnniversaryService {
     private AnniversaryMapper anniversaryMapper;
 
     @Autowired
-    private ImageStorageService imageStorageService;
+    private MediaService mediaService;
+
+    @Autowired
+    private SpaceService spaceService;
 
     @Cacheable(cacheNames = CacheNames.ANNIVERSARIES, key = "#userId")
     public List<Anniversary> findByUserId(Integer userId) {
-        return anniversaryMapper.findByUserId(userId);
+        return anniversaryMapper.findByUserId(userId).stream().peek(this::enrichCover).toList();
     }
 
     public String uploadCover(Integer userId, MultipartFile coverFile) {
@@ -34,7 +37,8 @@ public class AnniversaryService {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "封面图片不能为空");
         }
         try {
-            return imageStorageService.storeImage(coverFile, coverPrefix(userId), true);
+            return mediaService.upload(spaceService.requirePersonalSpace(userId).getPublicId(), userId, coverFile,
+                    null, "纪念日封面", null, null, null, null, null).getAssetId();
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "封面图片上传失败");
         }
@@ -42,21 +46,23 @@ public class AnniversaryService {
 
     @Transactional
     @CacheEvict(cacheNames = CacheNames.ANNIVERSARIES, key = "#userId")
-    public Anniversary create(Integer userId, String title, String date, String description, String coverImagePath, Integer sort) {
+    public Anniversary create(Integer userId, String title, String date, String description, String coverAssetId, Integer sort) {
         Anniversary anniversary = new Anniversary();
         anniversary.setUserId(userId);
         anniversary.setTitle(title);
         anniversary.setDate(Date.valueOf(date));
         anniversary.setDescription(description);
-        anniversary.setCoverImagePath(normalizeCoverPath(userId, coverImagePath, null));
+        anniversary.setCoverAssetId(resolveCoverAssetId(userId, coverAssetId));
         anniversary.setSort(sort == null ? 0 : sort);
         anniversaryMapper.insertAnniversary(anniversary);
-        return anniversaryMapper.findById(userId, anniversary.getAnniversaryId());
+        Anniversary created = anniversaryMapper.findById(userId, anniversary.getAnniversaryId());
+        enrichCover(created);
+        return created;
     }
 
     @Transactional
     @CacheEvict(cacheNames = CacheNames.ANNIVERSARIES, key = "#userId")
-    public Anniversary update(Integer userId, Integer anniversaryId, String title, String date, String description, String coverImagePath, Integer sort) {
+    public Anniversary update(Integer userId, Integer anniversaryId, String title, String date, String description, String coverAssetId, Integer sort) {
         Anniversary existing = anniversaryMapper.findById(userId, anniversaryId);
         if (existing == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
@@ -67,15 +73,12 @@ public class AnniversaryService {
         anniversary.setTitle(title);
         anniversary.setDate(Date.valueOf(date));
         anniversary.setDescription(description);
-        String normalizedCoverPath = normalizeCoverPath(userId, coverImagePath, existing.getCoverImagePath());
-        anniversary.setCoverImagePath(normalizedCoverPath);
+        anniversary.setCoverAssetId(resolveCoverAssetId(userId, coverAssetId));
         anniversary.setSort(sort == null ? 0 : sort);
         anniversaryMapper.updateAnniversary(anniversary);
-        if (!java.util.Objects.equals(existing.getCoverImagePath(), normalizedCoverPath)
-                && imageStorageService.isOwnedPath(existing.getCoverImagePath(), coverPrefix(userId))) {
-            imageStorageService.deleteAfterCommit(existing.getCoverImagePath());
-        }
-        return anniversaryMapper.findById(userId, anniversaryId);
+        Anniversary updated = anniversaryMapper.findById(userId, anniversaryId);
+        enrichCover(updated);
+        return updated;
     }
 
     @Transactional
@@ -86,23 +89,19 @@ public class AnniversaryService {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
         anniversaryMapper.deleteAnniversary(userId, anniversaryId);
-        if (imageStorageService.isOwnedPath(existing.getCoverImagePath(), coverPrefix(userId))) {
-            imageStorageService.deleteAfterCommit(existing.getCoverImagePath());
-        }
     }
 
-    private String normalizeCoverPath(Integer userId, String coverImagePath, String existingCoverPath) {
-        if (coverImagePath == null || coverImagePath.trim().isEmpty()) {
+    private Long resolveCoverAssetId(Integer userId, String coverAssetId) {
+        if (coverAssetId == null || coverAssetId.trim().isEmpty()) {
             return null;
         }
-        String normalized = coverImagePath.trim();
-        if (normalized.equals(existingCoverPath) || imageStorageService.isOwnedPath(normalized, coverPrefix(userId))) {
-            return normalized;
-        }
-        throw new BusinessException(ErrorCode.BAD_REQUEST, "封面图片不属于当前用户");
+        return mediaService.requireOwnedAsset(spaceService.requirePersonalSpace(userId).getPublicId(), coverAssetId.trim(), userId).getAssetId();
     }
 
-    private String coverPrefix(Integer userId) {
-        return "anniversary_" + userId + "_";
+    private void enrichCover(Anniversary anniversary) {
+        if (anniversary.getCoverAssetPublicId() != null) {
+            var asset = mediaService.findByPublicId(anniversary.getCoverAssetPublicId());
+            if (asset != null) anniversary.setCoverMedia(mediaService.toVO(asset));
+        }
     }
 }

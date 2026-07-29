@@ -185,21 +185,25 @@ case "$data_path" in
     exit 1
     ;;
 esac
+image_owner="$(stat -c '%U' "$IMAGE_DIR")"
 image_group="$(stat -c '%G' "$IMAGE_DIR")"
 image_mode="$(stat -c '%a' "$IMAGE_DIR")"
+data_owner="$(stat -c '%U' "$DATA_DIR")"
 data_group="$(stat -c '%G' "$DATA_DIR")"
 data_mode="$(stat -c '%a' "$DATA_DIR")"
 
-if [ "$image_group" != "$NGINX_GROUP" ] || [ "$data_group" != "$NGINX_GROUP" ]; then
-  echo "image directory group should be $NGINX_GROUP, got data=$data_group images=$image_group" >&2
+if [ "$CHECK_OS_USER" = "true" ] \
+  && { [ "$image_owner" != "$SERVICE_USER" ] || [ "$data_owner" != "$SERVICE_USER" ] \
+    || [ "$image_group" != "$SERVICE_GROUP" ] || [ "$data_group" != "$SERVICE_GROUP" ]; }; then
+  echo "legacy image tree should belong to $SERVICE_USER:$SERVICE_GROUP" >&2
   exit 1
 fi
 
-if [ "$image_mode" != "2750" ] || [ "$data_mode" != "2750" ]; then
-  echo "image directory mode should be 2750, got data=$data_mode images=$image_mode" >&2
+if [ "$image_mode" != "700" ] || [ "$data_mode" != "700" ]; then
+  echo "legacy image tree mode should be 700, got data=$data_mode images=$image_mode" >&2
   exit 1
 fi
-echo "image directory readable by nginx group"
+echo "legacy image directory quarantined"
 
 if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
   require_env_value DIARY_OBJECT_PATH
@@ -229,8 +233,10 @@ if [ "$CHECK_OS_USER" = "true" ]; then
     runuser -u "$SERVICE_USER" -- test -w "$TMP_ROOT"
     runuser -u "$SERVICE_USER" -- test -w "$IMAGE_DIR"
     id "$NGINX_USER" >/dev/null
-    runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"
-    runuser -u "$NGINX_USER" -- test -x "$IMAGE_DIR"
+    if runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"; then
+      echo "nginx user must not traverse the legacy image directory" >&2
+      exit 1
+    fi
     if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
       runuser -u "$SERVICE_USER" -- test -w "$OBJECT_DIR"
       if runuser -u "$NGINX_USER" -- test -r "$OBJECT_DIR"; then
@@ -240,7 +246,10 @@ if [ "$CHECK_OS_USER" = "true" ]; then
     fi
     first_image="$(find "$IMAGE_DIR" -maxdepth 1 -type f | head -n 1 || true)"
     if [ -n "$first_image" ]; then
-      runuser -u "$NGINX_USER" -- test -r "$first_image"
+      if runuser -u "$NGINX_USER" -- test -r "$first_image"; then
+        echo "nginx user must not read quarantined legacy images" >&2
+        exit 1
+      fi
     fi
   else
     test -w "$IMAGE_DIR"

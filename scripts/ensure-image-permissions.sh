@@ -15,15 +15,9 @@ OBJECT_DIR="${OBJECT_DIR:-${DIARY_OBJECT_PATH:-$PROJECT_ROOT/data/objects}}"
 DATA_DIR="$(dirname "$IMAGE_DIR")"
 SERVICE_USER="${SERVICE_USER:-baby-diary}"
 SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
-NGINX_GROUP="${NGINX_GROUP:-www-data}"
 
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
   echo "missing service user $SERVICE_USER" >&2
-  exit 1
-fi
-
-if ! getent group "$NGINX_GROUP" >/dev/null 2>&1; then
-  echo "missing nginx group $NGINX_GROUP" >&2
   exit 1
 fi
 
@@ -48,14 +42,16 @@ case "$object_path/" in
     ;;
 esac
 
-install -d -o "$SERVICE_USER" -g "$NGINX_GROUP" -m 2750 "$DATA_DIR" "$IMAGE_DIR"
-chown "$SERVICE_USER:$NGINX_GROUP" "$DATA_DIR" "$IMAGE_DIR"
-chmod 2750 "$DATA_DIR" "$IMAGE_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0700 "$DATA_DIR" "$IMAGE_DIR"
+chown "$SERVICE_USER:$SERVICE_GROUP" "$DATA_DIR" "$IMAGE_DIR"
+chmod 0700 "$DATA_DIR" "$IMAGE_DIR"
+chmod g-s "$DATA_DIR" "$IMAGE_DIR"
 
-find "$IMAGE_DIR" -type d -exec chown "$SERVICE_USER:$NGINX_GROUP" {} +
-find "$IMAGE_DIR" -type d -exec chmod 2750 {} +
-find "$IMAGE_DIR" -type f -exec chown "$SERVICE_USER:$NGINX_GROUP" {} +
-find "$IMAGE_DIR" -type f -exec chmod 0640 {} +
+find "$IMAGE_DIR" -type d -exec chown "$SERVICE_USER:$SERVICE_GROUP" {} +
+find "$IMAGE_DIR" -type d -exec chmod 0700 {} +
+find "$IMAGE_DIR" -type d -exec chmod g-s {} +
+find "$IMAGE_DIR" -type f -exec chown "$SERVICE_USER:$SERVICE_GROUP" {} +
+find "$IMAGE_DIR" -type f -exec chmod 0600 {} +
 
 install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0700 "$OBJECT_DIR"
 find "$OBJECT_DIR" -type d -exec chown "$SERVICE_USER:$SERVICE_GROUP" {} +
@@ -64,4 +60,4 @@ find "$OBJECT_DIR" -type d -exec chmod g-s {} +
 find "$OBJECT_DIR" -type f -exec chown "$SERVICE_USER:$SERVICE_GROUP" {} +
 find "$OBJECT_DIR" -type f -exec chmod 0600 {} +
 
-echo "image directory readable by $NGINX_GROUP and private objects restricted to $SERVICE_USER"
+echo "legacy images and unified objects restricted to $SERVICE_USER"

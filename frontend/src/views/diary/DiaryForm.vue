@@ -623,7 +623,7 @@ const loadDiary = async () => {
     form.moodKey = diary.moodKey || ''
     form.tagIds = diary.tags?.map(tag => tag.tagId) || []
 
-    setExistingImages(diary.imagePathList || [])
+    setExistingImages(diary.media || [])
   }
 }
 

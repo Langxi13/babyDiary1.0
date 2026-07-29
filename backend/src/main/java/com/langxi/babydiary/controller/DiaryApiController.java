@@ -10,7 +10,6 @@ import com.langxi.babydiary.entity.Diary;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.security.CurrentUser;
 import com.langxi.babydiary.service.DiaryArchiveService;
-import com.langxi.babydiary.service.DiaryImageService;
 import com.langxi.babydiary.service.DiaryService;
 import com.langxi.babydiary.validation.DiaryRequestValidator;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,9 +42,6 @@ public class DiaryApiController {
 
     @Autowired
     private DiaryService diaryService;
-
-    @Autowired
-    private DiaryImageService diaryImageService;
 
     @Autowired
     private DiaryArchiveService diaryArchiveService;
@@ -84,7 +80,6 @@ public class DiaryApiController {
             diaries = diaryService.getDiariesByKeyword(userId, dateRange.startDate(), dateRange.endDate(), normalizedKeyword, tagId, normalizedMoodKey, page, pageSize, summary);
         }
 
-        diaryService.setImagePathLists(diaries.getContent());
         List<DiaryVO> diaryVOList = diaries.getContent().stream()
                 .map(DiaryVO::fromEntity)
                 .collect(Collectors.toList());
@@ -155,7 +150,6 @@ public class DiaryApiController {
         diaryService.saveDiary(diary, imageFiles, requestValidator.parseTagIds(tagIds));
 
         Diary savedDiary = diaryService.findDiaryById(diary.getDiaryId());
-        savedDiary.setImagePathList(diaryImageService.findImagePathsByDiaryId(savedDiary.getDiaryId()));
         log.info("创建日记成功: userId={}, diaryId={}", userId, diary.getDiaryId());
         return Result.success("创建成功", DiaryVO.fromEntity(savedDiary));
     }
@@ -171,11 +165,11 @@ public class DiaryApiController {
             @Parameter(description = "心情标识") @RequestParam(required = false) String moodKey,
             @Parameter(description = "逗号分隔标签ID") @RequestParam(required = false) String tagIds,
             @Parameter(description = "图片文件") @RequestParam(value = "imageFiles", required = false) MultipartFile[] imageFiles,
-            @Parameter(description = "保留的旧图片文件名") @RequestParam(value = "retainedImagePaths", required = false) List<String> retainedImagePaths,
-            @Parameter(description = "图片排序，existing:文件名 或 new:新图片序号") @RequestParam(value = "imageOrder", required = false) List<String> imageOrder,
+            @Parameter(description = "保留的媒体资源ID") @RequestParam(value = "retainedAssetIds", required = false) List<String> retainedAssetIds,
+            @Parameter(description = "媒体排序，existing:资源ID 或 new:新图片序号") @RequestParam(value = "mediaOrder", required = false) List<String> mediaOrder,
             @Parameter(description = "是否清除图片") @RequestParam(value = "clearImages", required = false, defaultValue = "false") boolean clearImages) throws IOException {
 
-        return doUpdateDiary(diaryId, title, content, date, contentFormat, moodKey, tagIds, imageFiles, retainedImagePaths, imageOrder, clearImages);
+        return doUpdateDiary(diaryId, title, content, date, contentFormat, moodKey, tagIds, imageFiles, retainedAssetIds, mediaOrder, clearImages);
     }
 
     @PostMapping("/{diaryId}/update")
@@ -189,11 +183,11 @@ public class DiaryApiController {
             @Parameter(description = "心情标识") @RequestParam(required = false) String moodKey,
             @Parameter(description = "逗号分隔标签ID") @RequestParam(required = false) String tagIds,
             @Parameter(description = "图片文件") @RequestParam(value = "imageFiles", required = false) MultipartFile[] imageFiles,
-            @Parameter(description = "保留的旧图片文件名") @RequestParam(value = "retainedImagePaths", required = false) List<String> retainedImagePaths,
-            @Parameter(description = "图片排序，existing:文件名 或 new:新图片序号") @RequestParam(value = "imageOrder", required = false) List<String> imageOrder,
+            @Parameter(description = "保留的媒体资源ID") @RequestParam(value = "retainedAssetIds", required = false) List<String> retainedAssetIds,
+            @Parameter(description = "媒体排序，existing:资源ID 或 new:新图片序号") @RequestParam(value = "mediaOrder", required = false) List<String> mediaOrder,
             @Parameter(description = "是否清除图片") @RequestParam(value = "clearImages", required = false, defaultValue = "false") boolean clearImages) throws IOException {
 
-        return doUpdateDiary(diaryId, title, content, date, contentFormat, moodKey, tagIds, imageFiles, retainedImagePaths, imageOrder, clearImages);
+        return doUpdateDiary(diaryId, title, content, date, contentFormat, moodKey, tagIds, imageFiles, retainedAssetIds, mediaOrder, clearImages);
     }
 
     @DeleteMapping("/{diaryId}")
@@ -234,14 +228,14 @@ public class DiaryApiController {
             String moodKey,
             String tagIds,
             MultipartFile[] imageFiles,
-            List<String> retainedImagePaths,
-            List<String> imageOrder,
+            List<String> retainedAssetIds,
+            List<String> mediaOrder,
             boolean clearImages) throws IOException {
 
         Diary existingDiary = findOwnedDiary(diaryId);
         Integer userId = existingDiary.getUserId();
         requestValidator.validateImageCount(imageFiles);
-        requestValidator.validateImageReferences(retainedImagePaths, imageOrder);
+        requestValidator.validateMediaReferences(retainedAssetIds, mediaOrder);
         DiaryRequestValidator.DiaryInput input = requestValidator.diaryInput(title, content, date, contentFormat, moodKey);
 
         Diary diary = new Diary();
@@ -254,10 +248,9 @@ public class DiaryApiController {
         diary.setDate(input.date());
 
         diaryService.updateDiary(
-                diary, imageFiles, clearImages, retainedImagePaths, requestValidator.parseTagIds(tagIds), imageOrder);
+                diary, imageFiles, clearImages, retainedAssetIds, requestValidator.parseTagIds(tagIds), mediaOrder);
 
         Diary updatedDiary = diaryService.findDiaryById(diaryId);
-        updatedDiary.setImagePathList(diaryImageService.findImagePathsByDiaryId(diaryId));
         log.info("更新日记成功: userId={}, diaryId={}", userId, diaryId);
         return Result.success("更新成功", DiaryVO.fromEntity(updatedDiary));
     }
@@ -275,7 +268,6 @@ public class DiaryApiController {
     }
 
     private DiaryVO toDiaryVOWithImages(Diary diary) {
-        diary.setImagePathList(diaryImageService.findImagePathsByDiaryId(diary.getDiaryId()));
         return DiaryVO.fromEntity(diary);
     }
 

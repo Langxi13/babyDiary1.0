@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { getServerOrigin, isNativeApp, resolveServerUrl } from '@/platform/runtimeConfig'
 
 const WEB_APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '1.0.0'
+let nativeClientInfoPromise = null
 
 const positiveInteger = value => {
   const parsed = Number.parseInt(String(value || ''), 10)
@@ -29,6 +30,17 @@ export const getCurrentClientInfo = async () => {
     version: info.version || 'unknown',
     build: positiveInteger(info.build),
     platform
+  }
+}
+
+export const getClientRequestHeaders = async () => {
+  if (!isNativeApp()) return {}
+  if (!nativeClientInfoPromise) nativeClientInfoPromise = getCurrentClientInfo()
+  const info = await nativeClientInfoPromise
+  return {
+    'X-Client-Platform': info.platform,
+    'X-Client-Version-Code': String(info.build),
+    'X-Client-Version-Name': info.version
   }
 }
 

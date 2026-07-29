@@ -16,7 +16,7 @@
         <el-empty v-if="anniversaries.length === 0" description="暂无纪念日" />
         <article v-for="item in anniversaries" :key="item.anniversaryId" class="anniversary-card">
           <div class="cover" :style="coverStyle(item)">
-            <span v-if="!item.coverImagePath">{{ formatChineseDate(item.date) }}</span>
+            <span v-if="!item.coverMedia">{{ formatChineseDate(item.date) }}</span>
           </div>
           <div class="card-body">
             <div class="card-head">
@@ -158,7 +158,6 @@ import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatLocalDate } from '@/utils/diaryFormState'
-import { thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
 import 'element-plus/es/components/dialog/style/css.mjs'
@@ -186,7 +185,7 @@ const form = reactive({
   title: '',
   date: '',
   description: '',
-  coverImagePath: '',
+  coverAssetId: '',
   sort: 0
 })
 
@@ -195,7 +194,7 @@ const rules = {
   date: [{ required: true, message: '请选择日期', trigger: 'change' }]
 }
 
-const coverStyle = (item) => item.coverImagePath ? { backgroundImage: `url(${thumbnailImageUrl(item.coverImagePath)})` } : {}
+const coverStyle = (item) => item.coverMedia ? { backgroundImage: `url(${item.coverMedia.thumbnailUrl || item.coverMedia.contentUrl})` } : {}
 const coverPreviewStyle = computed(() => coverPreviewUrl.value ? { backgroundImage: `url(${coverPreviewUrl.value})` } : {})
 
 const setCoverPreviewUrl = (url, isObjectUrl = false) => {
@@ -227,7 +226,7 @@ const resetForm = () => {
     title: '',
     date: formatLocalDate(),
     description: '',
-    coverImagePath: '',
+    coverAssetId: '',
     sort: 0
   })
 }
@@ -244,10 +243,10 @@ const openEdit = (item) => {
     title: item.title,
     date: item.date,
     description: item.description || '',
-    coverImagePath: item.coverImagePath || '',
+    coverAssetId: item.coverAssetId || '',
     sort: item.sort || 0
   })
-  setCoverPreviewUrl(item.coverImagePath ? thumbnailImageUrl(item.coverImagePath) : '')
+  setCoverPreviewUrl(item.coverMedia?.thumbnailUrl || item.coverMedia?.contentUrl || '')
   dialogVisible.value = true
 }
 
@@ -269,7 +268,7 @@ const handleNativeCoverFiles = (files) => {
 
 const removeCover = () => {
   coverFile.value = null
-  form.coverImagePath = ''
+  form.coverAssetId = ''
   setCoverPreviewUrl('')
 }
 
@@ -286,7 +285,7 @@ const submitForm = async () => {
     const payload = { ...form }
     if (coverFile.value) {
       const coverResponse = await anniversaryApi.uploadCover(coverFile.value)
-      payload.coverImagePath = coverResponse.data?.coverImagePath || ''
+      payload.coverAssetId = coverResponse.data?.coverAssetId || ''
     }
     if (editingId.value) {
       await anniversaryApi.update(editingId.value, payload)

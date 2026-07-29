@@ -17,7 +17,7 @@ vi.mock('vue-router', () => ({
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     username: '一位名字很长的测试用户',
-    userInfo: { avatarPath: '' },
+    userInfo: { avatarMedia: null },
     logout: mocks.logout
   })
 }))

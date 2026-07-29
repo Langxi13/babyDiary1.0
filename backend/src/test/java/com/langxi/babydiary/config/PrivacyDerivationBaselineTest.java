@@ -25,8 +25,6 @@ class PrivacyDerivationBaselineTest {
                 Path.of("src/main/resources/mapper/AlbumMapper.xml"), StandardCharsets.UTF_8);
         String draftMapper = Files.readString(
                 Path.of("src/main/resources/mapper/DiaryDraftMapper.xml"), StandardCharsets.UTF_8);
-        String imageMapper = Files.readString(
-                Path.of("src/main/resources/mapper/DiaryImageMapper.xml"), StandardCharsets.UTF_8);
         String migration = Files.readString(
                 Path.of("src/main/resources/db/migration/V11__search_templates_media_sharing.sql"),
                 StandardCharsets.UTF_8);
@@ -39,14 +37,12 @@ class PrivacyDerivationBaselineTest {
                 .contains("deleted_at IS NULL AND locked = 0")
                 .contains("AND d.locked = 0");
         assertThat(photoMapper)
-                .contains("AND d.deleted_at IS NULL")
-                .contains("AND d.locked = 0");
+                .contains("d_pick.deleted_at IS NULL AND d_pick.locked = 0")
+                .contains("d_locked.deleted_at IS NULL AND d_locked.locked=1");
         assertThat(albumMapper)
-                .contains("d_explicit.locked = 0")
-                .contains("d_cover.locked = 0")
-                .contains("d_count.locked = 0");
+                .contains("d2.locked=0")
+                .contains("a_asset.deleted_at IS NULL");
         assertThat(draftMapper).contains("d.deleted_at IS NULL AND d.locked = 0");
-        assertThat(imageMapper).contains("AND d.locked = 0");
         assertThat(migration).contains("`deleted_at` IS NULL AND `locked` = 0");
     }
 

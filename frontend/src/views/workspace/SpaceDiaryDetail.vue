@@ -32,19 +32,6 @@
           <p v-else>{{ diary.content }}</p>
         </section>
 
-        <section v-if="diary.imagePathList?.length" class="legacy-images">
-          <el-image
-            v-for="(image, index) in diary.imagePathList"
-            :key="image"
-            :src="thumbnailImageUrl(image)"
-            :preview-src-list="diary.imagePathList.map(originalImageUrl)"
-            :initial-index="index"
-            preview-teleported
-            fit="cover"
-            lazy
-          />
-        </section>
-
         <section v-if="diary.media?.length" class="rich-media">
           <figure v-for="media in diary.media" :key="media.assetId">
             <el-image v-if="media.mediaType === 'IMAGE'" :src="media.thumbnailUrl || media.contentUrl" :preview-src-list="[media.contentUrl]" preview-teleported fit="cover" />
@@ -80,7 +67,7 @@
         </div>
         <div class="comment-list">
           <article v-for="comment in comments" :key="comment.publicId">
-            <el-avatar :size="34" :src="originalImageUrl(comment.avatarPath)">{{ comment.username?.slice(0, 1) }}</el-avatar>
+            <el-avatar :size="34" :src="comment.avatarMedia?.contentUrl">{{ comment.username?.slice(0, 1) }}</el-avatar>
             <div class="comment-body">
               <header>
                 <div><strong>{{ comment.username }}</strong><time>{{ formatChineseDateTime(comment.createdAt) }}</time></div>
@@ -179,7 +166,6 @@ import { workspaceApi } from '@/api/workspace'
 import { useAuthStore } from '@/stores/auth'
 import { withStepUpRetry } from '@/utils/stepUp'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
-import { originalImageUrl, thumbnailImageUrl } from '@/utils/imageUrl'
 import { copyText } from '@/utils/copyText'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'

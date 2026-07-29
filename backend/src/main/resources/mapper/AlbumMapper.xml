@@ -22,7 +22,8 @@
         <result property="name" column="name"/>
         <result property="description" column="description"/>
         <result property="type" column="type"/>
-        <result property="coverImagePath" column="cover_image_path"/>
+        <result property="coverAssetId" column="cover_asset_id"/>
+        <result property="coverAssetPublicId" column="cover_asset_public_id"/>
         <result property="sort" column="sort"/>
         <result property="photoCount" column="photo_count"/>
         <result property="createdAt" column="created_at"/>
@@ -30,10 +31,9 @@
     </resultMap>
 
     <resultMap id="photoResultMap" type="Photo">
-        <id property="imageId" column="image_id"/>
+        <id property="assetId" column="asset_public_id"/>
         <result property="diaryId" column="diary_id"/>
         <result property="userId" column="user_id"/>
-        <result property="imagePath" column="image_path"/>
         <result property="sort" column="sort"/>
         <result property="diaryTitle" column="diary_title"/>
         <result property="diaryDate" column="diary_date"/>
@@ -43,182 +43,95 @@
     </resultMap>
 
     <sql id="albumColumnsWithPhotoCover">
-        a.album_id,
-        a.group_id,
-        a.user_id,
-        a.name,
-        a.description,
-        a.type,
-        COALESCE((
-            SELECT i_explicit.image_path
-            FROM diary_image i_explicit
-            INNER JOIN diary d_explicit ON d_explicit.diary_id = i_explicit.diary_id
-            WHERE i_explicit.image_path = a.cover_image_path
-              AND d_explicit.user_id = a.user_id
-              AND d_explicit.deleted_at IS NULL
-              AND d_explicit.locked = 0
-            LIMIT 1
-        ), (
-            SELECT i.image_path
-            FROM album_photo ap_cover
-            INNER JOIN diary_image i ON i.image_id = ap_cover.image_id
-            INNER JOIN diary d_cover ON d_cover.diary_id = i.diary_id AND d_cover.user_id = a.user_id
-            WHERE ap_cover.album_id = a.album_id
-              AND d_cover.deleted_at IS NULL
-              AND d_cover.locked = 0
-            ORDER BY ap_cover.sort ASC, i.image_id ASC
-            LIMIT 1
-        )) AS cover_image_path,
+        a.album_id,a.group_id,a.user_id,a.space_id,a.name,a.description,a.type,
+        a.cover_asset_id,
+        COALESCE(explicit_cover.public_id, first_cover.public_id) AS cover_asset_public_id,
         a.sort,
-        (SELECT COUNT(*)
-         FROM album_photo ap_count
-         INNER JOIN diary_image i_count ON i_count.image_id = ap_count.image_id
-         INNER JOIN diary d_count ON d_count.diary_id = i_count.diary_id AND d_count.user_id = a.user_id
-         WHERE ap_count.album_id = a.album_id
-           AND d_count.deleted_at IS NULL
-           AND d_count.locked = 0) AS photo_count,
-        a.created_at,
-        a.updated_at
+        (SELECT COUNT(*) FROM album_media am_count
+         INNER JOIN media_asset a_count ON a_count.asset_id=am_count.asset_id
+         WHERE am_count.album_id=a.album_id AND a_count.media_type='IMAGE' AND a_count.deleted_at IS NULL) AS photo_count,
+        a.created_at,a.updated_at
     </sql>
 
     <select id="ensureAiGroup" resultMap="albumGroupResultMap">
-        SELECT * FROM album_group
-        WHERE user_id = #{userId} AND type = 'AI' AND name = 'AI 整理'
-        LIMIT 1
+        SELECT * FROM album_group WHERE user_id=#{userId} AND type='AI' AND name='AI 整理' LIMIT 1
     </select>
-
     <insert id="insertGroup" parameterType="AlbumGroup" useGeneratedKeys="true" keyProperty="groupId">
-        INSERT INTO album_group (user_id, space_id, name, type, sort)
-        VALUES (#{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
-                #{name}, #{type}, #{sort})
+        INSERT INTO album_group(user_id,space_id,name,type,sort)
+        VALUES(#{userId},(SELECT space_id FROM diary_space WHERE personal_owner_id=#{userId}),#{name},#{type},#{sort})
     </insert>
-
     <update id="updateGroup" parameterType="AlbumGroup">
-        UPDATE album_group
-        SET name = #{name}
-        WHERE user_id = #{userId} AND group_id = #{groupId} AND type = 'CUSTOM'
+        UPDATE album_group SET name=#{name} WHERE user_id=#{userId} AND group_id=#{groupId} AND type='CUSTOM'
     </update>
-
-    <delete id="deleteGroup">
-        DELETE FROM album_group WHERE user_id = #{userId} AND group_id = #{groupId} AND type = 'CUSTOM'
-    </delete>
-
-    <select id="findGroupById" resultMap="albumGroupResultMap">
-        SELECT * FROM album_group WHERE user_id = #{userId} AND group_id = #{groupId}
-    </select>
-
-    <select id="findGroupsByUserId" resultMap="albumGroupResultMap">
-        SELECT * FROM album_group
-        WHERE user_id = #{userId}
-        ORDER BY CASE type WHEN 'AI' THEN 10 ELSE 20 END, sort ASC, group_id ASC
-    </select>
+    <delete id="deleteGroup">DELETE FROM album_group WHERE user_id=#{userId} AND group_id=#{groupId} AND type='CUSTOM'</delete>
+    <select id="findGroupById" resultMap="albumGroupResultMap">SELECT * FROM album_group WHERE user_id=#{userId} AND group_id=#{groupId}</select>
+    <select id="findGroupsByUserId" resultMap="albumGroupResultMap">SELECT * FROM album_group WHERE user_id=#{userId} ORDER BY CASE type WHEN 'AI' THEN 10 ELSE 20 END,sort,group_id</select>
 
     <insert id="insertAlbum" parameterType="Album" useGeneratedKeys="true" keyProperty="albumId">
-        INSERT INTO album (group_id, user_id, space_id, name, description, type, cover_image_path, sort)
-        VALUES (#{groupId}, #{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
-                #{name}, #{description}, #{type}, #{coverImagePath}, #{sort})
+        INSERT INTO album(group_id,user_id,space_id,name,description,type,cover_asset_id,sort)
+        VALUES(#{groupId},#{userId},(SELECT space_id FROM diary_space WHERE personal_owner_id=#{userId}),#{name},#{description},#{type},#{coverAssetId},#{sort})
     </insert>
-
     <update id="updateAlbum" parameterType="Album">
-        UPDATE album
-        SET name = #{name},
-            description = #{description},
-            cover_image_path = #{coverImagePath}
-        WHERE user_id = #{userId} AND album_id = #{albumId} AND type IN ('AI', 'CUSTOM')
+        UPDATE album SET name=#{name},description=#{description},cover_asset_id=#{coverAssetId}
+        WHERE user_id=#{userId} AND album_id=#{albumId} AND type IN ('AI','CUSTOM')
     </update>
-
-    <delete id="deleteAlbum">
-        DELETE FROM album WHERE user_id = #{userId} AND album_id = #{albumId} AND type IN ('AI', 'CUSTOM')
-    </delete>
+    <delete id="deleteAlbum">DELETE FROM album WHERE user_id=#{userId} AND album_id=#{albumId} AND type IN ('AI','CUSTOM')</delete>
 
     <select id="findAlbumById" resultMap="albumResultMap">
-        SELECT
-        <include refid="albumColumnsWithPhotoCover"/>
+        SELECT <include refid="albumColumnsWithPhotoCover"/>
         FROM album a
-        WHERE a.user_id = #{userId} AND a.album_id = #{albumId}
+        LEFT JOIN media_asset explicit_cover ON explicit_cover.asset_id=a.cover_asset_id AND explicit_cover.deleted_at IS NULL
+        LEFT JOIN media_asset first_cover ON first_cover.asset_id=(SELECT am.asset_id FROM album_media am INNER JOIN media_asset fa ON fa.asset_id=am.asset_id WHERE am.album_id=a.album_id AND fa.deleted_at IS NULL ORDER BY am.sort,am.asset_id LIMIT 1)
+        WHERE a.user_id=#{userId} AND a.album_id=#{albumId}
     </select>
-
     <select id="findAlbumsByGroupIds" resultMap="albumResultMap">
-        SELECT
-        <include refid="albumColumnsWithPhotoCover"/>
+        SELECT <include refid="albumColumnsWithPhotoCover"/>
         FROM album a
-        WHERE a.group_id IN
-        <foreach collection="groupIds" item="groupId" open="(" separator="," close=")">
-            #{groupId}
-        </foreach>
-        ORDER BY a.sort ASC, a.album_id ASC
+        LEFT JOIN media_asset explicit_cover ON explicit_cover.asset_id=a.cover_asset_id AND explicit_cover.deleted_at IS NULL
+        LEFT JOIN media_asset first_cover ON first_cover.asset_id=(SELECT am.asset_id FROM album_media am INNER JOIN media_asset fa ON fa.asset_id=am.asset_id WHERE am.album_id=a.album_id AND fa.deleted_at IS NULL ORDER BY am.sort,am.asset_id LIMIT 1)
+        WHERE a.group_id IN <foreach collection="groupIds" item="groupId" open="(" separator="," close=")">#{groupId}</foreach>
+        ORDER BY a.sort,a.album_id
     </select>
-
     <select id="findAiAlbumsByUserId" resultMap="albumResultMap">
-        SELECT
-        <include refid="albumColumnsWithPhotoCover"/>
+        SELECT <include refid="albumColumnsWithPhotoCover"/>
         FROM album a
-        WHERE a.user_id = #{userId} AND a.type = 'AI'
-        ORDER BY a.updated_at DESC, a.album_id DESC
+        LEFT JOIN media_asset explicit_cover ON explicit_cover.asset_id=a.cover_asset_id AND explicit_cover.deleted_at IS NULL
+        LEFT JOIN media_asset first_cover ON first_cover.asset_id=(SELECT am.asset_id FROM album_media am INNER JOIN media_asset fa ON fa.asset_id=am.asset_id WHERE am.album_id=a.album_id AND fa.deleted_at IS NULL ORDER BY am.sort,am.asset_id LIMIT 1)
+        WHERE a.user_id=#{userId} AND a.type='AI' ORDER BY a.updated_at DESC,a.album_id DESC
     </select>
 
-    <insert id="insertAlbumPhotos">
-        INSERT IGNORE INTO album_photo (album_id, image_id, sort)
-        VALUES
-        <foreach collection="imageIds" item="imageId" index="index" separator=",">
-            (#{albumId}, #{imageId}, #{index})
-        </foreach>
+    <select id="nextAlbumPhotoSort" resultType="int">
+        SELECT COALESCE(MAX(sort),-1)+1 FROM album_media WHERE album_id=#{albumId}
+    </select>
+    <insert id="insertAlbumPhoto">
+        INSERT IGNORE INTO album_media(album_id,asset_id,sort)
+        SELECT #{albumId},a.asset_id,#{sort}
+        FROM media_asset a INNER JOIN album alb ON alb.album_id=#{albumId}
+        WHERE a.public_id=#{assetId} AND a.owner_user_id=#{userId}
+          AND alb.user_id=#{userId} AND a.space_id=alb.space_id AND a.deleted_at IS NULL
     </insert>
-
     <delete id="deleteAlbumPhoto">
-        DELETE FROM album_photo WHERE album_id = #{albumId} AND image_id = #{imageId}
+        DELETE am FROM album_media am INNER JOIN media_asset a ON a.asset_id=am.asset_id
+        WHERE am.album_id=#{albumId} AND a.public_id=#{assetId}
     </delete>
 
-    <select id="findAlbumPhotos" resultMap="photoResultMap">
-        SELECT i.image_id,
-               i.diary_id,
-               d.user_id,
-               i.image_path,
-               i.sort,
-               d.title AS diary_title,
-               d.date AS diary_date,
-               d.mood_key,
-               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
-               d.created_at
-        FROM album_photo ap
-        INNER JOIN album a ON a.album_id = ap.album_id
-        INNER JOIN diary_image i ON i.image_id = ap.image_id
-        INNER JOIN diary d ON d.diary_id = i.diary_id
-        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
-        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
-          AND d.deleted_at IS NULL AND d.locked = 0
-        ORDER BY ap.sort ASC, ap.image_id ASC
-    </select>
-
-    <select id="findAlbumPhotoPage" resultMap="photoResultMap">
-        SELECT i.image_id,
-               i.diary_id,
-               d.user_id,
-               i.image_path,
-               i.sort,
-               d.title AS diary_title,
-               d.date AS diary_date,
-               d.mood_key,
-               CASE WHEN fp.image_id IS NULL THEN false ELSE true END AS favorite,
-               d.created_at
-        FROM album_photo ap
-        INNER JOIN album a ON a.album_id = ap.album_id
-        INNER JOIN diary_image i ON i.image_id = ap.image_id
-        INNER JOIN diary d ON d.diary_id = i.diary_id
-        LEFT JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = #{userId}
-        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
-          AND d.deleted_at IS NULL AND d.locked = 0
-        ORDER BY ap.sort ASC, ap.image_id ASC
-        LIMIT #{limit} OFFSET #{offset}
-    </select>
-
-    <select id="countAlbumPhotos" resultType="int">
-        SELECT COUNT(*)
-        FROM album_photo ap
-        INNER JOIN album a ON a.album_id = ap.album_id
-        INNER JOIN diary_image i ON i.image_id = ap.image_id
-        INNER JOIN diary d ON d.diary_id = i.diary_id
-        WHERE a.user_id = #{userId} AND a.album_id = #{albumId} AND d.user_id = #{userId}
-          AND d.deleted_at IS NULL AND d.locked = 0
-    </select>
+    <sql id="albumPhotoSelect">
+        a_asset.public_id AS asset_public_id,
+        dm.diary_id,d.user_id,am.sort,
+        d.title AS diary_title,d.date AS diary_date,d.mood_key,
+        CASE WHEN fm.asset_id IS NULL THEN false ELSE true END AS favorite,
+        COALESCE(d.created_at,a_asset.created_at) AS created_at
+    </sql>
+    <sql id="albumPhotoSource">
+        FROM album_media am
+        INNER JOIN album alb ON alb.album_id=am.album_id
+        INNER JOIN media_asset a_asset ON a_asset.asset_id=am.asset_id
+        LEFT JOIN diary_media dm ON dm.asset_id=a_asset.asset_id AND dm.diary_id=(SELECT MIN(dm2.diary_id) FROM diary_media dm2 INNER JOIN diary d2 ON d2.diary_id=dm2.diary_id WHERE dm2.asset_id=a_asset.asset_id AND d2.user_id=alb.user_id AND d2.deleted_at IS NULL AND d2.locked=0)
+        LEFT JOIN diary d ON d.diary_id=dm.diary_id
+        LEFT JOIN favorite_media fm ON fm.asset_id=a_asset.asset_id AND fm.user_id=#{userId}
+        WHERE alb.user_id=#{userId} AND alb.album_id=#{albumId} AND a_asset.media_type='IMAGE' AND a_asset.deleted_at IS NULL
+    </sql>
+    <select id="findAlbumPhotos" resultMap="photoResultMap">SELECT <include refid="albumPhotoSelect"/><include refid="albumPhotoSource"/> ORDER BY am.sort,a_asset.asset_id</select>
+    <select id="findAlbumPhotoPage" resultMap="photoResultMap">SELECT <include refid="albumPhotoSelect"/><include refid="albumPhotoSource"/> ORDER BY am.sort,a_asset.asset_id LIMIT #{limit} OFFSET #{offset}</select>
+    <select id="countAlbumPhotos" resultType="int">SELECT COUNT(*) FROM album_media am INNER JOIN album alb ON alb.album_id=am.album_id INNER JOIN media_asset a ON a.asset_id=am.asset_id WHERE alb.user_id=#{userId} AND alb.album_id=#{albumId} AND a.media_type='IMAGE' AND a.deleted_at IS NULL</select>
 </mapper>

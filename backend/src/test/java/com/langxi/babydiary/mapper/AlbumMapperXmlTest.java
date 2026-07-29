@@ -1,36 +1,36 @@
 package com.langxi.babydiary.mapper;
 
+import com.langxi.babydiary.entity.Album;
+import com.langxi.babydiary.entity.AlbumGroup;
+import com.langxi.babydiary.entity.Photo;
+import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class AlbumMapperXmlTest {
-
     @Test
-    void albumQueriesOnlyUseVisiblePhotosForCoversAndCounts() throws Exception {
-        String xml = new String(
-                Files.readAllBytes(Paths.get("src/main/resources/mapper/AlbumMapper.xml")),
-                StandardCharsets.UTF_8
-        );
+    void albumQueriesUseTypedMediaRelationsAndValidMyBatisXml() throws Exception {
+        Path path = Path.of("src/main/resources/mapper/AlbumMapper.xml");
+        String xml = Files.readString(path);
+        assertThat(xml).contains("FROM album_media", "cover_asset_id", "a_asset.deleted_at IS NULL");
+        assertThat(xml).contains("nextAlbumPhotoSort", "#{sort}", "a.space_id=alb.space_id");
+        assertThat(xml).doesNotContain("album_photo", "diary_image", "ORDER BY RAND()");
 
-        assertThat(xml).contains("WHERE i_explicit.image_path = a.cover_image_path");
-        assertThat(xml).contains("d_explicit.deleted_at IS NULL");
-        assertThat(xml).contains("d_explicit.locked = 0");
-        assertThat(xml).contains("FROM album_photo ap_cover");
-        assertThat(xml).contains("d_cover.deleted_at IS NULL");
-        assertThat(xml).contains("d_cover.locked = 0");
-        assertThat(xml).contains("ORDER BY ap_cover.sort ASC, i.image_id ASC");
-        assertThat(xml).contains("d_count.deleted_at IS NULL");
-        assertThat(xml).contains("d_count.locked = 0");
-        assertThat(xml).contains("ORDER BY ap.sort ASC, ap.image_id ASC");
-        assertThat(xml).contains("<select id=\"findAlbumPhotoPage\"");
-        assertThat(xml).contains("<select id=\"countAlbumPhotos\"");
-        assertThat(xml).contains("LIMIT #{limit} OFFSET #{offset}");
-        assertThat(xml).doesNotContain("ORDER BY RAND()");
-        assertThat(xml).doesNotContain("SELECT a.*,\n               COUNT(ap.image_id) AS photo_count");
+        assertThatCode(() -> {
+            Configuration configuration = new Configuration();
+            configuration.getTypeAliasRegistry().registerAlias("Album", Album.class);
+            configuration.getTypeAliasRegistry().registerAlias("AlbumGroup", AlbumGroup.class);
+            configuration.getTypeAliasRegistry().registerAlias("Photo", Photo.class);
+            try (InputStream input = Files.newInputStream(path)) {
+                new XMLMapperBuilder(input, configuration, path.toString(), configuration.getSqlFragments()).parse();
+            }
+        }).doesNotThrowAnyException();
     }
 }

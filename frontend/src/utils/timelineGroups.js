@@ -4,7 +4,8 @@ export const timelineKey = (type, primary, secondary = '') => {
   return secondary ? `${type}:${primary}:${secondary}` : `${type}:${primary}`
 }
 
-const countPhotos = (diaries = []) => diaries.reduce((total, diary) => total + (diary.imagePathList?.length || 0), 0)
+const photoCount = diary => diary.media?.filter(item => item.mediaType === 'IMAGE').length || 0
+const countPhotos = (diaries = []) => diaries.reduce((total, diary) => total + photoCount(diary), 0)
 
 const monthOf = (date = '') => date.slice(0, 7)
 
@@ -31,7 +32,7 @@ const buildWeeks = (month, diaries) => {
     const week = weeksByIndex.get(weekIndex)
     week.diaries.push(diary)
     week.diaryCount += 1
-    week.photoCount += diary.imagePathList?.length || 0
+    week.photoCount += photoCount(diary)
   }
   return [...weeksByIndex.entries()]
     .sort(([left], [right]) => right - left)

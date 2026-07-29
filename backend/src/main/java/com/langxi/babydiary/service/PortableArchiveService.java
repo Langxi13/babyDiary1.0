@@ -7,7 +7,6 @@ import com.langxi.babydiary.dto.ImportResultVO;
 import com.langxi.babydiary.entity.*;
 import com.langxi.babydiary.exception.BusinessException;
 import com.langxi.babydiary.mapper.CollaborationMapper;
-import com.langxi.babydiary.mapper.DiaryImageMapper;
 import com.langxi.babydiary.storage.StoredObject;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
@@ -30,35 +29,28 @@ public class PortableArchiveService {
     private static final int MAX_ARCHIVE_ENTRIES = 10_000;
     private static final long MAX_UNCOMPRESSED_BYTES = 1024L * 1024 * 1024;
     private static final long MAX_ENTRY_BYTES = 256L * 1024 * 1024;
-    private static final long MAX_LEGACY_IMAGE_BYTES = 10L * 1024 * 1024;
-    private static final long MAX_PRIVATE_IMAGE_BYTES = 25L * 1024 * 1024;
+    private static final long MAX_IMAGE_BYTES = 25L * 1024 * 1024;
     private static final long MAX_MANIFEST_BYTES = 5L * 1024 * 1024;
 
     private final SpaceService spaceService;
     private final CollaborationMapper collaborationMapper;
-    private final DiaryImageMapper imageMapper;
     private final TagService tagService;
     private final CollaborativeDiaryService diaryService;
-    private final ImageStorageService imageStorageService;
     private final AccountSecurityService accountSecurityService;
     private final MediaService mediaService;
     private final ObjectMapper objectMapper;
 
     public PortableArchiveService(SpaceService spaceService,
                                   CollaborationMapper collaborationMapper,
-                                  DiaryImageMapper imageMapper,
                                   TagService tagService,
                                   CollaborativeDiaryService diaryService,
-                                  ImageStorageService imageStorageService,
                                   AccountSecurityService accountSecurityService,
                                   MediaService mediaService,
                                   ObjectMapper objectMapper) {
         this.spaceService = spaceService;
         this.collaborationMapper = collaborationMapper;
-        this.imageMapper = imageMapper;
         this.tagService = tagService;
         this.diaryService = diaryService;
-        this.imageStorageService = imageStorageService;
         this.accountSecurityService = accountSecurityService;
         this.mediaService = mediaService;
         this.objectMapper = objectMapper;
@@ -73,7 +65,7 @@ public class PortableArchiveService {
         }
 
         ArchiveManifest manifest = new ArchiveManifest();
-        manifest.version = 2;
+        manifest.version = 3;
         manifest.exportedAt = Timestamp.from(Instant.now()).toString();
         manifest.spaceName = space.getName();
         manifest.diaries = new ArrayList<>();
@@ -86,20 +78,7 @@ public class PortableArchiveService {
                         .map(ArchiveTag::from).toList();
                 record.comments = collaborationMapper.findComments(diary.getDiaryId()).stream()
                         .map(ArchiveComment::from).toList();
-                record.images = new ArrayList<>();
                 record.media = new ArrayList<>();
-                List<String> imagePaths = imageMapper.findImagePathsByDiaryId(diary.getDiaryId());
-                for (int index = 0; index < imagePaths.size(); index++) {
-                    String imagePath = imagePaths.get(index);
-                    Path source = imageStorageService.resolveImagePath(imagePath);
-                    if (!Files.isRegularFile(source)) continue;
-                    String extension = extensionOf(imagePath);
-                    String archivePath = "media/" + diary.getPublicId() + "/" + (index + 1) + extension;
-                    zip.putNextEntry(new ZipEntry(archivePath));
-                    Files.copy(source, zip);
-                    zip.closeEntry();
-                    record.images.add(archivePath);
-                }
                 for (MediaAsset asset : mediaService.findAssetsByDiary(diary.getDiaryId())) {
                     String extension = extensionOf(asset.getStorageKey());
                     String archivePath = "objects/" + diary.getPublicId() + "/" + asset.getPublicId() + extension;
@@ -143,7 +122,7 @@ public class PortableArchiveService {
                 throw new BusinessException(ErrorCode.FILE_SIZE_EXCEEDED, "导入包清单过大");
             }
             ArchiveManifest manifest = objectMapper.readValue(manifestPath.toFile(), ArchiveManifest.class);
-            if ((manifest.version != 1 && manifest.version != 2) || manifest.diaries == null) {
+            if ((manifest.version < 1 || manifest.version > 3) || manifest.diaries == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "不支持该导入包版本");
             }
 
@@ -176,36 +155,20 @@ public class PortableArchiveService {
                 diaryService.create(spacePublicId, userId, dto, stepUpToken);
                 Diary imported = collaborationMapper.findDiary(space.getSpaceId(), importedPublicId);
 
-                List<DiaryImage> images = new ArrayList<>();
                 if (record.images != null) {
-                    int sort = 1;
                     for (String archivePath : record.images) {
                         Path imagePath = entries.get(archivePath);
                         if (imagePath == null) continue;
                         long imageSize = Files.size(imagePath);
-                        long imageLimit = Boolean.TRUE.equals(record.locked)
-                                ? MAX_PRIVATE_IMAGE_BYTES : MAX_LEGACY_IMAGE_BYTES;
-                        if (imageSize > imageLimit) continue;
-                        if (Boolean.TRUE.equals(record.locked)) {
-                            mediaService.upload(spacePublicId, userId,
-                                    new PathMultipartFile("file", imagePath.getFileName().toString(),
-                                            contentType(archivePath), imagePath),
-                                    importedPublicId, null, null, null, null, null, stepUpToken);
-                            importedMedia++;
-                            continue;
-                        }
-                        byte[] bytes = Files.readAllBytes(imagePath);
-                        String stored = imageStorageService.storeImageBytes(
-                                bytes, contentType(archivePath), "diary_" + userId + "_", true);
-                        DiaryImage image = new DiaryImage();
-                        image.setDiaryId(imported.getDiaryId());
-                        image.setImagePath(stored);
-                        image.setSort(sort++);
-                        images.add(image);
+                        if (imageSize > MAX_IMAGE_BYTES) continue;
+                        mediaService.upload(spacePublicId, userId,
+                                new PathMultipartFile("file", imagePath.getFileName().toString(),
+                                        contentType(archivePath), imagePath),
+                                importedPublicId, null, null, null, null, null, stepUpToken);
                         importedImages++;
+                        importedMedia++;
                     }
                 }
-                if (!images.isEmpty()) imageMapper.insertDiaryImages(images.toArray(new DiaryImage[0]));
                 if (record.media != null) {
                     for (ArchiveMedia archivedMedia : record.media) {
                         Path mediaPath = entries.get(archivedMedia.path);

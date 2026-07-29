@@ -46,8 +46,7 @@ test('profile entries use direct router links instead of dropdown command naviga
   assert.match(source, /else \{[\s\S]*?router\.push\(command\)[\s\S]*?\}/)
 })
 
-test('navbar avatar uses shared original image url helper', () => {
-  assert.match(source, /import\s*\{\s*originalImageUrl\s*\}\s*from '@\/utils\/imageUrl'/)
-  assert.match(source, /const avatarUrl = computed\(\(\) => originalImageUrl\(authStore\.userInfo\?\.avatarPath\)\)/)
-  assert.doesNotMatch(source, /`\/images\/\$\{authStore\.userInfo\.avatarPath\}`/)
+test('navbar avatar uses the signed media asset url', () => {
+  assert.match(source, /const avatarUrl = computed\(\(\) => authStore\.userInfo\?\.avatarMedia\?\.contentUrl \|\| ''\)/)
+  assert.doesNotMatch(source, /avatarPath|\/images\//)
 })

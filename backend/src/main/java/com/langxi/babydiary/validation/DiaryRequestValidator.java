@@ -143,9 +143,9 @@ public class DiaryRequestValidator {
         }
     }
 
-    public void validateImageReferences(List<String> retainedImagePaths, List<String> imageOrder) {
-        validateStringList(retainedImagePaths, 100, 255, "保留图片参数无效");
-        validateStringList(imageOrder, 100, 300, "图片排序参数无效");
+    public void validateMediaReferences(List<String> retainedAssetIds, List<String> mediaOrder) {
+        validateStringList(retainedAssetIds, 100, 255, "保留媒体参数无效");
+        validateStringList(mediaOrder, 100, 300, "媒体排序参数无效");
     }
 
     private DateRange checkedRange(LocalDate start, LocalDate end) {

@@ -53,24 +53,27 @@ ORDER BY a.sort ASC, a.album_id ASC;
 
 SELECT 'album-detail' AS query_name;
 EXPLAIN
-SELECT i.image_id, i.diary_id, d.user_id, i.image_path, i.sort, d.title, d.date
-FROM album_photo ap
-INNER JOIN album a ON a.album_id = ap.album_id
-INNER JOIN diary_image i ON i.image_id = ap.image_id
-INNER JOIN diary d ON d.diary_id = i.diary_id
+SELECT ma.asset_id, dm.diary_id, d.user_id, ma.public_id, am.sort, d.title, d.date
+FROM album_media am
+INNER JOIN album a ON a.album_id = am.album_id
+INNER JOIN media_asset ma ON ma.asset_id = am.asset_id
+LEFT JOIN diary_media dm ON dm.asset_id = ma.asset_id
+INNER JOIN diary d ON d.diary_id = dm.diary_id
 WHERE a.user_id = @user_id
   AND a.album_id = @album_id
-ORDER BY ap.sort ASC, ap.image_id ASC
+ORDER BY am.sort ASC, ma.asset_id ASC
 LIMIT 24 OFFSET 0;
 
 SELECT 'favorite-photo-page' AS query_name;
 EXPLAIN
-SELECT i.image_id, i.diary_id, d.user_id, i.image_path, i.sort, d.title, d.date
-FROM diary_image i
-INNER JOIN diary d ON d.diary_id = i.diary_id
-INNER JOIN favorite_photo fp ON fp.image_id = i.image_id AND fp.user_id = @user_id
-WHERE d.user_id = @user_id
-ORDER BY d.date DESC, i.sort ASC, i.image_id DESC
+SELECT ma.asset_id, dm.diary_id, d.user_id, ma.public_id, dm.sort, d.title, d.date
+FROM favorite_media fm
+INNER JOIN media_asset ma ON ma.asset_id = fm.asset_id
+LEFT JOIN diary_media dm ON dm.asset_id = ma.asset_id
+INNER JOIN diary d ON d.diary_id = dm.diary_id
+WHERE fm.user_id = @user_id
+  AND d.user_id = @user_id
+ORDER BY d.date DESC, dm.sort ASC, ma.asset_id DESC
 LIMIT 6 OFFSET 0;
 
 SELECT 'ai-report-history' AS query_name;

@@ -17,7 +17,10 @@ describe('useDiaryImages', () => {
       route: { fullPath: '/diaries/12/edit' },
       isEdit: ref(true)
     })
-    images.setExistingImages(['old-a.jpg', 'old-b.jpg'])
+    images.setExistingImages([
+      { assetId: 'old-a', mediaType: 'IMAGE', contentUrl: '/media/old-a' },
+      { assetId: 'old-b', mediaType: 'IMAGE', contentUrl: '/media/old-b' }
+    ])
 
     const replacement = new File(['replacement'], 'replacement.jpg', { type: 'image/jpeg' })
     images.fileList.value = [{
@@ -30,8 +33,8 @@ describe('useDiaryImages', () => {
     images.appendImagesToFormData(formData)
 
     expect(formData.get('clearImages')).toBe('true')
-    expect(formData.getAll('retainedImagePaths')).toEqual([])
+    expect(formData.getAll('retainedAssetIds')).toEqual([])
     expect(formData.getAll('imageFiles')).toHaveLength(1)
-    expect(formData.getAll('imageOrder')).toEqual(['new:0'])
+    expect(formData.getAll('mediaOrder')).toEqual(['new:0'])
   })
 })

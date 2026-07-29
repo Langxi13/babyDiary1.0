@@ -10,7 +10,11 @@ const diary = (id, date, imageCount = 0) => ({
   diaryId: id,
   date,
   title: `日记 ${id}`,
-  imagePathList: Array.from({ length: imageCount }, (_, index) => `image-${id}-${index}.jpg`)
+  media: Array.from({ length: imageCount }, (_, index) => ({
+    assetId: `asset-${id}-${index}`,
+    mediaType: 'IMAGE',
+    contentUrl: `/api/media/asset-${id}-${index}/content`
+  }))
 })
 
 test('buildTimelineTree groups months under years and counts diaries and photos', () => {

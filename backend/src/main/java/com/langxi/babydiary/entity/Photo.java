@@ -7,10 +7,10 @@ import java.sql.Timestamp;
 
 @Data
 public class Photo {
-    private Integer imageId;
+    private String assetId;
+    private com.langxi.babydiary.dto.MediaAssetVO media;
     private Integer diaryId;
     private Integer userId;
-    private String imagePath;
     private Integer sort;
     private String diaryTitle;
     private Date diaryDate;

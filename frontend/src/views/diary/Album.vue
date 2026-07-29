@@ -80,9 +80,9 @@
               <el-button text type="danger" @click="discardProposalAlbum(album)">取消这个推荐</el-button>
             </div>
             <div class="proposal-photos">
-              <div v-for="photo in album.photos" :key="photo.imageId" class="proposal-photo">
-                <img :src="thumbnailImageUrl(photo.imagePath)" alt="" loading="lazy" decoding="async" />
-                <button @click="removeProposalPhoto(album, photo.imageId)">移除</button>
+              <div v-for="photo in album.photos" :key="photo.assetId" class="proposal-photo">
+                <img :src="photo.media?.thumbnailUrl || photo.media?.contentUrl" alt="" loading="lazy" decoding="async" />
+                <button @click="removeProposalPhoto(album, photo.assetId)">移除</button>
               </div>
             </div>
           </article>
@@ -136,8 +136,8 @@
               class="album-card"
               @click="openAlbumDetail(album)"
             >
-              <div class="album-cover" :class="{ empty: !album.coverImagePath }" :style="coverStyle(album)">
-                <el-icon v-if="!album.coverImagePath"><Picture /></el-icon>
+              <div class="album-cover" :class="{ empty: !album.coverMedia }" :style="coverStyle(album)">
+                <el-icon v-if="!album.coverMedia"><Picture /></el-icon>
               </div>
               <div class="album-info">
                 <strong>{{ formatSystemAlbumTitle(album) }}</strong>
@@ -199,7 +199,6 @@ import { FolderAdd, MagicStick, Picture, Plus, WarningFilled } from '@element-pl
 import { albumApi } from '@/api/album'
 import { formatLocalDate } from '@/utils/aiReportPeriod'
 import { formatChineseDateRange, formatChineseMonth } from '@/utils/dateDisplay'
-import { thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
 import 'element-plus/es/components/dialog/style/css.mjs'
@@ -237,7 +236,7 @@ const selectedAlbums = computed(() => selectedGroup.value?.albums || [])
 
 const groupKey = (group) => group ? `${group.type}:${group.groupId || 'system'}` : ''
 const albumKey = (album) => album ? `${album.systemKey || album.albumId}` : ''
-const coverStyle = (album) => album.coverImagePath ? { backgroundImage: `url(${thumbnailImageUrl(album.coverImagePath)})` } : {}
+const coverStyle = (album) => album.coverMedia ? { backgroundImage: `url(${album.coverMedia.thumbnailUrl || album.coverMedia.contentUrl})` } : {}
 const formatSystemAlbumTitle = (album) => {
   if (!album?.systemKey?.startsWith('year:')) return album?.name || ''
   return formatChineseMonth(`${album.systemKey.replace('year:', '')}-01`).replace('1月', '')
@@ -303,9 +302,9 @@ const generateProposal = async () => {
   }
 }
 
-const removeProposalPhoto = (album, imageId) => {
-  album.photos = album.photos.filter(photo => photo.imageId !== imageId)
-  album.imageIds = album.imageIds.filter(id => id !== imageId)
+const removeProposalPhoto = (album, assetId) => {
+  album.photos = album.photos.filter(photo => photo.assetId !== assetId)
+  album.assetIds = album.assetIds.filter(id => id !== assetId)
 }
 
 const discardProposalAlbum = (album) => {

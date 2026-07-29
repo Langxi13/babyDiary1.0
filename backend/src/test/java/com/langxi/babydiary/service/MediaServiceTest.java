@@ -17,10 +17,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -112,6 +115,46 @@ class MediaServiceTest {
         verify(accountSecurityService).requireStepUp(2, "step-up");
     }
 
+    @Test
+    void diaryMediaReplacementPreservesRequestedOrder() {
+        DiarySpace space = space();
+        MediaAsset first = asset(1, 10L, "first");
+        MediaAsset second = asset(1, 11L, "second");
+        MediaAsset added = asset(1, 12L, "added");
+        when(spaceService.requireSpace("space-one")).thenReturn(space);
+        when(mapper.countDiaryInSpace(21, 7L)).thenReturn(1);
+        when(mapper.findByDiaryId(21)).thenReturn(List.of(first, second));
+        when(mapper.findByPublicIds(List.of("added"))).thenReturn(List.of(added));
+
+        service.replaceDiaryMedia("space-one", 21, 1,
+                List.of("first", "second"), List.of("added"),
+                List.of("existing:second", "new:0", "existing:first"));
+
+        var ordered = inOrder(mapper);
+        ordered.verify(mapper).deleteDiaryMedia(21);
+        ordered.verify(mapper).attachToDiary(21, 11L, 0);
+        ordered.verify(mapper).attachToDiary(21, 12L, 1);
+        ordered.verify(mapper).attachToDiary(21, 10L, 2);
+    }
+
+    @Test
+    void diaryMediaReplacementRejectsAssetsFromAnotherSpaceBeforeDetachingCurrentLinks() {
+        DiarySpace space = space();
+        MediaAsset foreign = asset(1, 12L, "foreign");
+        foreign.setSpaceId(99L);
+        when(spaceService.requireSpace("space-one")).thenReturn(space);
+        when(mapper.countDiaryInSpace(21, 7L)).thenReturn(1);
+        when(mapper.findByDiaryId(21)).thenReturn(List.of());
+        when(mapper.findByPublicIds(List.of("foreign"))).thenReturn(List.of(foreign));
+
+        assertThatThrownBy(() -> service.replaceDiaryMedia(
+                "space-one", 21, 1, List.of(), List.of("foreign"), List.of("new:0")))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.getCode()).isEqualTo(ErrorCode.FILE_NOT_FOUND.getCode()));
+
+        verify(mapper, never()).deleteDiaryMedia(21);
+    }
+
     private DiarySpace space() {
         DiarySpace space = new DiarySpace();
         space.setSpaceId(7L);
@@ -120,9 +163,13 @@ class MediaServiceTest {
     }
 
     private MediaAsset asset(int ownerId) {
+        return asset(ownerId, 9L, "asset-one");
+    }
+
+    private MediaAsset asset(int ownerId, long assetId, String publicId) {
         MediaAsset asset = new MediaAsset();
-        asset.setAssetId(9L);
-        asset.setPublicId("asset-one");
+        asset.setAssetId(assetId);
+        asset.setPublicId(publicId);
         asset.setSpaceId(7L);
         asset.setOwnerUserId(ownerId);
         return asset;

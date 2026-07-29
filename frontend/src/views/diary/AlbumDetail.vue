@@ -18,9 +18,9 @@
 
       <div v-loading="loadingPhotos" class="album-photo-grid">
         <el-empty v-if="!loadingPhotos && photos.length === 0" description="暂无照片" />
-        <article v-for="(photo, index) in photos" :key="photo.imageId" class="photo-card">
+        <article v-for="(photo, index) in photos" :key="photo.assetId" class="photo-card">
           <el-image
-            :src="thumbnailImageUrl(photo.imagePath)"
+            :src="photo.media?.thumbnailUrl || photo.media?.contentUrl"
             :preview-src-list="previewImages"
             :initial-index="index"
             fit="cover"
@@ -46,7 +46,7 @@
           >
             <el-icon><StarFilled /></el-icon>
           </button>
-          <button v-if="editableAlbum" class="remove-photo-btn" @click.stop="removePhoto(photo.imageId)">
+          <button v-if="editableAlbum" class="remove-photo-btn" @click.stop="removePhoto(photo.assetId)">
             移除
           </button>
           <div class="photo-meta" @click.stop="router.push(`/diaries/${photo.diaryId}`)">
@@ -79,7 +79,6 @@ import { ArrowLeft, Picture, StarFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
 import { photoApi } from '@/api/experience'
 import { formatChineseDate } from '@/utils/dateDisplay'
-import { originalImageUrl, thumbnailImageUrl } from '@/utils/imageUrl'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
@@ -98,7 +97,7 @@ const photoPage = ref(0)
 const totalPhotos = ref(0)
 let loadVersion = 0
 
-const previewImages = computed(() => photos.value.map(item => originalImageUrl(item.imagePath)))
+const previewImages = computed(() => photos.value.map(item => item.media?.contentUrl).filter(Boolean))
 const editableAlbum = computed(() => !!albumMeta.value?.editable)
 const hasMorePhotos = computed(() => photos.value.length < totalPhotos.value)
 const albumTitle = computed(() => albumMeta.value?.name || fallbackSystemTitle())
@@ -180,8 +179,8 @@ const loadAlbumPhotos = async ({ append = false, force = false } = {}) => {
 
     const content = response.data?.content || []
     if (append) {
-      const existingIds = new Set(photos.value.map(photo => photo.imageId))
-      photos.value = photos.value.concat(content.filter(photo => !existingIds.has(photo.imageId)))
+      const existingIds = new Set(photos.value.map(photo => photo.assetId))
+      photos.value = photos.value.concat(content.filter(photo => !existingIds.has(photo.assetId)))
     } else {
       photos.value = content
     }
@@ -199,17 +198,17 @@ const loadMorePhotos = () => loadAlbumPhotos({ append: true })
 
 const toggleFavorite = async (photo) => {
   if (favoriteBusyId.value) return
-  favoriteBusyId.value = photo.imageId
+  favoriteBusyId.value = photo.assetId
   try {
     if (photo.favorite) {
-      await photoApi.unfavorite(photo.imageId)
+      await photoApi.unfavorite(photo.assetId)
       photo.favorite = false
       if (route.params.systemKey === 'favorites') {
         await loadAlbumPhotos({ force: true })
       }
       ElMessage.success('已取消收藏')
     } else {
-      const response = await photoApi.favorite(photo.imageId)
+      const response = await photoApi.favorite(photo.assetId)
       Object.assign(photo, response.data)
       ElMessage.success('已收藏')
     }
@@ -218,9 +217,9 @@ const toggleFavorite = async (photo) => {
   }
 }
 
-const removePhoto = async (imageId) => {
+const removePhoto = async (assetId) => {
   if (!editableAlbum.value || !route.params.albumId) return
-  await albumApi.removeAlbumPhoto(route.params.albumId, imageId)
+  await albumApi.removeAlbumPhoto(route.params.albumId, assetId)
   await loadAlbumPhotos({ force: true })
   ElMessage.success('已移出相册')
 }

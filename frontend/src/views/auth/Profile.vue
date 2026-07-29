@@ -170,7 +170,6 @@ import { useAuthStore } from '@/stores/auth'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
-import { originalImageUrl } from '@/utils/imageUrl'
 import { copyText } from '@/utils/copyText'
 import { getStepUpToken, requestStepUp, withStepUpRetry } from '@/utils/stepUp'
 import { clearOfflineData } from '@/utils/offlineDb'
@@ -254,7 +253,7 @@ const passwordRules = {
   ]
 }
 
-const avatarUrl = computed(() => originalImageUrl(authStore.userInfo?.avatarPath))
+const avatarUrl = computed(() => authStore.userInfo?.avatarMedia?.contentUrl || '')
 const usernameInitial = computed(() => authStore.username?.charAt(0)?.toUpperCase() || '')
 const joinedAt = computed(() => formatChineseDate(authStore.userInfo?.createdAt))
 const isAdmin = computed(() => authStore.userInfo?.systemRole === 'ADMIN')

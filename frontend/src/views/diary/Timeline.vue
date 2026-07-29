@@ -89,11 +89,11 @@
                             </el-tag>
                           </div>
                           <p>{{ previewText(diary) }}</p>
-                          <div class="thumbs" v-if="diary.imagePathList?.length">
+                          <div class="thumbs" v-if="diaryImages(diary).length">
                             <img
-                              v-for="img in diary.imagePathList.slice(0, 3)"
-                              :key="img"
-                              :src="thumbnailImageUrl(img)"
+                              v-for="img in diaryImages(diary).slice(0, 3)"
+                              :key="img.assetId"
+                              :src="img.thumbnailUrl || img.contentUrl"
                               alt=""
                               loading="lazy"
                               decoding="async"
@@ -122,11 +122,11 @@
                         </el-tag>
                       </div>
                       <p>{{ previewText(diary) }}</p>
-                      <div class="thumbs" v-if="diary.imagePathList?.length">
+                      <div class="thumbs" v-if="diaryImages(diary).length">
                         <img
-                          v-for="img in diary.imagePathList.slice(0, 3)"
-                          :key="img"
-                          :src="thumbnailImageUrl(img)"
+                          v-for="img in diaryImages(diary).slice(0, 3)"
+                          :key="img.assetId"
+                          :src="img.thumbnailUrl || img.contentUrl"
                           alt=""
                           loading="lazy"
                           decoding="async"
@@ -158,7 +158,6 @@ import { diaryApi } from '@/api/diary'
 import { tagApi } from '@/api/experience'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseMonth, formatChineseMonthDay } from '@/utils/dateDisplay'
-import { thumbnailImageUrl } from '@/utils/imageUrl'
 import { buildTimelineTree, initialExpandedTimelineKeys } from '@/utils/timelineGroups'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
@@ -205,6 +204,7 @@ const previewText = (diary) => {
   const text = diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
   return text?.slice(0, 160) || ''
 }
+const diaryImages = diary => diary?.media?.filter(item => item.mediaType === 'IMAGE') || []
 
 const fetchTags = async () => {
   const response = await tagApi.list()

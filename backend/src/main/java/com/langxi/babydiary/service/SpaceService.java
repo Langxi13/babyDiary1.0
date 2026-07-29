@@ -23,11 +23,14 @@ public class SpaceService {
     private final SpaceMapper spaceMapper;
     private final UserMapper userMapper;
     private final TagService tagService;
+    private final MediaAccessTokenService mediaTokenService;
 
-    public SpaceService(SpaceMapper spaceMapper, UserMapper userMapper, TagService tagService) {
+    public SpaceService(SpaceMapper spaceMapper, UserMapper userMapper, TagService tagService,
+                        MediaAccessTokenService mediaTokenService) {
         this.spaceMapper = spaceMapper;
         this.userMapper = userMapper;
         this.tagService = tagService;
+        this.mediaTokenService = mediaTokenService;
     }
 
     @Transactional
@@ -77,6 +80,12 @@ public class SpaceService {
         return space;
     }
 
+    public DiarySpace requirePersonalSpace(Integer userId) {
+        DiarySpace space = spaceMapper.findPersonalSpace(userId);
+        if (space == null) throw new BusinessException(ErrorCode.SPACE_NOT_FOUND, "个人空间不存在");
+        return space;
+    }
+
     public SpaceMember requireMember(String publicId, Integer userId) {
         return requireMember(requireSpace(publicId), userId);
     }
@@ -96,7 +105,11 @@ public class SpaceService {
     public List<SpaceMemberVO> listMembers(String publicId, Integer userId) {
         DiarySpace space = requireSpace(publicId);
         requireMember(space, userId);
-        return spaceMapper.listMembers(space.getSpaceId()).stream().map(SpaceMemberVO::from).toList();
+        return spaceMapper.listMembers(space.getSpaceId()).stream().map(member -> {
+            SpaceMemberVO vo = SpaceMemberVO.from(member);
+            vo.setAvatarMedia(profileMedia(member.getAvatarAssetId()));
+            return vo;
+        }).toList();
     }
 
     @Transactional
@@ -119,6 +132,15 @@ public class SpaceService {
         DiarySpace space = requireSpace(publicId);
         requireMember(space, userId);
         return TagVO.fromEntity(tagService.createTag(userId, space.getSpaceId(), dto.getName(), dto.getColor()));
+    }
+
+    private MediaAssetVO profileMedia(String assetId) {
+        if (assetId == null) return null;
+        MediaAssetVO vo = new MediaAssetVO();
+        vo.setAssetId(assetId);
+        vo.setMediaType("IMAGE");
+        vo.setContentUrl(mediaTokenService.sign(assetId, "original").url());
+        return vo;
     }
 
     @Transactional

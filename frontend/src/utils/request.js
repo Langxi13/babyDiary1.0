@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import router from '@/router'
 import { nativeAuthRawRequest } from '@/platform/nativeAuth'
 import { getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
+import { getClientRequestHeaders } from '@/platform/appRelease'
 import {
   getClientSessionGeneration,
   isClientSessionGenerationCurrent
@@ -97,13 +98,14 @@ const redirectToLogin = () => {
 }
 
 request.interceptors.request.use(
-  config => {
+  async config => {
     config.__clientSessionGeneration = getClientSessionGeneration()
     if (isNativeApp()) {
       const origin = getServerOrigin()
       if (!origin) return Promise.reject(new Error('请先配置服务器地址'))
       config.baseURL = origin
       config.withCredentials = false
+      Object.assign(config.headers, await getClientRequestHeaders())
     }
     const token = localStorage.getItem('token')
     if (token && !config.headers.Authorization) {
@@ -185,6 +187,9 @@ request.interceptors.response.use(
         localStorage.removeItem('userInfo')
         window.dispatchEvent(new Event('auth:expired'))
         redirectToLogin()
+      } else if (status === 426) {
+        window.dispatchEvent(new Event('app:update-required'))
+        if (shouldNotify) ElMessage.error(await parseMessage(data, '请更新应用后继续使用'))
       } else if (status === 403 && shouldNotify) {
         ElMessage.error(await parseMessage(data, '没有权限访问'))
       } else if (status === 409 && shouldNotify) {

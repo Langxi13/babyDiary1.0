@@ -27,8 +27,8 @@ public class UserVO {
     @Schema(description = "用户时区")
     private String timezone;
 
-    @Schema(description = "头像路径")
-    private String avatarPath;
+    private MediaAssetVO avatarMedia;
+    private String avatarAssetId;
 
     @Schema(description = "创建时间")
     private Timestamp createdAt;
@@ -41,7 +41,8 @@ public class UserVO {
         vo.setEmailVerified(user.getEmailVerified());
         vo.setSystemRole(user.getSystemRole());
         vo.setTimezone(user.getTimezone());
-        vo.setAvatarPath(user.getAvatarPath());
+        vo.setAvatarAssetId(user.getAvatarAssetId());
+        vo.setAvatarMedia(user.getAvatarMedia());
         vo.setCreatedAt(user.getCreatedAt());
         return vo;
     }

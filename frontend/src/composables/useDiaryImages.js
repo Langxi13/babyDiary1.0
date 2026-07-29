@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
-import { originalImageUrl } from '@/utils/imageUrl'
 import { copyText } from '@/utils/copyText'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -141,10 +140,10 @@ export function useDiaryImages({ route, isEdit }) {
         formData.append('imageFiles', file.raw)
         newImageIndex += 1
       } else if (file.isExisting && file.name) {
-        formData.append('retainedImagePaths', file.name)
+        formData.append('retainedAssetIds', file.name)
       }
       if (orderEntry) {
-        formData.append('imageOrder', orderEntry)
+        formData.append('mediaOrder', orderEntry)
       }
     }
 
@@ -154,13 +153,15 @@ export function useDiaryImages({ route, isEdit }) {
     }
   }
 
-  const setExistingImages = (imagePaths = []) => {
-    initialImageCount.value = imagePaths.length
-    fileList.value = imagePaths.map((imagePath, index) => ({
-      name: imagePath,
-      url: originalImageUrl(imagePath),
+  const setExistingImages = (media = []) => {
+    const images = media.filter(item => item?.mediaType === 'IMAGE')
+    initialImageCount.value = images.length
+    fileList.value = images.map((item, index) => ({
+      name: item.assetId,
+      url: item.thumbnailUrl || item.contentUrl,
       uid: `existing-${index}`,
-      isExisting: true
+      isExisting: true,
+      media: item
     }))
   }
 

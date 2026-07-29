@@ -39,6 +39,12 @@ public class AlbumService {
     @Autowired
     private PhotoService photoService;
 
+    @Autowired
+    private MediaService mediaService;
+
+    @Autowired
+    private SpaceService spaceService;
+
     @Cacheable(cacheNames = CacheNames.PHOTOS, key = "'album-groups:' + #userId")
     public List<AlbumGroupVO> listGroups(Integer userId) {
         ensureAiGroup(userId);
@@ -50,7 +56,7 @@ public class AlbumService {
         Map<Integer, List<AlbumVO>> albumsByGroup = new HashMap<>();
         if (!groupIds.isEmpty()) {
             for (Album album : albumMapper.findAlbumsByGroupIds(groupIds)) {
-                albumsByGroup.computeIfAbsent(album.getGroupId(), key -> new ArrayList<>()).add(AlbumVO.fromEntity(album));
+                albumsByGroup.computeIfAbsent(album.getGroupId(), key -> new ArrayList<>()).add(enrichAlbum(AlbumVO.fromEntity(album)));
             }
         }
         for (AlbumGroup group : groups) {
@@ -61,21 +67,21 @@ public class AlbumService {
 
     public List<Photo> findSystemPhotos(Integer userId, String systemKey) {
         if ("all".equals(systemKey)) {
-            return photoMapper.findPhotos(userId, null, null, null, null, null);
+            return photoService.findPhotos(userId, null, null, null, null, null);
         }
         if ("favorites".equals(systemKey)) {
-            return photoMapper.findPhotos(userId, null, null, null, null, true);
+            return photoService.findPhotos(userId, null, null, null, null, true);
         }
         if (systemKey != null && systemKey.startsWith("year:")) {
             String year = systemKey.substring("year:".length());
-            return photoMapper.findPhotos(userId, year + "-01-01", year + "-12-31", null, null, null);
+            return photoService.findPhotos(userId, year + "-01-01", year + "-12-31", null, null, null);
         }
         throw new BusinessException(ErrorCode.ALBUM_NOT_FOUND);
     }
 
     public List<Photo> findAlbumPhotos(Integer userId, Integer albumId) {
         requireEditableOrExisting(userId, albumId);
-        return albumMapper.findAlbumPhotos(userId, albumId);
+        return photoService.enrichMedia(albumMapper.findAlbumPhotos(userId, albumId));
     }
 
     public PageResult<Photo> findSystemPhotoPage(Integer userId, String systemKey, int page, int size) {
@@ -107,7 +113,7 @@ public class AlbumService {
                         albumId,
                         normalizedSize,
                         Pagination.offset(normalizedPage, normalizedSize));
-        return new PageResult<>(content, normalizedPage, normalizedSize, total);
+        return new PageResult<>(photoService.enrichMedia(content), normalizedPage, normalizedSize, total);
     }
 
     @Transactional
@@ -157,10 +163,10 @@ public class AlbumService {
         album.setType("CUSTOM");
         album.setName(trimRequired(dto.getName()));
         album.setDescription(trimToNull(dto.getDescription()));
-        album.setCoverImagePath(trimToNull(dto.getCoverImagePath()));
+        album.setCoverAssetId(resolveCoverAssetId(userId, dto.getCoverAssetId()));
         album.setSort(0);
         albumMapper.insertAlbum(album);
-        return album;
+        return albumMapper.findAlbumById(userId, album.getAlbumId());
     }
 
     @Transactional
@@ -169,9 +175,9 @@ public class AlbumService {
         Album album = requireEditableAlbum(userId, albumId);
         album.setName(trimRequired(dto.getName()));
         album.setDescription(trimToNull(dto.getDescription()));
-        album.setCoverImagePath(trimToNull(dto.getCoverImagePath()));
+        album.setCoverAssetId(resolveCoverAssetId(userId, dto.getCoverAssetId()));
         albumMapper.updateAlbum(album);
-        return album;
+        return albumMapper.findAlbumById(userId, albumId);
     }
 
     @Transactional
@@ -183,30 +189,38 @@ public class AlbumService {
 
     @Transactional
     @CacheEvict(cacheNames = CacheNames.PHOTOS, allEntries = true)
-    public void addPhotos(Integer userId, Integer albumId, List<Integer> imageIds) {
+    public void addPhotos(Integer userId, Integer albumId, List<?> assetIds) {
         requireEditableAlbum(userId, albumId);
-        if (imageIds == null || imageIds.isEmpty()) {
+        if (assetIds == null || assetIds.isEmpty()) {
             return;
         }
-        List<Integer> uniqueImageIds = imageIds.stream().filter(java.util.Objects::nonNull).distinct().collect(Collectors.toList());
-        if (uniqueImageIds.isEmpty()) {
+        List<?> uniqueAssetIds = assetIds.stream().filter(java.util.Objects::nonNull).distinct().collect(Collectors.toList());
+        if (uniqueAssetIds.isEmpty()) {
             return;
         }
-        List<Photo> ownedPhotos = photoMapper.findPhotosByIds(userId, uniqueImageIds);
-        List<Integer> ownedImageIds = (ownedPhotos == null ? Collections.<Photo>emptyList() : ownedPhotos).stream()
-                .map(Photo::getImageId)
-                .collect(Collectors.toList());
-        if (ownedImageIds.size() != uniqueImageIds.size() || !ownedImageIds.containsAll(uniqueImageIds)) {
+        List<Photo> ownedPhotos = photoMapper.findPhotosByIds(userId, uniqueAssetIds);
+        List<Photo> safePhotos = ownedPhotos == null ? Collections.emptyList() : ownedPhotos;
+        java.util.Set<String> ownedIds = safePhotos.stream()
+                .map(Photo::getAssetId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        boolean allOwned = uniqueAssetIds.stream()
+                .map(String::valueOf)
+                .allMatch(ownedIds::contains);
+        if (!allOwned) {
             throw new BusinessException(ErrorCode.FILE_NOT_FOUND, "部分照片不存在或不属于当前用户");
         }
-        albumMapper.insertAlbumPhotos(albumId, uniqueImageIds);
+        int sort = albumMapper.nextAlbumPhotoSort(albumId);
+        for (Object assetId : uniqueAssetIds) {
+            albumMapper.insertAlbumPhoto(albumId, userId, assetId, sort++);
+        }
     }
 
     @Transactional
     @CacheEvict(cacheNames = CacheNames.PHOTOS, allEntries = true)
-    public void removePhoto(Integer userId, Integer albumId, Integer imageId) {
+    public void removePhoto(Integer userId, Integer albumId, String assetId) {
         requireEditableAlbum(userId, albumId);
-        albumMapper.deleteAlbumPhoto(albumId, imageId);
+        albumMapper.deleteAlbumPhoto(albumId, assetId);
     }
 
     AlbumGroup ensureAiGroup(Integer userId) {
@@ -225,27 +239,27 @@ public class AlbumService {
 
     private AlbumGroupVO systemGroup(Integer userId) {
         List<AlbumVO> albums = new ArrayList<>();
-        albums.add(AlbumVO.system(
+        albums.add(enrichAlbum(AlbumVO.system(
                 "all",
                 "所有图片",
                 photoMapper.countPhotos(userId, null, null, null, null, null),
-                photoMapper.findCoverImagePath(userId, null, null, null)
-        ));
-        albums.add(AlbumVO.system(
+                photoMapper.findCoverAssetPublicId(userId, null, null, null)
+        )));
+        albums.add(enrichAlbum(AlbumVO.system(
                 "favorites",
                 "收藏照片",
                 photoMapper.countPhotos(userId, null, null, null, null, true),
-                photoMapper.findCoverImagePath(userId, null, null, true)
-        ));
+                photoMapper.findCoverAssetPublicId(userId, null, null, true)
+        )));
         for (Integer year : photoMapper.findPhotoYears(userId)) {
             String startDate = year + "-01-01";
             String endDate = year + "-12-31";
-            albums.add(AlbumVO.system(
+            albums.add(enrichAlbum(AlbumVO.system(
                     "year:" + year,
                     year + " 年",
                     photoMapper.countPhotos(userId, startDate, endDate, null, null, null),
-                    photoMapper.findCoverImagePath(userId, startDate, endDate, null)
-            ));
+                    photoMapper.findCoverAssetPublicId(userId, startDate, endDate, null)
+            )));
         }
         return AlbumGroupVO.system(albums);
     }
@@ -273,6 +287,26 @@ public class AlbumService {
         }
         return album;
     }
+
+    private Long resolveCoverAssetId(Integer userId, String publicId) {
+        if (publicId == null || publicId.isBlank()) return null;
+        if (mediaService == null) throw new BusinessException(ErrorCode.BAD_REQUEST, "封面媒体资源无效");
+        return mediaService.requireOwnedAsset(
+                spaceService.requirePersonalSpace(userId).getPublicId(), publicId, userId).getAssetId();
+    }
+
+    private AlbumVO enrichAlbum(AlbumVO vo) {
+        if (mediaService != null && vo.getCoverAssetId() != null) {
+            var asset = mediaService.findByPublicId(vo.getCoverAssetId());
+            if (asset != null) vo.setCoverMedia(mediaService.toVO(asset));
+        }
+        return vo;
+    }
+
+    public AlbumVO toVO(Album album) {
+        return enrichAlbum(AlbumVO.fromEntity(album));
+    }
+
 
     private String trimRequired(String value) {
         String trimmed = trimToNull(value);

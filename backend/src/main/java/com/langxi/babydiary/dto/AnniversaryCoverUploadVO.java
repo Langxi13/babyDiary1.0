@@ -1,4 +1,4 @@
 package com.langxi.babydiary.dto;
 
-public record AnniversaryCoverUploadVO(String coverImagePath) {
+public record AnniversaryCoverUploadVO(String coverAssetId) {
 }

@@ -47,15 +47,15 @@ public class AnniversaryController {
                 dto.getTitle(),
                 dto.getDate(),
                 dto.getDescription(),
-                dto.getCoverImagePath(),
+                dto.getCoverAssetId(),
                 dto.getSort()
         )));
     }
 
     @PostMapping("/cover")
     public Result<AnniversaryCoverUploadVO> uploadCover(@RequestParam("coverFile") MultipartFile coverFile) {
-        String coverImagePath = anniversaryService.uploadCover(currentUser.getUserId(), coverFile);
-        return Result.success("上传成功", new AnniversaryCoverUploadVO(coverImagePath));
+        String coverAssetId = anniversaryService.uploadCover(currentUser.getUserId(), coverFile);
+        return Result.success("上传成功", new AnniversaryCoverUploadVO(coverAssetId));
     }
 
     @PutMapping("/{anniversaryId}")
@@ -68,7 +68,7 @@ public class AnniversaryController {
                 dto.getTitle(),
                 dto.getDate(),
                 dto.getDescription(),
-                dto.getCoverImagePath(),
+                dto.getCoverAssetId(),
                 dto.getSort()
         )));
     }

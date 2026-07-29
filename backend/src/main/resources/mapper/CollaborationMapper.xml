@@ -38,7 +38,7 @@
         <result property="diaryId" column="diary_id"/>
         <result property="userId" column="user_id"/>
         <result property="username" column="username"/>
-        <result property="avatarPath" column="avatar_path"/>
+        <result property="avatarAssetId" column="avatar_asset_public_id"/>
         <result property="content" column="content"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -200,17 +200,21 @@
     </insert>
 
     <select id="findComments" resultMap="commentResultMap">
-        SELECT c.*, u.username, u.avatar_path
+        SELECT c.*,u.username,a.public_id AS avatar_asset_public_id
         FROM diary_comment c
         INNER JOIN user u ON u.user_id = c.user_id
+        LEFT JOIN user_avatar ua ON ua.user_id=u.user_id
+        LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL
         WHERE c.diary_id = #{diaryId} AND c.deleted_at IS NULL
         ORDER BY c.created_at ASC
     </select>
 
     <select id="findComment" resultMap="commentResultMap">
-        SELECT c.*, u.username, u.avatar_path
+        SELECT c.*,u.username,a.public_id AS avatar_asset_public_id
         FROM diary_comment c
         INNER JOIN user u ON u.user_id = c.user_id
+        LEFT JOIN user_avatar ua ON ua.user_id=u.user_id
+        LEFT JOIN media_asset a ON a.asset_id=ua.asset_id AND a.deleted_at IS NULL
         WHERE c.diary_id = #{diaryId} AND c.public_id = #{publicId} AND c.deleted_at IS NULL
     </select>
 

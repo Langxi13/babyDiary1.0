@@ -115,12 +115,12 @@ public class AlbumController {
 
     @PostMapping
     public Result<AlbumVO> createAlbum(@Valid @RequestBody AlbumDTO dto) {
-        return Result.success("相册已创建", AlbumVO.fromEntity(albumService.createAlbum(currentUser.getUserId(), dto)));
+        return Result.success("相册已创建", albumService.toVO(albumService.createAlbum(currentUser.getUserId(), dto)));
     }
 
     @PutMapping("/{albumId}")
     public Result<AlbumVO> updateAlbum(@PathVariable Integer albumId, @Valid @RequestBody AlbumDTO dto) {
-        return Result.success("相册已更新", AlbumVO.fromEntity(albumService.updateAlbum(currentUser.getUserId(), albumId, dto)));
+        return Result.success("相册已更新", albumService.toVO(albumService.updateAlbum(currentUser.getUserId(), albumId, dto)));
     }
 
     @DeleteMapping("/{albumId}")
@@ -131,13 +131,13 @@ public class AlbumController {
 
     @PostMapping("/{albumId}/photos")
     public Result<Void> addPhotos(@PathVariable Integer albumId, @Valid @RequestBody AlbumPhotoDTO dto) {
-        albumService.addPhotos(currentUser.getUserId(), albumId, dto.getImageIds());
+        albumService.addPhotos(currentUser.getUserId(), albumId, dto.getAssetIds());
         return Result.success("照片已加入相册", null);
     }
 
-    @DeleteMapping("/{albumId}/photos/{imageId}")
-    public Result<Void> removePhoto(@PathVariable Integer albumId, @PathVariable Integer imageId) {
-        albumService.removePhoto(currentUser.getUserId(), albumId, imageId);
+    @DeleteMapping("/{albumId}/photos/{assetId}")
+    public Result<Void> removePhoto(@PathVariable Integer albumId, @PathVariable String assetId) {
+        albumService.removePhoto(currentUser.getUserId(), albumId, assetId);
         return Result.success("照片已移出相册", null);
     }
 

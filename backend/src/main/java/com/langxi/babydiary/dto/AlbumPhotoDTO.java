@@ -12,5 +12,5 @@ import java.util.List;
 public class AlbumPhotoDTO {
     @NotEmpty(message = "请选择照片")
     @Size(max = 500, message = "单次最多添加500张照片")
-    private List<@NotNull @Positive Integer> imageIds;
+    private List<@NotNull String> assetIds;
 }

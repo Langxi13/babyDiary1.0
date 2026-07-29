@@ -24,8 +24,12 @@ public interface AlbumMapper {
     List<Album> findAlbumsByGroupIds(@Param("groupIds") List<Integer> groupIds);
     List<Album> findAiAlbumsByUserId(@Param("userId") Integer userId);
 
-    void insertAlbumPhotos(@Param("albumId") Integer albumId, @Param("imageIds") List<Integer> imageIds);
-    void deleteAlbumPhoto(@Param("albumId") Integer albumId, @Param("imageId") Integer imageId);
+    int nextAlbumPhotoSort(@Param("albumId") Integer albumId);
+    int insertAlbumPhoto(@Param("albumId") Integer albumId,
+                         @Param("userId") Integer userId,
+                         @Param("assetId") Object assetId,
+                         @Param("sort") int sort);
+    void deleteAlbumPhoto(@Param("albumId") Integer albumId, @Param("assetId") String assetId);
     List<Photo> findAlbumPhotos(@Param("userId") Integer userId, @Param("albumId") Integer albumId);
     List<Photo> findAlbumPhotoPage(
             @Param("userId") Integer userId,

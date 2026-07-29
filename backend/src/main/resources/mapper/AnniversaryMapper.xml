@@ -10,37 +10,29 @@
         <result property="title" column="title"/>
         <result property="date" column="date"/>
         <result property="description" column="description"/>
-        <result property="coverImagePath" column="cover_image_path"/>
+        <result property="coverAssetId" column="cover_asset_id"/>
+        <result property="coverAssetPublicId" column="cover_asset_public_id"/>
         <result property="sort" column="sort"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
-
     <select id="findByUserId" resultMap="anniversaryResultMap">
-        SELECT * FROM anniversary WHERE user_id = #{userId} ORDER BY sort ASC, date ASC, anniversary_id ASC
+        SELECT a.*,m.public_id AS cover_asset_public_id
+        FROM anniversary a LEFT JOIN media_asset m ON m.asset_id=a.cover_asset_id AND m.deleted_at IS NULL
+        WHERE a.user_id=#{userId} ORDER BY a.sort,a.date,a.anniversary_id
     </select>
-
     <select id="findById" resultMap="anniversaryResultMap">
-        SELECT * FROM anniversary WHERE user_id = #{userId} AND anniversary_id = #{anniversaryId}
+        SELECT a.*,m.public_id AS cover_asset_public_id
+        FROM anniversary a LEFT JOIN media_asset m ON m.asset_id=a.cover_asset_id AND m.deleted_at IS NULL
+        WHERE a.user_id=#{userId} AND a.anniversary_id=#{anniversaryId}
     </select>
-
     <insert id="insertAnniversary" parameterType="Anniversary" useGeneratedKeys="true" keyProperty="anniversaryId">
-        INSERT INTO anniversary (user_id, space_id, title, date, description, cover_image_path, sort)
-        VALUES (#{userId}, (SELECT space_id FROM diary_space WHERE personal_owner_id = #{userId}),
-                #{title}, #{date}, #{description}, #{coverImagePath}, #{sort})
+        INSERT INTO anniversary(user_id,space_id,title,date,description,cover_asset_id,sort)
+        VALUES(#{userId},(SELECT space_id FROM diary_space WHERE personal_owner_id=#{userId}),#{title},#{date},#{description},#{coverAssetId},#{sort})
     </insert>
-
     <update id="updateAnniversary" parameterType="Anniversary">
-        UPDATE anniversary
-        SET title = #{title},
-            date = #{date},
-            description = #{description},
-            cover_image_path = #{coverImagePath},
-            sort = #{sort}
-        WHERE user_id = #{userId} AND anniversary_id = #{anniversaryId}
+        UPDATE anniversary SET title=#{title},date=#{date},description=#{description},cover_asset_id=#{coverAssetId},sort=#{sort}
+        WHERE user_id=#{userId} AND anniversary_id=#{anniversaryId}
     </update>
-
-    <delete id="deleteAnniversary">
-        DELETE FROM anniversary WHERE user_id = #{userId} AND anniversary_id = #{anniversaryId}
-    </delete>
+    <delete id="deleteAnniversary">DELETE FROM anniversary WHERE user_id=#{userId} AND anniversary_id=#{anniversaryId}</delete>
 </mapper>
