@@ -9,6 +9,8 @@ SYSTEMD_V3_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-v
 
 cd "$PROJECT_ROOT"
 
+scripts/disk-audit.sh --enforce
+
 source scripts/java-env.sh
 
 mvn "${MAVEN_SETTINGS_ARGS[@]}" -q -DskipTests clean package -f backend/pom.xml

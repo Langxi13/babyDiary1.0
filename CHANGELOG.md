@@ -2,6 +2,7 @@
 
 ## 2026-07-30
 
+- Replaced whole-project backups with permission-hardened minimal recovery bundles containing compressed database, object storage, runtime configuration, release metadata and checksums; added a 5 GiB deployment disk gate.
 - Unified V3 media storage, representations, provider-aware reads, profile selection, signed access contexts, Range/HEAD/ETag delivery, and diary/signed-media regression coverage. Migrated diary images now retain their real `ORIGINAL/source` and `THUMBNAIL/default` profiles across diary, share, album cover, avatar, comment avatar, direct-media, and public-media responses.
 - Rejected old profile-less media signatures instead of retaining an ambiguous compatibility path; every new URL binds variant type, actual profile, expiry, and an HMAC-protected access context ticket.
 - Added real MIME/header and image-dimension validation, single-threaded idempotent media processing, unique derived-object keys, `DELETE_PENDING`/`DELETED` lifecycle states, reference checks, quota-safe storage GC, and MySQL migration V2 indexes/dedupe constraints.

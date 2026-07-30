@@ -131,6 +131,12 @@ V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封�
 
 媒体上传会校验真实文件头、声明 MIME、图片尺寸和大小；派生处理通过单线程后台任务生成，删除先进入 `DELETE_PENDING`，对象删除和空间额度释放由幂等 GC 任务完成。媒体内容支持 `HEAD`、单段 Range、ETag/304 和 416 响应。锁定日记关联媒体不返回 URL，直接媒体详情和内容读取需要二次验证；前端 Service Worker 只缓存固定壳文件和静态 `/assets/`，不缓存 API、媒体或个性化响应。
 
+## 备份与磁盘门禁
+
+`scripts/backup.sh` 生成权限为 `0700/0600` 的最小恢复包，包含压缩数据库、LOCAL 对象归档、运行配置、Android 签名、发布清单和 SHA-256，不重复打包源码、Git 历史、部署产物或私有文档。使用 `scripts/verify-backup.sh backups/<timestamp>` 验证权限、数据库、对象归档和校验和。
+
+部署前 `scripts/disk-audit.sh --enforce` 要求至少保留 5 GiB 可用空间。清理时不得删除当前数据库、`data/objects/`、Docker 数据卷或其他项目的具名回滚镜像。
+
 旧库、旧表和旧目录仅作为回滚隔离保留至少 14 天。生产升级必须先备份、停写，再执行 `scripts/v3-migrate.sh preflight`、`migrate`、`verify`，确认校验和、关系数量和页面访问正常后再完成切换；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向迁移。
 
 迁移期间旧媒体目录只由迁移工具读取；新媒体写入 `DIARY_OBJECT_PATH` 或后续配置的 S3/COS 对象存储。新媒体通过 `/api/v3/public/media/**` 的短时签名 URL 访问。旧版 `/images/**` 路由不属于 V3 运行时，完成回滚窗口后应保持移除。
