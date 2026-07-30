@@ -17,24 +17,44 @@ public interface AlbumMapper {
 
     @Select("""
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
-                   ca.public_id AS cover_public_id,COUNT(am.asset_id) AS media_count
+                   ca.public_id AS cover_public_id,cv.variant_type AS cover_variant_type,
+                   cv.profile AS cover_variant_profile,COUNT(am.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
+            LEFT JOIN media_variant cv ON cv.variant_id=(
+                SELECT candidate.variant_id FROM media_variant candidate
+                WHERE candidate.asset_id=ca.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
+                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
+                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
+                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         candidate.variant_id LIMIT 1
+            )
             WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
-            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
+            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id,
+                     cv.variant_type,cv.profile
             ORDER BY a.sort_order,a.album_id
             """)
     List<AlbumRow> findAlbums(long spaceId);
 
     @Select("""
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
-                   ca.public_id AS cover_public_id,COUNT(am.asset_id) AS media_count
+                   ca.public_id AS cover_public_id,cv.variant_type AS cover_variant_type,
+                   cv.profile AS cover_variant_profile,COUNT(am.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
+            LEFT JOIN media_variant cv ON cv.variant_id=(
+                SELECT candidate.variant_id FROM media_variant candidate
+                WHERE candidate.asset_id=ca.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
+                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
+                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
+                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         candidate.variant_id LIMIT 1
+            )
             WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND a.deleted_at IS NULL
-            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
+            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id,
+                     cv.variant_type,cv.profile
             """)
     AlbumRow findAlbum(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId);
 
@@ -235,6 +255,8 @@ public interface AlbumMapper {
         private String name;
         private String description;
         private byte[] coverPublicId;
+        private String coverVariantType;
+        private String coverVariantProfile;
         private long mediaCount;
 
         public AlbumRow() {
@@ -248,6 +270,8 @@ public interface AlbumMapper {
         public String name() { return name; }
         public String description() { return description; }
         public byte[] coverPublicId() { return coverPublicId; }
+        public String coverVariantType() { return coverVariantType; }
+        public String coverVariantProfile() { return coverVariantProfile; }
         public long mediaCount() { return mediaCount; }
 
         public void setAlbumId(long albumId) { this.albumId = albumId; }
@@ -258,6 +282,8 @@ public interface AlbumMapper {
         public void setName(String name) { this.name = name; }
         public void setDescription(String description) { this.description = description; }
         public void setCoverPublicId(byte[] coverPublicId) { this.coverPublicId = coverPublicId; }
+        public void setCoverVariantType(String coverVariantType) { this.coverVariantType = coverVariantType; }
+        public void setCoverVariantProfile(String coverVariantProfile) { this.coverVariantProfile = coverVariantProfile; }
         public void setMediaCount(long mediaCount) { this.mediaCount = mediaCount; }
     }
 }

@@ -151,7 +151,7 @@
                 v-for="(img, index) in diaryImages(diary).slice(0, 4)"
                 :key="img.assetId"
                 :src="img.thumbnailUrl || img.contentUrl"
-                :preview-src-list="diaryImages(diary).map(item => item.contentUrl)"
+                :preview-src-list="diaryImages(diary).map(item => item.contentUrl).filter(Boolean)"
                 :initial-index="index"
                 fit="cover"
                 class="diary-image"

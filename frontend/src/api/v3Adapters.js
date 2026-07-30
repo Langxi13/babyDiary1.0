@@ -22,7 +22,11 @@ export async function activeSpaceId() {
   return first.id
 }
 
-const variant = (media, type) => media?.variants?.find(item => item.type === type && item.status === 'READY')
+const profileRank = profile => profile === 'default' ? 0 : profile === 'source' ? 1 : 2
+const variant = (media, type) => (media?.variants || [])
+  .filter(item => item.type === type && item.status === 'READY')
+  .sort((left, right) => profileRank(left.profile) - profileRank(right.profile)
+    || String(left.profile || '').localeCompare(String(right.profile || '')))[0]
 const mediaUrl = value => value ? resolveServerUrl(value) : ''
 
 export const normalizeMedia = (media = {}) => {

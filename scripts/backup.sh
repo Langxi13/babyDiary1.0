@@ -12,9 +12,21 @@ if [ -f /etc/baby-diary/backend.env ]; then
   set +a
 fi
 
-MYSQL_USER="${MYSQL_USER:-${DB_USERNAME:-root}}"
-MYSQL_PASSWORD="${MYSQL_PASSWORD:-${DB_PASSWORD:-}}"
-MYSQL_DATABASE="${MYSQL_DATABASE:-baby-diary}"
+DATABASE_URL="${V3_DB_URL:-${DB_URL:-}}"
+JDBC_HOST=""
+JDBC_PORT=""
+JDBC_DATABASE=""
+if [[ "$DATABASE_URL" =~ ^jdbc:mysql://([^/:?]+)(:([0-9]+))?/([^?]+) ]]; then
+  JDBC_HOST="${BASH_REMATCH[1]}"
+  JDBC_PORT="${BASH_REMATCH[3]}"
+  JDBC_DATABASE="${BASH_REMATCH[4]}"
+fi
+
+MYSQL_HOST="${MYSQL_HOST:-${JDBC_HOST:-127.0.0.1}}"
+MYSQL_PORT="${MYSQL_PORT:-${JDBC_PORT:-3306}}"
+MYSQL_USER="${MYSQL_USER:-${V3_DB_USERNAME:-${DB_USERNAME:-root}}}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:-${V3_DB_PASSWORD:-${DB_PASSWORD:-}}}"
+MYSQL_DATABASE="${MYSQL_DATABASE:-${JDBC_DATABASE:-baby-diary}}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 TARGET="$BACKUP_ROOT/$STAMP"
 
@@ -33,7 +45,9 @@ tar \
   -czf "$TARGET/project.tgz" \
   -C "$(dirname "$PROJECT_ROOT")" "$PROJECT_NAME"
 
-MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --single-transaction --no-tablespaces -u"$MYSQL_USER" "$MYSQL_DATABASE" > "$TARGET/$MYSQL_DATABASE.sql"
+MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --single-transaction --no-tablespaces \
+  --protocol=TCP --host="$MYSQL_HOST" --port="$MYSQL_PORT" \
+  -u"$MYSQL_USER" "$MYSQL_DATABASE" > "$TARGET/$MYSQL_DATABASE.sql"
 
 if [ -f /etc/nginx/sites-available/diary ]; then
   cp /etc/nginx/sites-available/diary "$TARGET/nginx-diary.conf"

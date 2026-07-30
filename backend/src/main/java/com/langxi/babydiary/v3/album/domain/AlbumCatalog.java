@@ -10,7 +10,8 @@ public record AlbumCatalog(List<Group> groups) {
     }
 
     public record Album(UUID id, UUID groupId, String systemKey, String type, String name,
-                        String description, UUID coverAssetId, long mediaCount) {
+                        String description, UUID coverAssetId, String coverVariantType,
+                        String coverVariantProfile, long mediaCount) {
     }
 
     public record Detail(Album album, List<MediaAsset> media, long totalMedia) {

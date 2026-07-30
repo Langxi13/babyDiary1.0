@@ -178,6 +178,8 @@ public interface DiaryMapper {
         private LocalDateTime takenAt;
         private int position;
         private String status;
+        private String originalProfile;
+        private String thumbnailProfile;
 
         public MediaRow() {
         }
@@ -190,6 +192,8 @@ public interface DiaryMapper {
         public LocalDateTime takenAt() { return takenAt; }
         public int position() { return position; }
         public String status() { return status; }
+        public String originalProfile() { return originalProfile; }
+        public String thumbnailProfile() { return thumbnailProfile; }
 
         public void setDiaryId(long diaryId) { this.diaryId = diaryId; }
         public void setAssetId(long assetId) { this.assetId = assetId; }
@@ -199,6 +203,8 @@ public interface DiaryMapper {
         public void setTakenAt(LocalDateTime takenAt) { this.takenAt = takenAt; }
         public void setPosition(int position) { this.position = position; }
         public void setStatus(String status) { this.status = status; }
+        public void setOriginalProfile(String originalProfile) { this.originalProfile = originalProfile; }
+        public void setThumbnailProfile(String thumbnailProfile) { this.thumbnailProfile = thumbnailProfile; }
     }
 
     final class IdRow {

@@ -24,8 +24,14 @@ public interface MediaMapper {
                            @Param("type") String type, @Param("profile") String profile,
                            @Param("accountId") long accountId);
 
+    VariantRow findPreferredVariant(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId,
+                                    @Param("type") String type, @Param("accountId") long accountId);
+
     VariantRow findPublicVariant(@Param("spaceId") byte[] spaceId, @Param("publicId") byte[] publicId,
                                  @Param("type") String type, @Param("profile") String profile);
+
+    VariantRow findPreferredPublicVariant(@Param("spaceId") byte[] spaceId, @Param("publicId") byte[] publicId,
+                                          @Param("type") String type);
 
     @Insert("""
             INSERT INTO media_asset(public_id,space_id,owner_id,media_type,original_filename,caption,taken_at,

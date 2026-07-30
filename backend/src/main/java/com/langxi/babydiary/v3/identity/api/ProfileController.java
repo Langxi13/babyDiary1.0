@@ -77,8 +77,10 @@ public class ProfileController {
         static ProfileResponse from(ProfileRepository.Profile profile, MediaUrlSigner mediaUrls) {
             return new ProfileResponse(profile.id(), profile.username(), profile.email(), profile.emailVerified(),
                     profile.role(), profile.timezone(), profile.avatarAssetId(), profile.avatarSpaceId(),
-                    profile.avatarAssetId() == null ? null : new AvatarMedia(profile.avatarAssetId(),
-                    mediaUrls.url(profile.avatarSpaceId(), profile.avatarAssetId(), "ORIGINAL")));
+                    profile.avatarAssetId() == null || profile.avatarVariantType() == null
+                            || profile.avatarVariantProfile() == null ? null : new AvatarMedia(profile.avatarAssetId(),
+                    mediaUrls.url(profile.avatarSpaceId(), profile.avatarAssetId(), profile.avatarVariantType(),
+                            profile.avatarVariantProfile())));
         }
     }
 

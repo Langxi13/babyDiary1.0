@@ -91,6 +91,16 @@
           AND v.variant_type=#{type} AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
     </select>
 
+    <select id="findPreferredVariant" resultType="com.langxi.babydiary.v3.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
+          AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
+        ORDER BY CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,v.variant_id
+        LIMIT 1
+    </select>
+
     <select id="findPublicVariant" resultType="com.langxi.babydiary.v3.media.infrastructure.MediaMapper$VariantRow">
         SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
                v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
@@ -99,5 +109,17 @@
         WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
           AND a.deleted_at IS NULL AND a.status='READY'
           AND v.variant_type=#{type} AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
+    </select>
+
+    <select id="findPreferredPublicVariant" resultType="com.langxi.babydiary.v3.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
+        JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
+          AND a.deleted_at IS NULL AND a.status='READY'
+          AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
+        ORDER BY CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,v.variant_id
+        LIMIT 1
     </select>
 </mapper>

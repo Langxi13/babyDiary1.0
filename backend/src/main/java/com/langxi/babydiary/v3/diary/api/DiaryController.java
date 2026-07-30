@@ -171,10 +171,13 @@ public class DiaryController {
     public record DiaryMediaResponse(UUID id, String mediaType, String caption, String takenAt, int position,
                                      String status, String contentUrl, String thumbnailUrl) {
         static DiaryMediaResponse from(UUID spaceId, DiaryEntry.MediaRef media, MediaUrlSigner urls) {
-            String original = urls.url(spaceId, media.id(), "ORIGINAL");
+            String original = media.originalProfile() == null ? null
+                    : urls.url(spaceId, media.id(), "ORIGINAL", media.originalProfile());
+            String thumbnail = media.thumbnailProfile() == null ? original
+                    : urls.url(spaceId, media.id(), "THUMBNAIL", media.thumbnailProfile());
             return new DiaryMediaResponse(media.id(), media.mediaType(), media.caption(),
                     media.takenAt() == null ? null : media.takenAt().toString(), media.position(), media.status(),
-                    original, original);
+                    original, thumbnail);
         }
     }
 }

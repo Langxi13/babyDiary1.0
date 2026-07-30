@@ -48,9 +48,23 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
+    public Optional<MediaAsset.Variant> findPreferredVariant(long spaceId, UUID publicId, String type,
+                                                             long accountId) {
+        return Optional.ofNullable(mapper.findPreferredVariant(spaceId, BinaryUuid.toBytes(publicId), type, accountId))
+                .map(this::variant);
+    }
+
+    @Override
     public Optional<MediaAsset.Variant> findPublicVariant(UUID spaceId, UUID publicId, String type, String profile) {
         return Optional.ofNullable(mapper.findPublicVariant(BinaryUuid.toBytes(spaceId), BinaryUuid.toBytes(publicId),
                         type, profile))
+                .map(this::variant);
+    }
+
+    @Override
+    public Optional<MediaAsset.Variant> findPreferredPublicVariant(UUID spaceId, UUID publicId, String type) {
+        return Optional.ofNullable(mapper.findPreferredPublicVariant(BinaryUuid.toBytes(spaceId),
+                        BinaryUuid.toBytes(publicId), type))
                 .map(this::variant);
     }
 

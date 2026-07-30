@@ -44,8 +44,13 @@ public interface TransferMapper {
             SELECT dm.diary_id,a.public_id,a.original_filename,a.media_type,a.caption,a.taken_at,
                    dm.position,v.storage_key,v.content_type,v.size_bytes
             FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
-            JOIN media_variant v ON v.asset_id=a.asset_id AND v.variant_type='ORIGINAL'
-              AND v.profile='default' AND v.status='READY' AND v.deleted_at IS NULL
+            JOIN media_variant v ON v.variant_id=(
+                SELECT candidate.variant_id FROM media_variant candidate
+                WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='ORIGINAL'
+                  AND candidate.status='READY' AND candidate.deleted_at IS NULL
+                ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         candidate.variant_id LIMIT 1
+            )
             WHERE a.deleted_at IS NULL AND a.status='READY' AND dm.diary_id IN
             <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             ORDER BY dm.diary_id,dm.position,a.asset_id

@@ -25,11 +25,20 @@ public interface DiaryInteractionMapper {
     @Select("""
             SELECT c.comment_id,c.public_id,a.public_id AS author_public_id,a.username,c.content,
                    c.created_at,c.updated_at,ma.public_id AS avatar_asset_public_id,
-                   avs.public_id AS avatar_space_public_id
+                   avs.public_id AS avatar_space_public_id,av.variant_type AS avatar_variant_type,
+                   av.profile AS avatar_variant_profile
             FROM diary_comment c JOIN account a ON a.account_id=c.author_id
             LEFT JOIN user_avatar ua ON ua.account_id=a.account_id
             LEFT JOIN media_asset ma ON ma.asset_id=ua.asset_id AND ma.deleted_at IS NULL AND ma.status='READY'
             LEFT JOIN diary_space avs ON avs.space_id=ma.space_id
+            LEFT JOIN media_variant av ON av.variant_id=(
+                SELECT candidate.variant_id FROM media_variant candidate
+                WHERE candidate.asset_id=ma.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
+                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
+                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
+                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         candidate.variant_id LIMIT 1
+            )
             WHERE c.diary_id=#{diaryId} AND c.deleted_at IS NULL
             ORDER BY c.created_at,c.comment_id
             """)
@@ -84,17 +93,20 @@ public interface DiaryInteractionMapper {
         private long commentId; private byte[] publicId; private byte[] authorPublicId; private String username;
         private String content; private LocalDateTime createdAt; private LocalDateTime updatedAt;
         private byte[] avatarAssetPublicId; private byte[] avatarSpacePublicId;
+        private String avatarVariantType; private String avatarVariantProfile;
         public CommentRow() {}
         public long getCommentId(){return commentId;} public byte[] getPublicId(){return publicId;}
         public byte[] getAuthorPublicId(){return authorPublicId;} public String getUsername(){return username;}
         public String getContent(){return content;} public LocalDateTime getCreatedAt(){return createdAt;}
         public LocalDateTime getUpdatedAt(){return updatedAt;} public byte[] getAvatarAssetPublicId(){return avatarAssetPublicId;}
         public byte[] getAvatarSpacePublicId(){return avatarSpacePublicId;}
+        public String getAvatarVariantType(){return avatarVariantType;} public String getAvatarVariantProfile(){return avatarVariantProfile;}
         public void setCommentId(long v){commentId=v;} public void setPublicId(byte[] v){publicId=v;}
         public void setAuthorPublicId(byte[] v){authorPublicId=v;} public void setUsername(String v){username=v;}
         public void setContent(String v){content=v;} public void setCreatedAt(LocalDateTime v){createdAt=v;}
         public void setUpdatedAt(LocalDateTime v){updatedAt=v;} public void setAvatarAssetPublicId(byte[] v){avatarAssetPublicId=v;}
         public void setAvatarSpacePublicId(byte[] v){avatarSpacePublicId=v;}
+        public void setAvatarVariantType(String v){avatarVariantType=v;} public void setAvatarVariantProfile(String v){avatarVariantProfile=v;}
     }
 
     record ReactionRow(String emoji, long reactionCount, boolean reactedByMe) {}

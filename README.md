@@ -127,7 +127,7 @@ Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`sc
 
 ## 统一媒体模型
 
-V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；图片统一返回带有效期的签名 `contentUrl/thumbnailUrl`。
+V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；图片统一返回带有效期的签名 `contentUrl/thumbnailUrl`。媒体变体由 `variant_type + profile` 唯一标识，迁移原图保留 `ORIGINAL/source`，派生缩略图使用 `THUMBNAIL/default`；签名 URL 会绑定实际 profile，不能把 profile 当作固定的 `default`。
 
 旧库、旧表和旧目录仅作为回滚隔离保留至少 14 天。生产升级必须先备份、停写，再执行 `scripts/v3-migrate.sh preflight`、`migrate`、`verify`，确认校验和、关系数量和页面访问正常后再完成切换；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向迁移。
 

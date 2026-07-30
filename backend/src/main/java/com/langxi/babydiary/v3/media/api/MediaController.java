@@ -73,8 +73,9 @@ public class MediaController {
     @GetMapping("/{assetId}/variants/{variant}")
     public ResponseEntity<StreamingResponseBody> content(@AuthenticationPrincipal V3Principal principal,
                                                           @PathVariable UUID spaceId, @PathVariable UUID assetId,
-                                                          @PathVariable String variant) throws IOException {
-        StoredObject object = media.openVariant(spaceId, assetId, variant, principal.accountId());
+                                                          @PathVariable String variant,
+                                                          @RequestParam(required = false) String profile) throws IOException {
+        StoredObject object = media.openVariant(spaceId, assetId, variant, profile, principal.accountId());
         String contentType = object.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : object.contentType();
         StreamingResponseBody body = output -> {
             try (object) {
@@ -114,7 +115,7 @@ public class MediaController {
             return new MediaResponse(asset.id(), spaceId, asset.mediaType(), asset.originalFilename(), asset.caption(),
                     asset.takenAt(), asset.accessScope(), asset.libraryVisible(), asset.status(), asset.createdAt(),
                     asset.variants().stream().map(value -> new VariantResponse(value.type(), value.profile(),
-                            urls.url(spaceId, asset.id(), value.type()),
+                            urls.url(spaceId, asset.id(), value.type(), value.profile()),
                             value.contentType(), value.sizeBytes(), value.width(), value.height(), value.status())).toList());
         }
     }

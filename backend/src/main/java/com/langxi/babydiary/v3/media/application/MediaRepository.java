@@ -15,9 +15,13 @@ public interface MediaRepository {
     List<MediaAsset> findByPublicIds(long spaceId, List<UUID> publicIds, long accountId);
 
     Optional<MediaAsset.Variant> findVariant(long spaceId, UUID publicId, String type, String profile,
-                                              long accountId);
+                                             long accountId);
+
+    Optional<MediaAsset.Variant> findPreferredVariant(long spaceId, UUID publicId, String type, long accountId);
 
     Optional<MediaAsset.Variant> findPublicVariant(UUID spaceId, UUID publicId, String type, String profile);
+
+    Optional<MediaAsset.Variant> findPreferredPublicVariant(UUID spaceId, UUID publicId, String type);
 
     long insertAsset(NewAsset asset);
 

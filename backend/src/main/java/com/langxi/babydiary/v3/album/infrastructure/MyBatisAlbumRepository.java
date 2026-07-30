@@ -110,6 +110,7 @@ public class MyBatisAlbumRepository implements AlbumRepository {
         return new AlbumRow(row.albumId(), BinaryUuid.fromBytes(row.publicId()), row.groupId(),
                 row.groupPublicId() == null ? null : BinaryUuid.fromBytes(row.groupPublicId()),
                 row.type(), row.name(), row.description(),
-                row.coverPublicId() == null ? null : BinaryUuid.fromBytes(row.coverPublicId()), row.mediaCount());
+                row.coverPublicId() == null ? null : BinaryUuid.fromBytes(row.coverPublicId()),
+                row.coverVariantType(), row.coverVariantProfile(), row.mediaCount());
     }
 }

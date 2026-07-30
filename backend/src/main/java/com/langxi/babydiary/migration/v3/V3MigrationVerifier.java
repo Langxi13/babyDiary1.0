@@ -77,6 +77,11 @@ final class V3MigrationVerifier {
         if (scalar(target, "SELECT COUNT(*) FROM diary_media dm JOIN diary d ON d.diary_id=dm.diary_id JOIN media_asset a ON a.asset_id=dm.asset_id WHERE d.space_id<>a.space_id") != 0) {
             failures.add("Cross-space diary media exists in V3 target");
         }
+        if (scalar(target, "SELECT COUNT(*) FROM media_asset a WHERE a.deleted_at IS NULL AND a.status='READY' "
+                + "AND NOT EXISTS (SELECT 1 FROM media_variant v WHERE v.asset_id=a.asset_id "
+                + "AND v.variant_type='ORIGINAL' AND v.status='READY' AND v.deleted_at IS NULL)") != 0) {
+            failures.add("Ready media without a readable original variant exists in V3 target");
+        }
         if (scalar(target, "SELECT COUNT(*) FROM space_storage_usage u JOIN (SELECT s.space_id,COALESCE(SUM(v.size_bytes),0) bytes FROM diary_space s LEFT JOIN media_asset a ON a.space_id=s.space_id AND a.deleted_at IS NULL LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL GROUP BY s.space_id) c ON c.space_id=u.space_id WHERE c.bytes<>u.used_bytes") != 0) {
             failures.add("Storage usage does not equal media variant bytes");
         }
@@ -96,7 +101,8 @@ final class V3MigrationVerifier {
 
         if (failures.isEmpty()) checks.addAll(List.of(
                 "all-counts", "account-semantics", "diary-semantics", "media-semantics",
-                "memory-semantics", "ai-report-semantics", "space-isolation", "storage-accounting", "legacy-removed"));
+                "media-variant-availability", "memory-semantics", "ai-report-semantics", "space-isolation",
+                "storage-accounting", "legacy-removed"));
         return new V3MigrationReport("verify", failures.isEmpty(), counts, checks, failures);
     }
 

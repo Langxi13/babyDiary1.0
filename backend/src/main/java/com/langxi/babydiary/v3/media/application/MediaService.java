@@ -106,10 +106,14 @@ public class MediaService {
         return require(space.internalId(), assetId, accountId);
     }
 
-    public StoredObject openVariant(UUID spaceId, UUID assetId, String variant, long accountId) throws IOException {
+    public StoredObject openVariant(UUID spaceId, UUID assetId, String variant, String profile,
+                                    long accountId) throws IOException {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         String normalized = variant == null || variant.isBlank() ? "ORIGINAL" : variant.trim().toUpperCase();
-        MediaAsset.Variant value = media.findVariant(space.internalId(), assetId, normalized, "default", accountId)
+        MediaAsset.Variant value = profile == null || profile.isBlank()
+                ? media.findPreferredVariant(space.internalId(), assetId, normalized, accountId)
+                    .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"))
+                : media.findVariant(space.internalId(), assetId, normalized, normalizeProfile(profile), accountId)
                 .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"));
         try {
             StoredObject object = storage.get(value.storageKey());
@@ -121,8 +125,11 @@ public class MediaService {
         }
     }
 
-    public StoredObject openSignedVariant(UUID spaceId, UUID assetId, String variant) throws IOException {
-        MediaAsset.Variant value = media.findPublicVariant(spaceId, assetId, variant, "default")
+    public StoredObject openSignedVariant(UUID spaceId, UUID assetId, String variant, String profile) throws IOException {
+        MediaAsset.Variant value = profile == null || profile.isBlank()
+                ? media.findPreferredPublicVariant(spaceId, assetId, variant)
+                    .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"))
+                : media.findPublicVariant(spaceId, assetId, variant, normalizeProfile(profile))
                 .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"));
         try {
             StoredObject object = storage.get(value.storageKey());
@@ -179,6 +186,14 @@ public class MediaService {
         if (contentType.startsWith("image/")) return "IMAGE";
         if (contentType.startsWith("video/")) return "VIDEO";
         return "AUDIO";
+    }
+
+    private String normalizeProfile(String profile) {
+        String normalized = profile.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!normalized.matches("[a-z0-9][a-z0-9._-]{0,31}")) {
+            throw V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在");
+        }
+        return normalized;
     }
 
     private String safeFilename(String value) {

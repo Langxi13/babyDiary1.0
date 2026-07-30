@@ -56,7 +56,7 @@
             v-for="(img, index) in images"
             :key="img.assetId"
             :src="img.thumbnailUrl || img.contentUrl"
-            :preview-src-list="images.map(item => item.contentUrl)"
+            :preview-src-list="images.map(item => item.contentUrl).filter(Boolean)"
             :initial-index="index"
             :preview-teleported="true"
             fit="cover"

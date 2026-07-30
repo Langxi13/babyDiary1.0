@@ -31,10 +31,12 @@ public class PublicMediaController {
 
     @GetMapping("/{spaceId}/{assetId}/{variant}")
     public ResponseEntity<StreamingResponseBody> content(@PathVariable UUID spaceId, @PathVariable UUID assetId,
-                                                          @PathVariable String variant, @RequestParam long expires,
+                                                          @PathVariable String variant,
+                                                          @RequestParam(required = false) String profile,
+                                                          @RequestParam long expires,
                                                           @RequestParam String signature) throws IOException {
-        String verifiedVariant = signer.verify(spaceId, assetId, variant, expires, signature);
-        StoredObject object = media.openSignedVariant(spaceId, assetId, verifiedVariant);
+        MediaUrlSigner.VerifiedVariant verified = signer.verify(spaceId, assetId, variant, profile, expires, signature);
+        StoredObject object = media.openSignedVariant(spaceId, assetId, verified.type(), verified.profile());
         String contentType = object.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : object.contentType();
         StreamingResponseBody body = output -> {
             try (object) {

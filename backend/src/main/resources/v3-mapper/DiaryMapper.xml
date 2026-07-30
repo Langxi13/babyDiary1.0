@@ -86,10 +86,26 @@
     </select>
 
     <select id="findMedia" resultType="com.langxi.babydiary.v3.diary.infrastructure.DiaryMapper$MediaRow">
-        SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,a.caption,a.taken_at,dm.position,a.status
+        SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,a.caption,a.taken_at,dm.position,a.status,
+               ov.profile AS original_profile,tv.profile AS thumbnail_profile
         FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
+        LEFT JOIN media_variant ov ON ov.variant_id=(
+            SELECT candidate.variant_id FROM media_variant candidate
+            WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='ORIGINAL'
+              AND candidate.status='READY' AND candidate.deleted_at IS NULL
+            ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                     candidate.variant_id LIMIT 1
+        )
+        LEFT JOIN media_variant tv ON tv.variant_id=(
+            SELECT candidate.variant_id FROM media_variant candidate
+            WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='THUMBNAIL'
+              AND candidate.status='READY' AND candidate.deleted_at IS NULL
+            ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                     candidate.variant_id LIMIT 1
+        )
         WHERE dm.diary_id IN
         <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+          AND a.deleted_at IS NULL AND a.status='READY'
         ORDER BY dm.diary_id,dm.position,a.asset_id
     </select>
 

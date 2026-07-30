@@ -30,7 +30,10 @@ import java.nio.ByteBuffer;
 import java.net.URI;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.List;
@@ -57,6 +60,8 @@ import static org.mockito.Mockito.when;
 @ActiveProfiles("v3")
 class V3ApiIntegrationTest {
     private static final String PASSWORD = "V3-integration-password";
+    private static final String MEDIA_SIGNING_KEY =
+            "v3-test-media-url-signing-key-that-is-long-enough-for-hmac";
     private static final UUID OWNER_PUBLIC_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
     private static final UUID OTHER_PUBLIC_ID = UUID.fromString("22222222-2222-4222-8222-222222222222");
     private static final UUID OWNER_SPACE_ID = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -76,8 +81,7 @@ class V3ApiIntegrationTest {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("jwt.secret", () -> "v3-test-secret-that-is-long-enough-for-hmac-sha-256-signing-key");
-        registry.add("app.v3.media.url-signing-key",
-                () -> "v3-test-media-url-signing-key-that-is-long-enough-for-hmac");
+        registry.add("app.v3.media.url-signing-key", () -> MEDIA_SIGNING_KEY);
         registry.add("app.v3.rate-limit.enabled", () -> "false");
         registry.add("app.v3.jobs.enabled", () -> "false");
         registry.add("spring.data.redis.repositories.enabled", () -> "false");
@@ -460,6 +464,67 @@ class V3ApiIntegrationTest {
     }
 
     @Test
+    void migratedSourceOriginalsAndDefaultThumbnailsRemainReadableFromDiaries() throws Exception {
+        String token = accessToken(login("owner"));
+        byte[] originalBytes = "migrated-original".getBytes(StandardCharsets.UTF_8);
+        byte[] thumbnailBytes = "migrated-thumb".getBytes(StandardCharsets.UTF_8);
+        MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                        .file(new MockMultipartFile("file", "migrated.jpg", "image/jpeg", originalBytes))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isCreated()).andReturn();
+        UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
+        Long internalId = setOriginalProfile(assetId, "source");
+
+        String thumbnailKey = "v3/test/" + assetId + "/thumbnail.jpg";
+        Path thumbnail = Path.of(OBJECT_ROOT).resolve(thumbnailKey);
+        Files.createDirectories(thumbnail.getParent());
+        Files.write(thumbnail, thumbnailBytes);
+        jdbc.update("""
+                INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,
+                  content_type,size_bytes,status)
+                VALUES(?,'THUMBNAIL','default','LOCAL',?,'image/jpeg',?,'READY')
+                """, internalId, thumbnailKey, thumbnailBytes.length);
+
+        MvcResult created = mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)).contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "title", "Migrated media", "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>Profile-aware media</p>", "visibility", "PRIVATE",
+                                "locked", false, "tagIds", List.of(), "mediaIds", List.of(assetId)))))
+                .andExpect(status().isCreated()).andReturn();
+        UUID diaryId = UUID.fromString(body(created).path("id").asText());
+        MvcResult detail = mvc.perform(get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media[0].contentUrl").value(org.hamcrest.Matchers.containsString("profile=source")))
+                .andExpect(jsonPath("$.media[0].thumbnailUrl").value(org.hamcrest.Matchers.containsString("profile=default")))
+                .andReturn();
+        String contentUrl = body(detail).path("media").get(0).path("contentUrl").asText();
+        String thumbnailUrl = body(detail).path("media").get(0).path("thumbnailUrl").asText();
+
+        mvc.perform(get(URI.create(contentUrl))).andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(originalBytes.length)));
+        mvc.perform(get(URI.create(thumbnailUrl))).andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(thumbnailBytes.length)));
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}/variants/original", OWNER_SPACE_ID, assetId)
+                        .queryParam("profile", "source").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}/variants/original", OWNER_SPACE_ID, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}/variants/original", OWNER_SPACE_ID, assetId)
+                        .queryParam("profile", "default").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("MEDIA_VARIANT_NOT_FOUND"));
+        mvc.perform(get(URI.create(contentUrl.replace("profile=source", "profile=default"))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MEDIA_URL_INVALID"));
+
+        mvc.perform(get(URI.create(legacyMediaUrl(OWNER_SPACE_ID, assetId, "ORIGINAL"))))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(originalBytes.length)));
+    }
+
+    @Test
     void privateSharesProtectPasswordsViewsAndSignedMediaWithoutAuthentication() throws Exception {
         String token = accessToken(login("owner"));
         MockMultipartFile file = new MockMultipartFile("file", "shared.jpg", "image/jpeg", "shared-photo".getBytes());
@@ -467,6 +532,7 @@ class V3ApiIntegrationTest {
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
         UUID assetId = UUID.fromString(body(upload).path("id").asText());
+        setOriginalProfile(assetId, "source");
         MvcResult diary = mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)).contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
@@ -492,6 +558,8 @@ class V3ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Shared privately"))
                 .andExpect(jsonPath("$.media[0].assetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.media[0].contentUrl",
+                        org.hamcrest.Matchers.containsString("profile=source")))
                 .andReturn();
         mvc.perform(get(URI.create(body(opened).path("media").get(0).path("contentUrl").asText())))
                 .andExpect(status().isOk());
@@ -604,6 +672,7 @@ class V3ApiIntegrationTest {
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
+        setOriginalProfile(assetId, "source");
         MockMultipartFile secondFile = new MockMultipartFile("file", "album-second.jpg", "image/jpeg",
                 "album-image-second".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         MvcResult secondUpload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
@@ -641,6 +710,8 @@ class V3ApiIntegrationTest {
                                 "mediaIds", List.of(assetId.toString(), secondAssetId.toString())))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.coverAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.coverContentUrl",
+                        org.hamcrest.Matchers.containsString("profile=source")))
                 .andExpect(jsonPath("$.mediaCount").value(2))
                 .andReturn();
         UUID albumId = UUID.fromString(body(album).path("id").asText());
@@ -999,12 +1070,15 @@ class V3ApiIntegrationTest {
                         .file(avatar).header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isCreated()).andReturn();
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
+        setOriginalProfile(assetId, "source");
         mvc.perform(put("/api/v3/account/avatar")
                         .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("spaceId", OWNER_SPACE_ID.toString(), "assetId", assetId.toString()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.avatarAssetId").value(assetId.toString()));
+                .andExpect(jsonPath("$.avatarAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.avatarMedia.contentUrl",
+                        org.hamcrest.Matchers.containsString("profile=source")));
 
         MvcResult invitation = mvc.perform(post("/api/v3/spaces/{spaceId}/invitations", sharedSpaceId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
@@ -1141,6 +1215,7 @@ class V3ApiIntegrationTest {
                         .file(image).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
         String assetId = body(upload).path("id").asText();
+        setOriginalProfile(UUID.fromString(assetId), "source");
         mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -1349,5 +1424,25 @@ class V3ApiIntegrationTest {
     private byte[] sha256(String value) throws Exception {
         return java.security.MessageDigest.getInstance("SHA-256")
                 .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String legacyMediaUrl(UUID spaceId, UUID assetId, String variant) throws Exception {
+        long expires = Instant.now().plusSeconds(1800).getEpochSecond();
+        String normalized = variant.toUpperCase(java.util.Locale.ROOT);
+        String payload = spaceId + "\n" + assetId + "\n" + normalized + "\n" + expires;
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec(MEDIA_SIGNING_KEY.getBytes(StandardCharsets.UTF_8),
+                "HmacSHA256"));
+        String signature = java.util.HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+        return "/api/v3/public/media/" + spaceId + "/" + assetId + "/"
+                + normalized.toLowerCase(java.util.Locale.ROOT) + "?expires=" + expires + "&signature=" + signature;
+    }
+
+    private Long setOriginalProfile(UUID assetId, String profile) {
+        Long internalId = jdbc.queryForObject("SELECT asset_id FROM media_asset WHERE public_id=?", Long.class,
+                uuid(assetId));
+        jdbc.update("UPDATE media_variant SET profile=? WHERE asset_id=? AND variant_type='ORIGINAL'",
+                profile, internalId);
+        return internalId;
     }
 }

@@ -60,6 +60,11 @@ class V3DataMigrationIntegrationTest {
             assertThat(scalar(statement, "SELECT COUNT(*) FROM diary")).isEqualTo(2);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM diary_revision")).isEqualTo(2);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM media_variant")).isEqualTo(2);
+            assertThat(string(statement, "SELECT profile FROM media_variant WHERE variant_type='ORIGINAL'"))
+                    .isEqualTo("source");
+            assertThat(string(statement, "SELECT profile FROM media_variant WHERE variant_type='THUMBNAIL'"))
+                    .isEqualTo("default");
+            assertThat(report.checks()).contains("media-variant-availability");
             assertThat(scalar(statement, "SELECT COUNT(*) FROM ai_album_candidate")).isEqualTo(1);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM ai_album_candidate_media")).isEqualTo(1);
             assertThat(scalar(statement, "SELECT COUNT(*) FROM ai_album_candidate_diary")).isEqualTo(1);

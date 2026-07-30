@@ -62,6 +62,6 @@ public interface AlbumRepository {
     }
 
     record AlbumRow(long internalId, UUID id, Long groupInternalId, UUID groupId, String type, String name, String description,
-                    UUID coverAssetId, long mediaCount) {
+                    UUID coverAssetId, String coverVariantType, String coverVariantProfile, long mediaCount) {
     }
 }

@@ -2,6 +2,10 @@
 
 ## 2026-07-30
 
+- Fixed migrated diary images returning `MEDIA_VARIANT_NOT_FOUND` by carrying each media variant's real profile through diary, share, album-cover, avatar, comment-avatar, direct-media, and signed-public-media responses.
+- Bound new media signatures to both variant type and profile, retained expiry-bounded verification for already issued profile-less signatures, and made profile-less authenticated reads choose `default`, then `source`, then other profiles deterministically.
+- Updated frontend media normalization and diary preview filtering, repaired portable exports for `ORIGINAL/source`, and strengthened migration verification and regression coverage for mixed source/default media assets.
+- Aligned deployment backups with the V3 datasource credentials and JDBC target so a retained legacy datasource cannot cause the current V3 database export to fail.
 - Promoted the V3 UUID-based runtime to production with an isolated `baby_diary_v3` database and a verified migration of the existing accounts, spaces, diaries, media, albums, favorites, avatars, anniversaries, templates, and AI history.
 - Made `/api/v3` the only documented business API and switched local Compose, staging, Docker, systemd, health checks, media policy, and native bootstrap documentation to the V3 runtime.
 - Added the V3 migration CLI with read-only preflight, empty-target enforcement, semantic verification, media checksum validation, space-isolation checks, and explicit migration confirmation.

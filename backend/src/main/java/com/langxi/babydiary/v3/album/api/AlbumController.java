@@ -156,8 +156,10 @@ public class AlbumController {
                                 String description, UUID coverAssetId, String coverContentUrl, long mediaCount) {
         static AlbumResponse from(AlbumCatalog.Album album, UUID spaceId, MediaUrlSigner urls) {
             return new AlbumResponse(album.id(), album.groupId(), album.systemKey(), album.type(), album.name(),
-                    album.description(), album.coverAssetId(), album.coverAssetId() == null ? null
-                    : urls.url(spaceId, album.coverAssetId(), "ORIGINAL"), album.mediaCount());
+                    album.description(), album.coverAssetId(), album.coverAssetId() == null
+                    || album.coverVariantType() == null || album.coverVariantProfile() == null ? null
+                    : urls.url(spaceId, album.coverAssetId(), album.coverVariantType(),
+                    album.coverVariantProfile()), album.mediaCount());
         }
     }
 

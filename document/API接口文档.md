@@ -146,6 +146,10 @@
 | `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
 | `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
+媒体变体由 `variant + profile` 共同确定。资产响应的 `variants[]` 会返回实际 `type`、`profile` 和与二者绑定的 `contentUrl`；日记媒体响应分别返回原图 `contentUrl` 和缩略图 `thumbnailUrl`。受保护变体接口可传可选查询参数 `profile`，省略时按 `default`、`source`、其他 profile 的顺序选择同类型可用变体。
+
+公开媒体 URL 的查询参数为 `profile`、`expires` 和 `signature`，其中 profile 已纳入 HMAC 签名，客户端不得修改。滚动部署前已签发且尚未过期的无 profile URL 仍可读取，并使用相同的确定性顺序选择变体；所有新 URL 都必须携带实际 profile。
+
 ### 相册与收藏
 
 | 方法 | 路径 | 说明 |
@@ -169,7 +173,7 @@
 | `POST` | `/api/v3/spaces/{spaceId}/transfer/import` | 校验并导入 V3 ZIP 归档 |
 | `GET` | `/api/v3/spaces/{spaceId}/books?format=PDF|EPUB` | 导出 PDF 或 EPUB 日记书 |
 
-ZIP 导入会拒绝路径穿越、重复路径、未知版本、超大条目、超大总量和媒体校验失败；临时文件在完成后清理。
+ZIP 导出按同一确定性顺序读取可用原图，因此迁移保留的 `ORIGINAL/source` 与新上传的 `ORIGINAL/default` 都会进入归档。ZIP 导入会拒绝路径穿越、重复路径、未知版本、超大条目、超大总量和媒体校验失败；临时文件在完成后清理。
 
 ## AI、通知与同步
 

@@ -21,7 +21,8 @@ public class MyBatisProfileRepository implements ProfileRepository {
                 BinaryUuid.fromBytes(row.publicId()), row.username(), row.passwordHash(), row.email(),
                 row.emailVerified(), row.systemRole(), row.timezone(),
                 row.avatarPublicId() == null ? null : BinaryUuid.fromBytes(row.avatarPublicId()),
-                row.avatarSpacePublicId() == null ? null : BinaryUuid.fromBytes(row.avatarSpacePublicId())));
+                row.avatarSpacePublicId() == null ? null : BinaryUuid.fromBytes(row.avatarSpacePublicId()),
+                row.avatarVariantType(), row.avatarVariantProfile()));
     }
 
     @Override

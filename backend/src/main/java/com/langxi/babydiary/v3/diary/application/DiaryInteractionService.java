@@ -81,10 +81,12 @@ public class DiaryInteractionService {
 
     private Comment comment(DiaryInteractionMapper.CommentRow row) {
         AvatarMedia avatar = null;
-        if (row.getAvatarAssetPublicId() != null && row.getAvatarSpacePublicId() != null) {
+        if (row.getAvatarAssetPublicId() != null && row.getAvatarSpacePublicId() != null
+                && row.getAvatarVariantType() != null && row.getAvatarVariantProfile() != null) {
             UUID assetId = BinaryUuid.fromBytes(row.getAvatarAssetPublicId());
             UUID spaceId = BinaryUuid.fromBytes(row.getAvatarSpacePublicId());
-            avatar = new AvatarMedia(assetId, mediaUrls.url(spaceId, assetId, "ORIGINAL"));
+            avatar = new AvatarMedia(assetId, mediaUrls.url(spaceId, assetId, row.getAvatarVariantType(),
+                    row.getAvatarVariantProfile()));
         }
         UUID authorId = BinaryUuid.fromBytes(row.getAuthorPublicId());
         return new Comment(BinaryUuid.fromBytes(row.getPublicId()), authorId, authorId, row.getUsername(),

@@ -31,9 +31,9 @@ public class AlbumService {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         List<AlbumCatalog.Group> groups = new ArrayList<>();
         groups.add(new AlbumCatalog.Group(null, "SYSTEM", "默认相册", List.of(
-                new AlbumCatalog.Album(null, null, "all", "SYSTEM", "所有图片", "", null,
+                new AlbumCatalog.Album(null, null, "all", "SYSTEM", "所有图片", "", null, null, null,
                         albums.countLibraryImages(space.internalId(), accountId)),
-                new AlbumCatalog.Album(null, null, "favorites", "SYSTEM", "收藏", "", null,
+                new AlbumCatalog.Album(null, null, "favorites", "SYSTEM", "收藏", "", null, null, null,
                         albums.countFavoriteMedia(space.internalId(), accountId))
         )));
         Map<Long, List<AlbumCatalog.Album>> byGroup = new LinkedHashMap<>();
@@ -83,7 +83,7 @@ public class AlbumService {
                 ? albums.countFavoriteMedia(space.internalId(), accountId)
                 : albums.countLibraryImages(space.internalId(), accountId);
         AlbumCatalog.Album album = new AlbumCatalog.Album(null, null, key, "SYSTEM",
-                "favorites".equals(key) ? "收藏" : "所有图片", "", null, total);
+                "favorites".equals(key) ? "收藏" : "所有图片", "", null, null, null, total);
         return new AlbumCatalog.Detail(album, items, total);
     }
 
@@ -150,7 +150,10 @@ public class AlbumService {
             throw new V3Exception(org.springframework.http.HttpStatus.CONFLICT, "ALBUM_EXISTS", "当前空间已存在同名相册");
         }
         for (int i = 0; i < assets.size(); i++) albums.insertMedia(space.internalId(), albumId, assets.get(i).internalId(), i);
-        return new AlbumCatalog.Album(publicId, groupId, null, "CUSTOM", value, description, assets.isEmpty() ? null : assets.get(0).id(), assets.size());
+        MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
+        return new AlbumCatalog.Album(publicId, groupId, null, "CUSTOM", value, description,
+                assets.isEmpty() ? null : assets.get(0).id(), coverVariant == null ? null : coverVariant.type(),
+                coverVariant == null ? null : coverVariant.profile(), assets.size());
     }
 
     @Transactional
@@ -167,8 +170,10 @@ public class AlbumService {
         for (int index = 0; index < assets.size(); index++) {
             albums.insertMedia(space.internalId(), albumId, assets.get(index).internalId(), index);
         }
+        MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
         return new AlbumCatalog.Album(publicId, group.id(), null, "AI", value, description,
-                assets.isEmpty() ? null : assets.get(0).id(), assets.size());
+                assets.isEmpty() ? null : assets.get(0).id(), coverVariant == null ? null : coverVariant.type(),
+                coverVariant == null ? null : coverVariant.profile(), assets.size());
     }
 
     private AlbumRepository.GroupRow findOrCreateAiGroup(long spaceId, long accountId) {
@@ -276,6 +281,18 @@ public class AlbumService {
 
     private AlbumCatalog.Album toAlbum(AlbumRepository.AlbumRow row, UUID groupId) {
         return new AlbumCatalog.Album(row.id(), groupId, null, row.type(), row.name(), row.description(),
-                row.coverAssetId(), row.mediaCount());
+                row.coverAssetId(), row.coverVariantType(), row.coverVariantProfile(), row.mediaCount());
+    }
+
+    private MediaAsset.Variant coverVariant(MediaAsset asset) {
+        return asset.variants().stream()
+                .filter(value -> "READY".equals(value.status()))
+                .filter(value -> "THUMBNAIL".equals(value.type()) || "ORIGINAL".equals(value.type()))
+                .min(java.util.Comparator
+                        .comparingInt((MediaAsset.Variant value) -> "THUMBNAIL".equals(value.type()) ? 0 : 1)
+                        .thenComparingInt(value -> "default".equals(value.profile()) ? 0
+                                : "source".equals(value.profile()) ? 1 : 2)
+                        .thenComparing(MediaAsset.Variant::profile))
+                .orElse(null);
     }
 }
