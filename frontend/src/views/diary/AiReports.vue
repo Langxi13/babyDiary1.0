@@ -5,12 +5,12 @@
         <div>
           <span class="hero-kicker">智能回忆报告</span>
           <h1>AI 报告</h1>
-          <p>把一周或一个月的日记整理成温暖回忆</p>
+          <p>把一周、一个月或一年的日记整理成温暖回忆</p>
         </div>
         <div class="report-stats">
           <div>
             <span>当前类型</span>
-            <strong>{{ generateForm.type === 'WEEKLY' ? '周报' : '月报' }}</strong>
+            <strong>{{ formatReportType(generateForm.type) }}</strong>
           </div>
           <div>
             <span>周期</span>
@@ -39,10 +39,11 @@
                   <el-radio-group v-model="generateForm.type" class="type-switch">
                     <el-radio-button label="WEEKLY">周报</el-radio-button>
                     <el-radio-button label="MONTHLY">月报</el-radio-button>
+                    <el-radio-button label="ANNUAL">年报</el-radio-button>
                   </el-radio-group>
                 </el-form-item>
 
-                <el-form-item :label="generateForm.type === 'WEEKLY' ? '选择周内任意一天' : '选择月份'">
+                <el-form-item :label="periodPickerLabel">
                   <el-date-picker
                     v-if="generateForm.type === 'WEEKLY'"
                     v-model="generateForm.date"
@@ -52,11 +53,19 @@
                     style="width: 100%"
                   />
                   <el-date-picker
-                    v-else
+                    v-else-if="generateForm.type === 'MONTHLY'"
                     v-model="generateForm.month"
                     type="month"
                     format="YYYY年MM月"
                     value-format="YYYY-MM"
+                    style="width: 100%"
+                  />
+                  <el-date-picker
+                    v-else
+                    v-model="generateForm.year"
+                    type="year"
+                    format="YYYY年"
+                    value-format="YYYY"
                     style="width: 100%"
                   />
                 </el-form-item>
@@ -113,6 +122,7 @@
                 <el-radio-button label="">全部</el-radio-button>
                 <el-radio-button label="WEEKLY">周报</el-radio-button>
                 <el-radio-button label="MONTHLY">月报</el-radio-button>
+                <el-radio-button label="ANNUAL">年报</el-radio-button>
               </el-radio-group>
               <el-button @click="resetReports">
                 <el-icon><Refresh /></el-icon>
@@ -296,7 +306,8 @@ const today = new Date()
 const generateForm = reactive({
   type: 'WEEKLY',
   date: formatLocalDate(today),
-  month: formatMonthlyPeriod(today)
+  month: formatMonthlyPeriod(today),
+  year: String(today.getFullYear())
 })
 
 const configForm = reactive({
@@ -309,6 +320,9 @@ const configForm = reactive({
 })
 
 const reportPeriod = computed(() => {
+  if (generateForm.type === 'ANNUAL') {
+    return generateForm.year || String(new Date().getFullYear())
+  }
   if (generateForm.type === 'MONTHLY') {
     return generateForm.month || formatMonthlyPeriod(new Date())
   }
@@ -317,14 +331,22 @@ const reportPeriod = computed(() => {
 
 const reportPeriodText = computed(() => formatChineseReportPeriod(generateForm.type, reportPeriod.value))
 
+const periodPickerLabel = computed(() => {
+  if (generateForm.type === 'WEEKLY') return '选择周内任意一天'
+  return generateForm.type === 'MONTHLY' ? '选择月份' : '选择年份'
+})
+
 const periodLabel = computed(() => {
-  return `${reportPeriodText.value} ${generateForm.type === 'MONTHLY' ? '月报' : '周报'}`
+  return `${reportPeriodText.value} ${formatReportType(generateForm.type)}`
 })
 
 const renderedReportHtml = computed(() => renderMarkdownReport(currentReport.value?.contentMarkdown || ''))
 const hasMoreReports = computed(() => reports.value.length < totalReports.value)
 
-const formatReportType = (type) => type === 'MONTHLY' ? '月报' : '周报'
+const formatReportType = (type) => {
+  if (type === 'MONTHLY') return '月报'
+  return type === 'ANNUAL' ? '年报' : '周报'
+}
 
 const stopGenerationTimer = () => {
   if (generationTimer) {

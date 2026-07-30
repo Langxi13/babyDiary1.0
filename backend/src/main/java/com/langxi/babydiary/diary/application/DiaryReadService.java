@@ -1,7 +1,11 @@
 package com.langxi.babydiary.diary.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.langxi.babydiary.platform.application.ApiException;
+import com.langxi.babydiary.platform.application.ReadCache;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -13,19 +17,39 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DiaryReadService {
+    private static final TypeReference<CalendarMonth> CALENDAR = new TypeReference<>() {};
+    private static final TypeReference<TimelineIndex> TIMELINE = new TypeReference<>() {};
+    private static final TypeReference<List<WeekSummary>> WEEKS = new TypeReference<>() {};
     private final SpaceAccess spaces;
     private final DiaryReadRepository reads;
+    private final ReadCache cache;
 
-    public DiaryReadService(SpaceAccess spaces, DiaryReadRepository reads) {
+    public DiaryReadService(SpaceAccess spaces, DiaryReadRepository reads, ReadCache cache) {
         this.spaces = spaces;
         this.reads = reads;
+        this.cache = cache;
     }
 
     public CalendarMonth calendar(UUID spaceId, long accountId, YearMonth month, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         if (month == null) throw ApiException.badRequest("MONTH_REQUIRED", "请选择月份");
+        if (!elevated) {
+            return cache.get(
+                    ReadCacheInvalidator.DIARY_AGGREGATES,
+                    spaceId,
+                    accountId,
+                    "calendar:" + month,
+                    Duration.ofMinutes(3),
+                    CALENDAR,
+                    () -> calendar(space.internalId(), accountId, month, false));
+        }
+        return calendar(space.internalId(), accountId, month, true);
+    }
+
+    private CalendarMonth calendar(
+            long spaceId, long accountId, YearMonth month, boolean elevated) {
         Map<LocalDate, List<DiaryReadRepository.CalendarRow>> grouped = new LinkedHashMap<>();
-        reads.findCalendar(space.internalId(), accountId, month.atDay(1), month.atEndOfMonth())
+        reads.findCalendar(spaceId, accountId, month.atDay(1), month.atEndOfMonth())
                 .forEach(
                         row ->
                                 grouped.computeIfAbsent(row.date(), ignored -> new ArrayList<>())
@@ -68,10 +92,20 @@ public class DiaryReadService {
 
     public TimelineIndex timeline(UUID spaceId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        return cache.get(
+                ReadCacheInvalidator.DIARY_AGGREGATES,
+                spaceId,
+                accountId,
+                "timeline",
+                Duration.ofMinutes(3),
+                TIMELINE,
+                () -> timeline(space.internalId(), accountId));
+    }
+
+    private TimelineIndex timeline(long spaceId, long accountId) {
         Map<Integer, List<MonthSummary>> months = new LinkedHashMap<>();
         Map<Integer, Long> yearCounts = new LinkedHashMap<>();
-        for (DiaryReadRepository.MonthCount row :
-                reads.findMonthCounts(space.internalId(), accountId)) {
+        for (DiaryReadRepository.MonthCount row : reads.findMonthCounts(spaceId, accountId)) {
             months.computeIfAbsent(row.year(), ignored -> new ArrayList<>())
                     .add(new MonthSummary(YearMonth.of(row.year(), row.month()), row.count()));
             yearCounts.merge(row.year(), row.count(), Long::sum);
@@ -90,14 +124,28 @@ public class DiaryReadService {
     public List<WeekSummary> weeks(UUID spaceId, long accountId, YearMonth month) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         if (month == null) throw ApiException.badRequest("MONTH_REQUIRED", "请选择月份");
-        return reads
-                .findWeekCounts(space.internalId(), accountId, month.atDay(1), month.atEndOfMonth())
-                .stream()
-                .map(
-                        row ->
-                                new WeekSummary(
-                                        row.weekStart(), row.weekStart().plusDays(6), row.count()))
-                .toList();
+        return cache.get(
+                ReadCacheInvalidator.DIARY_AGGREGATES,
+                spaceId,
+                accountId,
+                "weeks:" + month,
+                Duration.ofMinutes(3),
+                WEEKS,
+                () ->
+                        reads
+                                .findWeekCounts(
+                                        space.internalId(),
+                                        accountId,
+                                        month.atDay(1),
+                                        month.atEndOfMonth())
+                                .stream()
+                                .map(
+                                        row ->
+                                                new WeekSummary(
+                                                        row.weekStart(),
+                                                        row.weekStart().plusDays(6),
+                                                        row.count()))
+                                .toList());
     }
 
     private String ellipsis(String value, int max) {

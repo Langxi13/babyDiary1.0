@@ -149,6 +149,22 @@ public class MediaController {
                 MediaAccessContext.direct(principal.accountId(), elevated));
     }
 
+    @PostMapping("/{assetId}/transfer")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void transferOwnership(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @PathVariable UUID assetId,
+            @Valid @RequestBody TransferRequest request,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        media.transferOwnership(
+                spaceId,
+                assetId,
+                request.targetAccountId(),
+                principal.accountId(),
+                stepUp.valid(principal, stepToken));
+    }
+
     public record MediaPageResponse(List<MediaView> items, String nextCursor) {}
 
     public record MetadataRequest(
@@ -156,4 +172,6 @@ public class MediaController {
             LocalDateTime takenAt,
             @Pattern(regexp = "LINKED|SPACE") String accessScope,
             boolean libraryVisible) {}
+
+    public record TransferRequest(UUID targetAccountId) {}
 }

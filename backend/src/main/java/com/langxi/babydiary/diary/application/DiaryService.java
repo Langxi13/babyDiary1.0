@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.langxi.babydiary.diary.domain.DiaryEntry;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.application.ChangeRecorder;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.platform.domain.CursorPage;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +34,7 @@ public class DiaryService {
     private final DiaryRepository diaries;
     private final DiaryContentPolicy contentPolicy;
     private final ChangeRecorder changes;
+    private final ReadCacheInvalidator cacheInvalidator;
     private final ObjectMapper json;
     private final Clock clock;
 
@@ -42,8 +44,9 @@ public class DiaryService {
             DiaryRepository diaries,
             DiaryContentPolicy contentPolicy,
             ChangeRecorder changes,
-            ObjectMapper json) {
-        this(spaces, diaries, contentPolicy, changes, json, Clock.systemUTC());
+            ObjectMapper json,
+            ReadCacheInvalidator cacheInvalidator) {
+        this(spaces, diaries, contentPolicy, changes, json, cacheInvalidator, Clock.systemUTC());
     }
 
     DiaryService(
@@ -52,12 +55,14 @@ public class DiaryService {
             DiaryContentPolicy contentPolicy,
             ChangeRecorder changes,
             ObjectMapper json,
+            ReadCacheInvalidator cacheInvalidator,
             Clock clock) {
         this.spaces = spaces;
         this.diaries = diaries;
         this.contentPolicy = contentPolicy;
         this.changes = changes;
         this.json = json;
+        this.cacheInvalidator = cacheInvalidator;
         this.clock = clock;
     }
 
@@ -162,7 +167,8 @@ public class DiaryService {
                 publicId,
                 "DIARY_CREATED",
                 created.version(),
-                Map.of());
+                Map.of("visibility", created.visibility()));
+        cacheInvalidator.diary(spaceId);
         return created;
     }
 
@@ -208,7 +214,8 @@ public class DiaryService {
                 diaryId,
                 "DIARY_UPDATED",
                 result.version(),
-                Map.of());
+                Map.of("visibility", result.visibility()));
+        cacheInvalidator.diary(spaceId);
         return result;
     }
 
@@ -228,7 +235,8 @@ public class DiaryService {
                 diaryId,
                 "DIARY_DELETED",
                 expectedVersion + 1,
-                Map.of());
+                Map.of("visibility", current.visibility()));
+        cacheInvalidator.diary(spaceId);
     }
 
     @Transactional
@@ -249,8 +257,33 @@ public class DiaryService {
                 diaryId,
                 "DIARY_RESTORED",
                 result.version(),
-                Map.of());
+                Map.of("visibility", result.visibility()));
+        cacheInvalidator.diary(spaceId);
         return result;
+    }
+
+    @Transactional
+    public void permanentlyDelete(
+            UUID spaceId, UUID diaryId, long accountId, int expectedVersion, boolean elevated) {
+        SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
+        DiaryEntry current = requireDiary(space.internalId(), diaryId, accountId, true);
+        requireProtection(current, elevated);
+        if (current.deletedAt() == null) {
+            throw ApiException.conflict("DIARY_NOT_IN_TRASH", "请先将日记移入回收站");
+        }
+        if (current.version() != expectedVersion
+                || !diaries.permanentlyDelete(current.internalId(), expectedVersion)) {
+            throw versionMismatch();
+        }
+        changes.record(
+                space.internalId(),
+                accountId,
+                "DIARY",
+                diaryId,
+                "DIARY_PURGED",
+                expectedVersion + 1,
+                Map.of("visibility", current.visibility()));
+        cacheInvalidator.diary(spaceId);
     }
 
     public List<DiaryRepository.RevisionSummary> revisions(

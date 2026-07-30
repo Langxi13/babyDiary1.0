@@ -2,6 +2,10 @@
 
 ## 2026-07-30
 
+- Added account/space-scoped Redis read caching for tags, diary aggregates and sanitized album metadata, with post-commit version invalidation, database fallback, a short circuit breaker and deferred invalidation replay.
+- Added bounded Outbox delivery, idempotent shared-diary notifications, optional VAPID Web Push, timezone-aware writing reminders, scheduled weekly/monthly/annual AI reports and catch-up for missed period boundaries.
+- Added Flyway V3 retention infrastructure, 30-day diary trash purging, explicit permanent deletion, 90-day sync baselines/reset responses, expired operational-data cleanup and media ownership transfer between active space members.
+- Updated the frontend for annual reports, permanent trash deletion and stale offline cursor resets; updated current API/performance/AI smoke scripts and removed public documentation of production data counts.
 - Removed the frontend's fabricated V3 success envelopes and legacy model aliases; Web and Capacitor transports now expose the same raw response body, API methods require an explicit space, and UI state uses canonical `id`, `diaryDate`, `mood`, and `representations` fields.
 - Consolidated personal and shared diary API behavior, media presentation helpers, the Emoji mood picker, and the diary media gallery; corrected shared-space cursor pagination, invitation acceptance, notifications, templates, comments, shares, and account session consumers that still expected retired response fields.
 - Replaced the remaining application-to-MyBatis dependencies with explicit repository/gateway ports and infrastructure adapters across AI albums, schedules, discovery, templates, interactions, recovery, media authorization, notifications, shares, transfers and background jobs.

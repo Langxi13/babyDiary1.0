@@ -1,8 +1,12 @@
 package com.langxi.babydiary.diary.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.application.BinaryUuid;
+import com.langxi.babydiary.platform.application.ReadCache;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
@@ -12,12 +16,16 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DiaryDiscoveryService {
+    private static final TypeReference<YearInsight> YEAR_INSIGHT = new TypeReference<>() {};
     private final SpaceAccess spaces;
     private final DiaryDiscoveryRepository mapper;
+    private final ReadCache cache;
 
-    public DiaryDiscoveryService(SpaceAccess spaces, DiaryDiscoveryRepository mapper) {
+    public DiaryDiscoveryService(
+            SpaceAccess spaces, DiaryDiscoveryRepository mapper, ReadCache cache) {
         this.spaces = spaces;
         this.mapper = mapper;
+        this.cache = cache;
     }
 
     public SearchResponse search(UUID spaceId, long accountId, String query, int limit) {
@@ -50,9 +58,20 @@ public class DiaryDiscoveryService {
         if (year < 1900 || year > LocalDate.now().getYear() + 1)
             throw ApiException.badRequest("INSIGHT_YEAR_INVALID", "统计年份无效");
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        return cache.get(
+                ReadCacheInvalidator.DIARY_AGGREGATES,
+                spaceId,
+                accountId,
+                "year-insight:" + year,
+                Duration.ofMinutes(3),
+                YEAR_INSIGHT,
+                () -> yearly(space.internalId(), accountId, year));
+    }
+
+    private YearInsight yearly(long spaceId, long accountId, int year) {
         LocalDate start = LocalDate.of(year, 1, 1), end = LocalDate.of(year, 12, 31);
         List<DiaryDiscoveryRepository.DayCount> days =
-                mapper.findDays(space.internalId(), accountId, start, end);
+                mapper.findDays(spaceId, accountId, start, end);
         Streak streak = streak(days);
         return new YearInsight(
                 year,
@@ -60,12 +79,12 @@ public class DiaryDiscoveryService {
                 days.size(),
                 streak.current,
                 streak.longest,
-                mapper.countPhotos(space.internalId(), accountId, start, end),
+                mapper.countPhotos(spaceId, accountId, start, end),
                 days.stream().map(row -> new Day(row.day(), row.itemCount())).toList(),
-                mapper.findMoods(space.internalId(), accountId, start, end).stream()
+                mapper.findMoods(spaceId, accountId, start, end).stream()
                         .map(row -> new Mood(row.moodKey(), row.itemCount()))
                         .toList(),
-                mapper.findMonths(space.internalId(), accountId, start, end).stream()
+                mapper.findMonths(spaceId, accountId, start, end).stream()
                         .map(row -> new Month(row.month(), row.itemCount()))
                         .toList());
     }

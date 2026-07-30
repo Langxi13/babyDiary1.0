@@ -1,12 +1,16 @@
 package com.langxi.babydiary.album.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.langxi.babydiary.album.domain.AlbumCatalog;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.domain.MediaAsset;
 import com.langxi.babydiary.platform.application.ApiException;
+import com.langxi.babydiary.platform.application.ReadCache;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,24 +22,43 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AlbumService {
+    private static final TypeReference<AlbumCatalog> CATALOG = new TypeReference<>() {};
+    private static final TypeReference<AlbumCatalog.Detail> DETAIL = new TypeReference<>() {};
     private final SpaceAccess spaces;
     private final AlbumRepository albums;
     private final MediaRepository media;
     private final MediaAccessPolicy mediaAccess;
+    private final ReadCache cache;
+    private final ReadCacheInvalidator cacheInvalidator;
 
     public AlbumService(
             SpaceAccess spaces,
             AlbumRepository albums,
             MediaRepository media,
-            MediaAccessPolicy mediaAccess) {
+            MediaAccessPolicy mediaAccess,
+            ReadCache cache,
+            ReadCacheInvalidator cacheInvalidator) {
         this.spaces = spaces;
         this.albums = albums;
         this.media = media;
         this.mediaAccess = mediaAccess;
+        this.cache = cache;
+        this.cacheInvalidator = cacheInvalidator;
     }
 
     public AlbumCatalog catalog(UUID spaceId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        return cache.get(
+                ReadCacheInvalidator.ALBUM_METADATA,
+                spaceId,
+                accountId,
+                "catalog",
+                Duration.ofMinutes(2),
+                CATALOG,
+                () -> cacheSafe(catalog(space.internalId(), accountId)));
+    }
+
+    private AlbumCatalog catalog(long spaceId, long accountId) {
         List<AlbumCatalog.Group> groups = new ArrayList<>();
         groups.add(
                 new AlbumCatalog.Group(
@@ -53,7 +76,7 @@ public class AlbumService {
                                         null,
                                         null,
                                         null,
-                                        albums.countLibraryImages(space.internalId(), accountId),
+                                        albums.countLibraryImages(spaceId, accountId),
                                         null),
                                 new AlbumCatalog.Album(
                                         null,
@@ -65,21 +88,21 @@ public class AlbumService {
                                         null,
                                         null,
                                         null,
-                                        albums.countFavoriteMedia(space.internalId(), accountId),
+                                        albums.countFavoriteMedia(spaceId, accountId),
                                         null))));
         Map<Long, List<AlbumCatalog.Album>> byGroup = new LinkedHashMap<>();
-        List<AlbumRepository.GroupRow> groupRows = albums.findGroups(space.internalId());
+        List<AlbumRepository.GroupRow> groupRows = albums.findGroups(spaceId);
         for (AlbumRepository.GroupRow group : groupRows) {
             byGroup.put(group.internalId(), new ArrayList<>());
             groups.add(
                     new AlbumCatalog.Group(
                             group.id(), "CUSTOM", group.name(), byGroup.get(group.internalId())));
         }
-        List<AlbumRepository.AlbumRow> albumRows = albums.findAlbums(space.internalId());
+        List<AlbumRepository.AlbumRow> albumRows = albums.findAlbums(spaceId);
         Map<UUID, MediaAsset> covers =
                 media
                         .findByPublicIdsInSpace(
-                                space.internalId(),
+                                spaceId,
                                 albumRows.stream()
                                         .map(AlbumRepository.AlbumRow::coverAssetId)
                                         .filter(java.util.Objects::nonNull)
@@ -106,27 +129,38 @@ public class AlbumService {
     public AlbumCatalog.Detail detail(
             UUID spaceId, UUID albumId, long accountId, int page, int size) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        AlbumRepository.AlbumRow row =
-                albums.findAlbum(space.internalId(), albumId)
-                        .orElseThrow(() -> ApiException.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问"));
         PageBounds bounds = PageBounds.of(page, size);
+        return cache.get(
+                ReadCacheInvalidator.ALBUM_METADATA,
+                spaceId,
+                accountId,
+                "detail:" + albumId + ":" + bounds.offset() + ":" + bounds.size(),
+                Duration.ofMinutes(2),
+                DETAIL,
+                () -> cacheSafe(detail(space.internalId(), albumId, accountId, bounds)));
+    }
+
+    private AlbumCatalog.Detail detail(
+            long spaceId, UUID albumId, long accountId, PageBounds bounds) {
+        AlbumRepository.AlbumRow row =
+                albums.findAlbum(spaceId, albumId)
+                        .orElseThrow(() -> ApiException.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问"));
         List<UUID> ids =
                 albums.findMediaPublicIds(
-                        space.internalId(), albumId, accountId, bounds.offset(), bounds.size());
-        List<MediaAsset> items = media.findByPublicIdsInSpace(space.internalId(), ids);
+                        spaceId, albumId, accountId, bounds.offset(), bounds.size());
+        List<MediaAsset> items = media.findByPublicIdsInSpace(spaceId, ids);
         MediaAsset cover =
                 row.coverAssetId() == null
                         ? null
                         : media
-                                .findByPublicIdsInSpace(
-                                        space.internalId(), List.of(row.coverAssetId()))
+                                .findByPublicIdsInSpace(spaceId, List.of(row.coverAssetId()))
                                 .stream()
                                 .findFirst()
                                 .orElse(null);
         return new AlbumCatalog.Detail(
                 toAlbum(row, row.groupId(), cover),
                 items,
-                albums.countMedia(space.internalId(), albumId, accountId));
+                albums.countMedia(spaceId, albumId, accountId));
     }
 
     public AlbumCatalog.Detail systemDetail(
@@ -136,17 +170,29 @@ public class AlbumService {
             throw ApiException.notFound("ALBUM_NOT_FOUND", "系统相册不存在");
         }
         PageBounds bounds = PageBounds.of(page, size);
+        return cache.get(
+                ReadCacheInvalidator.ALBUM_METADATA,
+                spaceId,
+                accountId,
+                "system:" + key + ":" + bounds.offset() + ":" + bounds.size(),
+                Duration.ofMinutes(2),
+                DETAIL,
+                () -> cacheSafe(systemDetail(space.internalId(), key, accountId, bounds)));
+    }
+
+    private AlbumCatalog.Detail systemDetail(
+            long spaceId, String key, long accountId, PageBounds bounds) {
         List<UUID> ids =
                 "favorites".equals(key)
                         ? albums.findFavoritePublicIds(
-                                space.internalId(), accountId, bounds.offset(), bounds.size())
+                                spaceId, accountId, bounds.offset(), bounds.size())
                         : albums.findLibraryPublicIds(
-                                space.internalId(), accountId, bounds.offset(), bounds.size());
-        List<MediaAsset> items = media.findByPublicIds(space.internalId(), ids, accountId);
+                                spaceId, accountId, bounds.offset(), bounds.size());
+        List<MediaAsset> items = media.findByPublicIds(spaceId, ids, accountId);
         long total =
                 "favorites".equals(key)
-                        ? albums.countFavoriteMedia(space.internalId(), accountId)
-                        : albums.countLibraryImages(space.internalId(), accountId);
+                        ? albums.countFavoriteMedia(spaceId, accountId)
+                        : albums.countLibraryImages(spaceId, accountId);
         AlbumCatalog.Album album =
                 new AlbumCatalog.Album(
                         null,
@@ -186,7 +232,10 @@ public class AlbumService {
                             .filter(group -> group.internalId() == id)
                             .findFirst()
                             .orElseThrow();
-            return new AlbumCatalog.Group(row.id(), "CUSTOM", row.name(), List.of());
+            AlbumCatalog.Group created =
+                    new AlbumCatalog.Group(row.id(), "CUSTOM", row.name(), List.of());
+            cacheInvalidator.albums(spaceId);
+            return created;
         } catch (DuplicateKeyException exception) {
             throw new ApiException(
                     org.springframework.http.HttpStatus.CONFLICT,
@@ -209,11 +258,17 @@ public class AlbumService {
                     "ALBUM_GROUP_EXISTS",
                     "当前空间已存在同名相册组");
         }
-        return albums.findGroups(space.internalId()).stream()
-                .filter(group -> group.id().equals(groupId))
-                .map(group -> new AlbumCatalog.Group(group.id(), "CUSTOM", group.name(), List.of()))
-                .findFirst()
-                .orElseThrow();
+        AlbumCatalog.Group updated =
+                albums.findGroups(space.internalId()).stream()
+                        .filter(group -> group.id().equals(groupId))
+                        .map(
+                                group ->
+                                        new AlbumCatalog.Group(
+                                                group.id(), "CUSTOM", group.name(), List.of()))
+                        .findFirst()
+                        .orElseThrow();
+        cacheInvalidator.albums(spaceId);
+        return updated;
     }
 
     @Transactional
@@ -222,6 +277,7 @@ public class AlbumService {
         if (!albums.deleteGroup(space.internalId(), groupId)) {
             throw ApiException.badRequest("ALBUM_GROUP_NOT_EMPTY", "请先删除或移动相册组内的相册");
         }
+        cacheInvalidator.albums(spaceId);
     }
 
     @Transactional
@@ -261,18 +317,21 @@ public class AlbumService {
         for (int i = 0; i < assets.size(); i++)
             albums.insertMedia(space.internalId(), albumId, assets.get(i).internalId(), i);
         MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
-        return new AlbumCatalog.Album(
-                publicId,
-                groupId,
-                null,
-                "CUSTOM",
-                value,
-                description,
-                assets.isEmpty() ? null : assets.get(0).id(),
-                coverVariant == null ? null : coverVariant.type(),
-                coverVariant == null ? null : coverVariant.profile(),
-                assets.size(),
-                assets.isEmpty() ? null : assets.get(0));
+        AlbumCatalog.Album created =
+                new AlbumCatalog.Album(
+                        publicId,
+                        groupId,
+                        null,
+                        "CUSTOM",
+                        value,
+                        description,
+                        assets.isEmpty() ? null : assets.get(0).id(),
+                        coverVariant == null ? null : coverVariant.type(),
+                        coverVariant == null ? null : coverVariant.profile(),
+                        assets.size(),
+                        assets.isEmpty() ? null : assets.get(0));
+        cacheInvalidator.albums(spaceId);
+        return created;
     }
 
     @Transactional
@@ -302,18 +361,21 @@ public class AlbumService {
             albums.insertMedia(space.internalId(), albumId, assets.get(index).internalId(), index);
         }
         MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
-        return new AlbumCatalog.Album(
-                publicId,
-                group.id(),
-                null,
-                "AI",
-                value,
-                description,
-                assets.isEmpty() ? null : assets.get(0).id(),
-                coverVariant == null ? null : coverVariant.type(),
-                coverVariant == null ? null : coverVariant.profile(),
-                assets.size(),
-                assets.isEmpty() ? null : assets.get(0));
+        AlbumCatalog.Album created =
+                new AlbumCatalog.Album(
+                        publicId,
+                        group.id(),
+                        null,
+                        "AI",
+                        value,
+                        description,
+                        assets.isEmpty() ? null : assets.get(0).id(),
+                        coverVariant == null ? null : coverVariant.type(),
+                        coverVariant == null ? null : coverVariant.profile(),
+                        assets.size(),
+                        assets.isEmpty() ? null : assets.get(0));
+        cacheInvalidator.albums(spaceId);
+        return created;
     }
 
     private AlbumRepository.GroupRow findOrCreateAiGroup(long spaceId, long accountId) {
@@ -372,7 +434,9 @@ public class AlbumService {
                                 .stream()
                                 .findFirst()
                                 .orElse(null);
-        return toAlbum(row, row.groupId(), cover);
+        AlbumCatalog.Album updated = toAlbum(row, row.groupId(), cover);
+        cacheInvalidator.albums(spaceId);
+        return updated;
     }
 
     @Transactional
@@ -381,6 +445,7 @@ public class AlbumService {
         if (!albums.softDeleteAlbum(space.internalId(), albumId)) {
             throw ApiException.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问");
         }
+        cacheInvalidator.albums(spaceId);
     }
 
     @Transactional
@@ -401,6 +466,7 @@ public class AlbumService {
         }
         if (album.coverAssetId() == null && !assets.isEmpty())
             albums.updateCover(space.internalId(), album.internalId(), assets.get(0).internalId());
+        cacheInvalidator.albums(spaceId);
     }
 
     @Transactional
@@ -434,6 +500,7 @@ public class AlbumService {
                                     .orElse(null);
             albums.updateCover(space.internalId(), album.internalId(), replacementId);
         }
+        cacheInvalidator.albums(spaceId);
     }
 
     @Transactional
@@ -447,6 +514,7 @@ public class AlbumService {
         mediaAccess.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
         if (value) albums.addFavorite(space.internalId(), accountId, asset.internalId());
         else albums.removeFavorite(space.internalId(), accountId, asset.internalId());
+        cacheInvalidator.albums(spaceId);
     }
 
     private Long resolveGroup(long spaceId, UUID groupId) {
@@ -515,5 +583,75 @@ public class AlbumService {
                                                         : "source".equals(value.profile()) ? 1 : 2)
                                 .thenComparing(MediaAsset.Variant::profile))
                 .orElse(null);
+    }
+
+    private AlbumCatalog cacheSafe(AlbumCatalog value) {
+        return new AlbumCatalog(
+                value.groups().stream()
+                        .map(
+                                group ->
+                                        new AlbumCatalog.Group(
+                                                group.id(),
+                                                group.type(),
+                                                group.name(),
+                                                group.albums().stream()
+                                                        .map(this::cacheSafe)
+                                                        .toList()))
+                        .toList());
+    }
+
+    private AlbumCatalog.Detail cacheSafe(AlbumCatalog.Detail value) {
+        return new AlbumCatalog.Detail(
+                cacheSafe(value.album()),
+                value.media().stream().map(this::cacheSafe).toList(),
+                value.totalMedia());
+    }
+
+    private AlbumCatalog.Album cacheSafe(AlbumCatalog.Album value) {
+        return new AlbumCatalog.Album(
+                value.id(),
+                value.groupId(),
+                value.systemKey(),
+                value.type(),
+                value.name(),
+                value.description(),
+                value.coverAssetId(),
+                value.coverVariantType(),
+                value.coverVariantProfile(),
+                value.mediaCount(),
+                value.coverMedia() == null ? null : cacheSafe(value.coverMedia()));
+    }
+
+    private MediaAsset cacheSafe(MediaAsset value) {
+        return new MediaAsset(
+                value.internalId(),
+                value.id(),
+                value.spaceId(),
+                value.ownerId(),
+                value.mediaType(),
+                value.originalFilename(),
+                value.caption(),
+                value.takenAt(),
+                value.accessScope(),
+                value.libraryVisible(),
+                value.status(),
+                value.createdAt(),
+                value.updatedAt(),
+                value.variants().stream()
+                        .map(
+                                variant ->
+                                        new MediaAsset.Variant(
+                                                variant.type(),
+                                                variant.profile(),
+                                                null,
+                                                null,
+                                                variant.contentType(),
+                                                variant.sizeBytes(),
+                                                null,
+                                                variant.width(),
+                                                variant.height(),
+                                                variant.durationMillis(),
+                                                variant.status()))
+                        .toList());
     }
 }

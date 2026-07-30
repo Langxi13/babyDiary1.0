@@ -75,6 +75,31 @@ public interface DiaryMapper {
             @Param("expectedVersion") int expectedVersion,
             @Param("deletedAt") LocalDateTime deletedAt);
 
+    @Select(
+            """
+            SELECT d.diary_id,d.public_id,d.space_id,s.public_id AS space_public_id,d.author_id,d.version
+            FROM diary d JOIN diary_space s ON s.space_id=d.space_id
+            WHERE d.deleted_at IS NOT NULL AND d.deleted_at<#{deletedBefore}
+            ORDER BY d.deleted_at,d.diary_id LIMIT #{limit}
+            """)
+    List<PurgeRow> findPurgeCandidates(
+            @Param("deletedBefore") LocalDateTime deletedBefore, @Param("limit") int limit);
+
+    @Select(
+            "SELECT diary_id FROM diary WHERE diary_id=#{diaryId} AND version=#{expectedVersion} AND deleted_at IS NOT NULL FOR UPDATE")
+    Long lockDeleted(@Param("diaryId") long diaryId, @Param("expectedVersion") int expectedVersion);
+
+    @Delete("DELETE FROM ai_report_diary WHERE diary_id=#{diaryId}")
+    void deleteReportLinks(long diaryId);
+
+    @Delete("DELETE FROM ai_album_candidate_diary WHERE diary_id=#{diaryId}")
+    void deleteProposalLinks(long diaryId);
+
+    @Delete(
+            "DELETE FROM diary WHERE diary_id=#{diaryId} AND version=#{expectedVersion} AND deleted_at IS NOT NULL")
+    int permanentlyDelete(
+            @Param("diaryId") long diaryId, @Param("expectedVersion") int expectedVersion);
+
     @Delete("DELETE FROM diary_tag WHERE diary_id=#{diaryId}")
     void deleteTags(long diaryId);
 
@@ -122,6 +147,14 @@ public interface DiaryMapper {
             FROM diary_revision WHERE diary_id=#{diaryId} ORDER BY version DESC,revision_id DESC
             """)
     List<DiaryRepository.RevisionSummary> findRevisions(long diaryId);
+
+    record PurgeRow(
+            long diaryId,
+            byte[] publicId,
+            long spaceId,
+            byte[] spacePublicId,
+            long authorId,
+            int version) {}
 
     final class DiaryRow {
         private long diaryId;

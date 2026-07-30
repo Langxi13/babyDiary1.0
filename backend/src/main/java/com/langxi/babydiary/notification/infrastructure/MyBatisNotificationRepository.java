@@ -53,4 +53,24 @@ public class MyBatisNotificationRepository implements NotificationRepository {
     public void markAllRead(long accountId, LocalDateTime now) {
         mapper.markAllRead(accountId, now);
     }
+
+    @Override
+    public boolean insert(NewNotification notification) {
+        return mapper.insert(
+                        new NotificationMapper.NotificationInsert(
+                                BinaryUuid.toBytes(notification.publicId()),
+                                notification.accountId(),
+                                notification.spaceId(),
+                                notification.type(),
+                                notification.title(),
+                                notification.body(),
+                                notification.targetRefJson(),
+                                notification.dedupeKey()))
+                == 1;
+    }
+
+    @Override
+    public List<Long> findActiveSpaceMemberIds(long spaceId, Long excludedAccountId) {
+        return mapper.findActiveSpaceMemberIds(spaceId, excludedAccountId);
+    }
 }

@@ -6,14 +6,10 @@ import com.langxi.babydiary.identity.application.ProfileRepository;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.space.application.SpaceAccess;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -26,16 +22,19 @@ public class ReminderService {
     private final ReminderRepository reminders;
     private final ObjectMapper json;
     private final ProfileRepository profiles;
+    private final ReminderScheduleCalculator scheduleCalculator;
 
     public ReminderService(
             SpaceAccess spaces,
             ReminderRepository reminders,
             ObjectMapper json,
-            ProfileRepository profiles) {
+            ProfileRepository profiles,
+            ReminderScheduleCalculator scheduleCalculator) {
         this.spaces = spaces;
         this.reminders = reminders;
         this.json = json;
         this.profiles = profiles;
+        this.scheduleCalculator = scheduleCalculator;
     }
 
     public List<ReminderRepository.Row> list(UUID spaceId, long accountId) {
@@ -78,7 +77,10 @@ public class ReminderService {
             zone = ZoneId.of("Asia/Shanghai");
         }
         LocalDateTime next =
-                enabled ? next(normalized, parsed, dayOfWeek, ZonedDateTime.now(zone)) : null;
+                enabled
+                        ? scheduleCalculator.nextUtc(
+                                normalized, parsed, dayOfWeek, zone, ZonedDateTime.now(zone))
+                        : null;
         reminders.upsert(
                 new ReminderRepository.NewReminder(
                         BinaryUuid.toBytes(UUID.randomUUID()),
@@ -92,23 +94,5 @@ public class ReminderService {
                 .filter(row -> normalized.equals(row.type()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Reminder was not saved"));
-    }
-
-    private LocalDateTime next(String type, LocalTime time, Integer day, ZonedDateTime now) {
-        ZonedDateTime candidate;
-        if ("DAILY".equals(type)) {
-            candidate = now.toLocalDate().atTime(time).atZone(now.getZone());
-            if (!candidate.isAfter(now)) candidate = candidate.plusDays(1);
-        } else {
-            LocalDate date =
-                    now.toLocalDate().with(TemporalAdjusters.nextOrSame(DayOfWeek.of(day)));
-            candidate = date.atTime(time).atZone(now.getZone());
-            if (!candidate.isAfter(now)) candidate = candidate.plusWeeks(1);
-        }
-        return candidate
-                .withSecond(0)
-                .withNano(0)
-                .withZoneSameInstant(ZoneOffset.UTC)
-                .toLocalDateTime();
     }
 }

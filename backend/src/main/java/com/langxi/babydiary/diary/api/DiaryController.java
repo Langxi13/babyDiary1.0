@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -162,6 +163,22 @@ public class DiaryController {
         return ResponseEntity.ok()
                 .eTag(etag(diary.version()))
                 .body(DiaryResponse.from(diary, urls, principal.accountId(), elevated));
+    }
+
+    @DeleteMapping("/{diaryId}/permanent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void permanentlyDelete(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @PathVariable UUID diaryId,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        diaries.permanentlyDelete(
+                spaceId,
+                diaryId,
+                principal.accountId(),
+                requiredVersion(ifMatch),
+                stepUp.valid(principal, stepToken));
     }
 
     @GetMapping("/{diaryId}/revisions")

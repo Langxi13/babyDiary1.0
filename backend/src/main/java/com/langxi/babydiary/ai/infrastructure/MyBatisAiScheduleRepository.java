@@ -1,7 +1,9 @@
 package com.langxi.babydiary.ai.infrastructure;
 
 import com.langxi.babydiary.ai.application.AiScheduleRepository;
+import com.langxi.babydiary.platform.application.BinaryUuid;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -33,5 +35,26 @@ public class MyBatisAiScheduleRepository implements AiScheduleRepository {
             boolean annualEnabled,
             LocalDateTime nextRunAt) {
         mapper.upsert(spaceId, accountId, weeklyEnabled, monthlyEnabled, annualEnabled, nextRunAt);
+    }
+
+    @Override
+    public List<DueSchedule> findDue(LocalDateTime now, int limit) {
+        return mapper.findDue(now, limit).stream()
+                .map(
+                        row ->
+                                new DueSchedule(
+                                        row.spaceId(),
+                                        BinaryUuid.fromBytes(row.spacePublicId()),
+                                        row.updatedBy(),
+                                        row.weeklyEnabled(),
+                                        row.monthlyEnabled(),
+                                        row.annualEnabled(),
+                                        row.nextRunAt()))
+                .toList();
+    }
+
+    @Override
+    public boolean claim(long spaceId, LocalDateTime expectedRunAt, LocalDateTime nextRunAt) {
+        return mapper.claim(spaceId, expectedRunAt, nextRunAt) == 1;
     }
 }

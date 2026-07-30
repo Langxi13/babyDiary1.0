@@ -21,6 +21,10 @@ public interface DiaryRepository {
 
     int setDeleted(long diaryId, int expectedVersion, LocalDateTime deletedAt);
 
+    boolean permanentlyDelete(long diaryId, int expectedVersion);
+
+    List<PurgeCandidate> findPurgeCandidates(LocalDateTime deletedBefore, int limit);
+
     List<Long> resolveTagIds(long spaceId, List<UUID> publicIds);
 
     List<Long> resolveMediaIds(long spaceId, long accountId, boolean locked, List<UUID> publicIds);
@@ -75,4 +79,12 @@ public interface DiaryRepository {
             long id, int version, long editorId, String snapshotJson, LocalDateTime createdAt) {}
 
     record RevisionSummary(long id, int version, long editorId, LocalDateTime createdAt) {}
+
+    record PurgeCandidate(
+            long internalId,
+            UUID id,
+            long spaceInternalId,
+            UUID spaceId,
+            long authorId,
+            int version) {}
 }

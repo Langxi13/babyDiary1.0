@@ -102,18 +102,56 @@ class CleanSchemaMigrationTest {
         }
     }
 
+    @Test
+    void v3DoesNotReplayHistoricalOutboxEventsAsFreshNotifications() throws Exception {
+        clean();
+        flyway("2").migrate();
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO account (account_id,public_id,username,password_hash) "
+                            + "VALUES (1,UUID_TO_BIN(UUID()),'owner','hash')");
+            statement.execute(
+                    "INSERT INTO diary_space (space_id,public_id,name,type,created_by,personal_owner_id,default_visibility) "
+                            + "VALUES (10,UUID_TO_BIN(UUID()),'Owner space','PERSONAL',1,1,'PRIVATE')");
+            statement.execute(
+                    "INSERT INTO outbox_event (public_id,space_id,aggregate_type,event_type,payload) "
+                            + "VALUES (UUID_TO_BIN(UUID()),10,'DIARY','DIARY_CREATED',JSON_OBJECT('visibility','SHARED'))");
+        }
+
+        flyway(null).migrate();
+
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT processed_at FROM outbox_event WHERE space_id=10")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getTimestamp(1)).isNotNull();
+        }
+    }
+
     private void migrate() {
+        clean();
+        flyway(null).migrate();
+    }
+
+    private void clean() {
         Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
                 .cleanDisabled(false)
                 .load()
                 .clean();
-        Flyway.configure()
-                .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+    }
+
+    private Flyway flyway(String target) {
+        var configuration =
+                Flyway.configure()
+                        .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
+                        .locations("classpath:db/migration");
+        if (target != null) configuration.target(target);
+        return configuration.load();
     }
 
     private Connection connection() throws SQLException {

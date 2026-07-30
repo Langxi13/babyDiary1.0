@@ -20,16 +20,19 @@ public class AiReportService {
     private final AiConfigService configs;
     private final AiClient client;
     private final AiReportRepository reports;
+    private final AiReportPersistenceService persistence;
 
     public AiReportService(
             SpaceAccess spaces,
             AiConfigService configs,
             AiClient client,
-            AiReportRepository reports) {
+            AiReportRepository reports,
+            AiReportPersistenceService persistence) {
         this.spaces = spaces;
         this.configs = configs;
         this.client = client;
         this.reports = reports;
+        this.persistence = persistence;
     }
 
     public List<AiReportRepository.Report> list(UUID spaceId, long accountId) {
@@ -51,7 +54,6 @@ public class AiReportService {
         }
     }
 
-    @Transactional
     public AiReportRepository.Report generate(
             UUID spaceId, long accountId, String type, String period) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
@@ -60,31 +62,36 @@ public class AiReportService {
                 reports.findDiaries(space.internalId(), accountId, value.start(), value.end());
         if (diaries.isEmpty())
             throw ApiException.badRequest("AI_REPORT_NO_DIARIES", "该周期没有可用于报告的日记");
+        AiRuntimeConfig config = configs.runtime();
         String markdown =
                 client.generate(
-                        configs.runtime(),
+                        config,
                         List.of(
                                 new AiClient.Message("system", systemPrompt()),
                                 new AiClient.Message("user", userPrompt(value, diaries))));
-        AiRuntimeConfig config = configs.runtime();
         UUID publicId = UUID.randomUUID();
-        String title = value.label() + ("WEEKLY".equals(value.type()) ? " 周报" : " 月报");
-        long reportId =
-                reports.insert(
-                        new AiReportRepository.NewReport(
-                                publicId,
-                                space.internalId(),
-                                accountId,
-                                value.type(),
-                                value.start(),
-                                value.end(),
-                                title,
-                                markdown,
-                                diaries.size(),
-                                config.model()));
-        for (AiReportRepository.DiaryInput diary : diaries)
-            reports.insertDiary(space.internalId(), reportId, diary.internalId());
-        return detail(spaceId, publicId, accountId);
+        String title = value.label() + " " + reportName(value.type());
+        return persistence.save(
+                new AiReportRepository.NewReport(
+                        publicId,
+                        space.internalId(),
+                        accountId,
+                        value.type(),
+                        value.start(),
+                        value.end(),
+                        title,
+                        markdown,
+                        diaries.size(),
+                        config.model()),
+                diaries);
+    }
+
+    public java.util.Optional<AiReportRepository.Report> findExisting(
+            UUID spaceId, long accountId, String type, String period) {
+        SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        Period value = resolve(type, period);
+        return reports.findByPeriod(
+                space.internalId(), accountId, value.type(), value.start(), value.end());
     }
 
     private Period resolve(String type, String period) {
@@ -94,6 +101,11 @@ public class AiReportService {
             if ("MONTHLY".equals(normalized)) {
                 YearMonth month = YearMonth.parse(value);
                 return new Period(normalized, value, month.atDay(1), month.atEndOfMonth());
+            }
+            if ("ANNUAL".equals(normalized) && value.matches("\\d{4}")) {
+                int year = Integer.parseInt(value);
+                return new Period(
+                        normalized, value, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
             }
             if ("WEEKLY".equals(normalized) && value.matches("\\d{4}-W\\d{2}")) {
                 int year = Integer.parseInt(value.substring(0, 4));
@@ -108,7 +120,7 @@ public class AiReportService {
         } catch (RuntimeException ignored) {
         }
         throw ApiException.badRequest(
-                "AI_REPORT_PERIOD_INVALID", "报告周期格式无效，请使用 yyyy-MM 或 yyyy-Www");
+                "AI_REPORT_PERIOD_INVALID", "报告周期格式无效，请使用 yyyy、yyyy-MM 或 yyyy-Www");
     }
 
     private String systemPrompt() {
@@ -118,7 +130,7 @@ public class AiReportService {
     private String userPrompt(Period period, List<AiReportRepository.DiaryInput> diaries) {
         StringBuilder prompt =
                 new StringBuilder("请生成一份")
-                        .append("WEEKLY".equals(period.type()) ? "周报" : "月报")
+                        .append(reportName(period.type()))
                         .append("，周期：")
                         .append(period.start())
                         .append(" 至 ")
@@ -139,6 +151,15 @@ public class AiReportService {
             prompt.append(item);
         }
         return prompt.toString();
+    }
+
+    private String reportName(String type) {
+        return switch (type) {
+            case "WEEKLY" -> "周报";
+            case "MONTHLY" -> "月报";
+            case "ANNUAL" -> "年度回顾";
+            default -> "回顾报告";
+        };
     }
 
     private String safe(String value) {

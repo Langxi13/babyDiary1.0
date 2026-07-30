@@ -76,6 +76,7 @@
                       <el-dropdown-item v-if="!filters.trash" command="edit">编辑</el-dropdown-item>
                       <el-dropdown-item v-if="!filters.trash" command="delete" divided>移入回收站</el-dropdown-item>
                       <el-dropdown-item v-else command="restore">恢复日记</el-dropdown-item>
+                      <el-dropdown-item v-if="filters.trash" command="permanent" divided>永久删除</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
@@ -370,6 +371,15 @@ const handleDiaryCommand = async (command, diary) => {
   if (command === 'delete') {
     await ElMessageBox.confirm('这篇日记会在回收站保留30天。', '移入回收站', { confirmButtonText: '移入', cancelButtonText: '取消', type: 'warning' })
     await applyDiaryStateChange('DELETE', diary)
+  } else if (command === 'permanent') {
+    if (!workspaceStore.online) return ElMessage.warning('永久删除需要联网操作')
+    await ElMessageBox.confirm('永久删除后无法恢复，关联图片仍会保留在相册中。', '永久删除日记', { confirmButtonText: '永久删除', cancelButtonText: '取消', type: 'warning' })
+    await withStepUpRetry(token => diaryApi.permanentlyDelete(
+      activeSpaceId.value,
+      diary.id,
+      diary.version,
+      token
+    ))
   } else if (command === 'restore') {
     await applyDiaryStateChange('RESTORE', diary)
   }

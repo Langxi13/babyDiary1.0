@@ -23,6 +23,9 @@ public interface SyncMapper {
             @Param("cursor") long cursor,
             @Param("limit") int limit);
 
+    @Select("SELECT COALESCE(baseline_cursor,0) FROM sync_retention WHERE space_id=#{spaceId}")
+    Long baselineCursor(long spaceId);
+
     @Select(
             "SELECT result_code,entity_type,entity_public_id FROM sync_operation "
                     + "WHERE operation_id=#{operationId} AND account_id=#{accountId} AND space_id=#{spaceId} AND expires_at>UTC_TIMESTAMP(6)")

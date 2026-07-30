@@ -10,6 +10,12 @@ public interface ReminderRepository {
 
     void upsert(NewReminder reminder);
 
+    List<DueReminder> findDue(LocalDateTime now, int limit);
+
+    boolean claim(long reminderId, LocalDateTime expectedRunAt, LocalDateTime nextRunAt);
+
+    void disable(long reminderId, LocalDateTime expectedRunAt);
+
     record Row(
             UUID id,
             String type,
@@ -25,5 +31,16 @@ public interface ReminderRepository {
             String type,
             boolean enabled,
             String scheduleJson,
+            LocalDateTime nextRunAt) {}
+
+    record DueReminder(
+            long internalId,
+            UUID id,
+            long accountId,
+            long spaceInternalId,
+            UUID spaceId,
+            String spaceName,
+            String type,
+            JsonNode schedule,
             LocalDateTime nextRunAt) {}
 }

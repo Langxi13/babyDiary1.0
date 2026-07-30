@@ -11,6 +11,9 @@ public interface AiReportRepository {
 
     Optional<Report> findByPublicId(long spaceId, long creatorId, UUID publicId);
 
+    Optional<Report> findByPeriod(
+            long spaceId, long creatorId, String periodType, LocalDate start, LocalDate end);
+
     boolean delete(long spaceId, long creatorId, UUID publicId);
 
     long insert(NewReport report);

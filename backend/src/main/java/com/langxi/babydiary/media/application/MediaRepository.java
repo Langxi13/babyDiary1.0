@@ -68,6 +68,10 @@ public interface MediaRepository {
             String accessScope,
             boolean libraryVisible);
 
+    Long findActiveMemberAccountId(long spaceId, UUID accountId);
+
+    boolean transferOwnership(long spaceId, UUID assetId, long currentOwnerId, long targetOwnerId);
+
     record Query(
             long spaceId,
             long accountId,

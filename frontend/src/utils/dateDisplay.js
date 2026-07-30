@@ -74,6 +74,10 @@ export function formatChineseDateRange(start, end) {
 }
 
 export function formatChineseReportPeriod(type, period) {
+  if (type === 'ANNUAL') {
+    const year = String(period || '').match(/^\d{4}$/)?.[0]
+    return year ? `${year}年` : period || ''
+  }
   if (type === 'MONTHLY') return formatChineseMonth(period)
   const match = String(period || '').match(/^(\d{4})-W0?(\d{1,2})$/)
   if (match) return `${match[1]}年第${Number(match[2])}周`

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
@@ -197,6 +198,27 @@ public interface MediaMapper {
             @Param("takenAt") LocalDateTime takenAt,
             @Param("accessScope") String accessScope,
             @Param("libraryVisible") boolean libraryVisible);
+
+    @Select(
+            """
+            SELECT a.account_id FROM account a JOIN space_member m ON m.account_id=a.account_id
+            WHERE m.space_id=#{spaceId} AND m.status='ACTIVE' AND a.public_id=#{accountPublicId}
+              AND a.status='ACTIVE'
+            """)
+    Long findActiveMemberAccountId(
+            @Param("spaceId") long spaceId, @Param("accountPublicId") byte[] accountPublicId);
+
+    @Update(
+            """
+            UPDATE media_asset SET owner_id=#{targetOwnerId},updated_at=UTC_TIMESTAMP(6)
+            WHERE space_id=#{spaceId} AND public_id=#{assetPublicId}
+              AND owner_id=#{currentOwnerId} AND status='READY' AND deleted_at IS NULL
+            """)
+    int transferOwnership(
+            @Param("spaceId") long spaceId,
+            @Param("assetPublicId") byte[] assetPublicId,
+            @Param("currentOwnerId") long currentOwnerId,
+            @Param("targetOwnerId") long targetOwnerId);
 
     final class AssetInsert {
         private Long assetId;

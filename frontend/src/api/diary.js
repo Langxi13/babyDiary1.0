@@ -201,6 +201,16 @@ export const diaryApi = {
     invalidateApiCache(`spaces:${spaceId}:diaries:detail:${id}`)
   },
 
+  async permanentlyDelete(spaceId, id, version, stepUpToken) {
+    await withStepUpRetry(token => request.delete(
+      `/api/v3/spaces/${spaceId}/diaries/${id}/permanent`,
+      { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
+    ))
+    diaryVersions.delete(id)
+    invalidateDiaryReads(spaceId)
+    invalidateApiCache(`spaces:${spaceId}:diaries:detail:${id}`)
+  },
+
   async restore(spaceId, id, version, stepUpToken) {
     const diary = rememberVersion(normalizeDiary(await withStepUpRetry(token => request.post(
       `/api/v3/spaces/${spaceId}/diaries/${id}/restore`,

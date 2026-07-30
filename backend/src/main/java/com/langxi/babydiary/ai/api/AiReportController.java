@@ -66,7 +66,8 @@ public class AiReportController {
     }
 
     public record GenerateRequest(
-            @NotBlank @Pattern(regexp = "WEEKLY|MONTHLY") String type, @NotBlank String period) {}
+            @NotBlank @Pattern(regexp = "WEEKLY|MONTHLY|ANNUAL") String type,
+            @NotBlank String period) {}
 
     public record ReportSummary(
             UUID id,

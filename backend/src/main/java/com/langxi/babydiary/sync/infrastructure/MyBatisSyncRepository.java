@@ -32,6 +32,12 @@ public class MyBatisSyncRepository implements SyncRepository {
     }
 
     @Override
+    public long baselineCursor(long spaceId) {
+        Long value = mapper.baselineCursor(spaceId);
+        return value == null ? 0 : value;
+    }
+
+    @Override
     public OperationResult findOperation(UUID operationId, long accountId, long spaceId) {
         SyncMapper.OperationRow row =
                 mapper.findOperation(BinaryUuid.toBytes(operationId), accountId, spaceId);

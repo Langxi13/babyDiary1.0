@@ -29,6 +29,13 @@ public class MyBatisAiReportRepository implements AiReportRepository {
     }
 
     @Override
+    public Optional<Report> findByPeriod(
+            long spaceId, long creatorId, String periodType, LocalDate start, LocalDate end) {
+        return Optional.ofNullable(mapper.findByPeriod(spaceId, creatorId, periodType, start, end))
+                .map(this::report);
+    }
+
+    @Override
     public boolean delete(long spaceId, long creatorId, UUID publicId) {
         return mapper.delete(spaceId, creatorId, BinaryUuid.toBytes(publicId)) == 1;
     }

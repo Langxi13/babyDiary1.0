@@ -2,6 +2,8 @@ package com.langxi.babydiary;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.ai.application.AiClient;
+import com.langxi.babydiary.ai.application.AiReportJobHandler;
 import com.langxi.babydiary.identity.application.InvitationCodeService;
 import com.langxi.babydiary.media.application.StorageGcJobHandler;
 import com.langxi.babydiary.platform.infrastructure.BackgroundJobMapper;
@@ -89,6 +92,12 @@ class ApiIntegrationTest {
         registry.add("app.media.url-signing-key", () -> MEDIA_SIGNING_KEY);
         registry.add("app.rate-limit.enabled", () -> "false");
         registry.add("app.jobs.enabled", () -> "false");
+        registry.add("app.cache.enabled", () -> "false");
+        registry.add("app.outbox.enabled", () -> "false");
+        registry.add("app.ai-schedules.enabled", () -> "false");
+        registry.add("app.reminders.enabled", () -> "false");
+        registry.add("app.retention.enabled", () -> "false");
+        registry.add("app.push.validate-public-dns", () -> "false");
         registry.add("spring.data.redis.repositories.enabled", () -> "false");
         registry.add("app.storage.local-root", () -> OBJECT_ROOT);
         registry.add("ai.config.encryption-key", () -> "v3-test-ai-config-encryption-key");
@@ -109,6 +118,8 @@ class ApiIntegrationTest {
 
     @Autowired StorageGcJobHandler storageGc;
 
+    @Autowired AiReportJobHandler aiReportJobs;
+
     @MockitoBean AiClient aiClient;
 
     @BeforeEach
@@ -116,6 +127,7 @@ class ApiIntegrationTest {
         jdbc.update("DELETE FROM outbox_event");
         jdbc.update("DELETE FROM background_job");
         jdbc.update("DELETE FROM sync_change");
+        jdbc.update("DELETE FROM sync_retention");
         jdbc.update("DELETE FROM sync_operation");
         jdbc.update("DELETE FROM ai_report_diary");
         jdbc.update("DELETE FROM ai_report");
@@ -1752,6 +1764,33 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.periodType").value("MONTHLY"));
 
         mvc.perform(
+                        post("/api/v3/spaces/{spaceId}/ai-reports", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                Map.of("type", "ANNUAL", "period", "2026"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.periodType").value("ANNUAL"))
+                .andExpect(jsonPath("$.start").value("2026-01-01"))
+                .andExpect(jsonPath("$.end").value("2026-12-31"));
+
+        JsonNode existing =
+                aiReportJobs.handle(
+                        json.valueToTree(
+                                Map.of(
+                                        "spaceId",
+                                        OWNER_SPACE_ID.toString(),
+                                        "accountId",
+                                        101,
+                                        "type",
+                                        "MONTHLY",
+                                        "period",
+                                        "2026-07")));
+        assertThat(existing.path("reportId").asText()).isEqualTo(reportId.toString());
+        verify(aiClient, times(2)).generate(any(), any());
+
+        mvc.perform(
                         post("/api/v3/admin/ai/test")
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isForbidden())
@@ -2175,6 +2214,62 @@ class ApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.changes[0].entityId").value(diaryId.toString()));
+    }
+
+    @Test
+    void permanentDiaryDeletionRequiresTrashAndSyncPullSignalsRetentionReset() throws Exception {
+        String token = accessToken(login("owner"));
+        UUID diaryId = createDiary(token, "Disposable memory", "2026-07-30");
+
+        mvc.perform(
+                        delete(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}/permanent",
+                                        OWNER_SPACE_ID,
+                                        diaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header(HttpHeaders.IF_MATCH, "\"1\""))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DIARY_NOT_IN_TRASH"));
+
+        mvc.perform(
+                        delete(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}",
+                                        OWNER_SPACE_ID,
+                                        diaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header(HttpHeaders.IF_MATCH, "\"1\""))
+                .andExpect(status().isNoContent());
+        mvc.perform(
+                        delete(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}/permanent",
+                                        OWNER_SPACE_ID,
+                                        diaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header(HttpHeaders.IF_MATCH, "\"2\""))
+                .andExpect(status().isNoContent());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM diary WHERE public_id=?",
+                                Integer.class,
+                                uuid(diaryId)))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM sync_change WHERE entity_public_id=? AND operation='DELETE'",
+                                Integer.class,
+                                uuid(diaryId)))
+                .isEqualTo(2);
+
+        jdbc.update(
+                "INSERT INTO sync_retention(space_id,baseline_cursor) VALUES(11,50) ON DUPLICATE KEY UPDATE baseline_cursor=50");
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/sync/pull", OWNER_SPACE_ID)
+                                .queryParam("cursor", "10")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resetRequired").value(true))
+                .andExpect(jsonPath("$.baselineCursor").value(50))
+                .andExpect(jsonPath("$.changes").isEmpty());
     }
 
     @Test

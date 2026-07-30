@@ -3,6 +3,7 @@ package com.langxi.babydiary.media.application;
 import com.langxi.babydiary.media.domain.MediaAsset;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.application.BackgroundJobQueue;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import com.langxi.babydiary.storage.ObjectStorage;
 import com.langxi.babydiary.storage.ObjectStorageRegistry;
@@ -37,6 +38,7 @@ public class MediaService {
     private final MediaVariantPolicy variants;
     private final MediaAccessPolicy access;
     private final BackgroundJobQueue jobs;
+    private final ReadCacheInvalidator cacheInvalidator;
 
     public MediaService(
             SpaceAccess spaces,
@@ -45,7 +47,8 @@ public class MediaService {
             MediaFileInspector inspector,
             MediaVariantPolicy variants,
             MediaAccessPolicy access,
-            BackgroundJobQueue jobs) {
+            BackgroundJobQueue jobs,
+            ReadCacheInvalidator cacheInvalidator) {
         this.spaces = spaces;
         this.media = media;
         this.storages = storages;
@@ -53,6 +56,7 @@ public class MediaService {
         this.variants = variants;
         this.access = access;
         this.jobs = jobs;
+        this.cacheInvalidator = cacheInvalidator;
     }
 
     public MediaAsset upload(
@@ -130,7 +134,9 @@ public class MediaService {
             } catch (RuntimeException exception) {
                 log.error("Unable to enqueue media processing for asset {}", publicId, exception);
             }
-            return require(space.internalId(), publicId, accountId);
+            MediaAsset uploaded = require(space.internalId(), publicId, accountId);
+            cacheInvalidator.albums(spaceId);
+            return uploaded;
         } catch (IOException | RuntimeException exception) {
             if (assetId > 0) media.failUpload(assetId, now());
             if (stored) deleteQuietly(storage, storageKey);
@@ -233,6 +239,7 @@ public class MediaService {
                 "asset:" + assetId,
                 java.util.Map.of("spaceId", spaceId.toString(), "assetId", assetId.toString()),
                 8);
+        cacheInvalidator.albums(spaceId);
     }
 
     @Transactional
@@ -262,7 +269,32 @@ public class MediaService {
                 libraryVisible)) {
             throw ApiException.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权修改");
         }
-        return require(space.internalId(), assetId, accountId);
+        MediaAsset updated = require(space.internalId(), assetId, accountId);
+        cacheInvalidator.albums(spaceId);
+        return updated;
+    }
+
+    @Transactional
+    public void transferOwnership(
+            UUID spaceId, UUID assetId, UUID targetAccountId, long accountId, boolean elevated) {
+        SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
+        MediaAsset asset = require(space.internalId(), assetId, accountId);
+        if (asset.ownerId() != accountId) {
+            throw ApiException.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权转移");
+        }
+        access.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        if (targetAccountId == null) {
+            throw ApiException.badRequest("MEDIA_TARGET_REQUIRED", "请选择接收成员");
+        }
+        Long target = media.findActiveMemberAccountId(space.internalId(), targetAccountId);
+        if (target == null) {
+            throw ApiException.badRequest("MEDIA_TARGET_INVALID", "接收账户不是当前空间的有效成员");
+        }
+        if (target == accountId) return;
+        if (!media.transferOwnership(space.internalId(), assetId, accountId, target)) {
+            throw ApiException.conflict("MEDIA_TRANSFER_CONFLICT", "媒体状态已变化，请刷新后重试");
+        }
+        cacheInvalidator.albums(spaceId);
     }
 
     private ResolvedVariant resolve(MediaAsset asset, String variant, String profile) {

@@ -230,6 +230,19 @@ public class MyBatisMediaRepository implements MediaRepository {
                 == 1;
     }
 
+    @Override
+    public Long findActiveMemberAccountId(long spaceId, UUID accountId) {
+        return mapper.findActiveMemberAccountId(spaceId, BinaryUuid.toBytes(accountId));
+    }
+
+    @Override
+    public boolean transferOwnership(
+            long spaceId, UUID assetId, long currentOwnerId, long targetOwnerId) {
+        return mapper.transferOwnership(
+                        spaceId, BinaryUuid.toBytes(assetId), currentOwnerId, targetOwnerId)
+                == 1;
+    }
+
     private List<MediaAsset> hydrate(List<MediaMapper.MediaRow> rows) {
         Map<Long, Builder> values = new LinkedHashMap<>();
         for (MediaMapper.MediaRow row : rows) {

@@ -1,11 +1,12 @@
 import { workspaceApi } from '@/api/workspace'
-import { diaryApi } from '@/api/diary'
+import { diaryApi, invalidateDiaryReads } from '@/api/diary'
 import { mediaApi } from '@/api/media'
 import {
   getOfflineMeta,
   listOfflineOperations,
   removeOfflineOperations,
-  setOfflineMeta
+  setOfflineMeta,
+  clearOfflineSessionCache
 } from '@/utils/offlineDb'
 import { chunkOperations } from '@/utils/offlineQueue'
 import { getStepUpToken } from '@/utils/stepUp'
@@ -77,6 +78,18 @@ export async function syncWorkspace(spaceId) {
     let hasMore = true
     while (hasMore) {
       const result = await workspaceApi.sync.pull(spaceId, cursor, 200)
+      if (result.resetRequired) {
+        await clearOfflineSessionCache()
+        invalidateDiaryReads(spaceId)
+        cursor = result.baselineCursor
+        hasMore = false
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('workspace:changes', {
+            detail: { spaceId, changes: [], resetRequired: true }
+          }))
+        }
+        break
+      }
       cursor = result.nextCursor
       hasMore = result.hasMore
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('workspace:changes', { detail: { spaceId, changes: result.changes } }))

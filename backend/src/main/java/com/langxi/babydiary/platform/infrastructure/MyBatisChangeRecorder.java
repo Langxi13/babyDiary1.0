@@ -32,9 +32,16 @@ public class MyBatisChangeRecorder implements ChangeRecorder {
         try {
             LocalDateTime now = LocalDateTime.now(clock);
             byte[] binaryId = BinaryUuid.toBytes(aggregateId);
-            mapper.insertSync(spaceId, aggregateType, binaryId, revision, actorId, now);
+            String operation =
+                    eventType != null
+                                    && (eventType.endsWith("_DELETED")
+                                            || eventType.endsWith("_PURGED"))
+                            ? "DELETE"
+                            : "UPSERT";
+            mapper.insertSync(spaceId, aggregateType, binaryId, operation, revision, actorId, now);
             mapper.insertOutbox(
                     spaceId,
+                    actorId,
                     aggregateType,
                     binaryId,
                     eventType,

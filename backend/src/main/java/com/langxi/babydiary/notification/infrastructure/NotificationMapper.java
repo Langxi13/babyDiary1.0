@@ -2,6 +2,7 @@ package com.langxi.babydiary.notification.infrastructure;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -37,6 +38,33 @@ public interface NotificationMapper {
     @Update(
             "UPDATE notification SET read_at=#{now} WHERE account_id=#{accountId} AND read_at IS NULL")
     void markAllRead(@Param("accountId") long accountId, @Param("now") LocalDateTime now);
+
+    @Insert(
+            """
+            INSERT IGNORE INTO notification(public_id,account_id,space_id,type,title,body,target_ref,dedupe_key,created_at)
+            VALUES(#{publicId},#{accountId},#{spaceId},#{type},#{title},#{body},#{targetRefJson},#{dedupeKey},UTC_TIMESTAMP(6))
+            """)
+    int insert(NotificationInsert notification);
+
+    @Select(
+            """
+            SELECT account_id FROM space_member
+            WHERE space_id=#{spaceId} AND status='ACTIVE'
+              AND (#{excludedAccountId} IS NULL OR account_id<>#{excludedAccountId})
+            ORDER BY account_id
+            """)
+    List<Long> findActiveSpaceMemberIds(
+            @Param("spaceId") long spaceId, @Param("excludedAccountId") Long excludedAccountId);
+
+    record NotificationInsert(
+            byte[] publicId,
+            long accountId,
+            Long spaceId,
+            String type,
+            String title,
+            String body,
+            String targetRefJson,
+            String dedupeKey) {}
 
     final class Row {
         private byte[] publicId;

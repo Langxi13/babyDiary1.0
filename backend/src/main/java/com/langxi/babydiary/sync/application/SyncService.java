@@ -46,15 +46,23 @@ public class SyncService {
     public PullResponse pull(UUID spaceId, long accountId, long cursor, int limit) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         int size = Math.max(1, Math.min(limit, 500));
+        long requested = Math.max(0, cursor);
+        long baseline = sync.baselineCursor(space.internalId());
+        if (requested < baseline) {
+            return new PullResponse(List.of(), baseline, false, true, baseline);
+        }
         List<SyncRepository.Change> changes =
-                sync.findChanges(space.internalId(), accountId, Math.max(0, cursor), size);
-        long next =
-                changes.isEmpty() ? Math.max(0, cursor) : changes.get(changes.size() - 1).cursor();
-        return new PullResponse(changes, next, changes.size() == size);
+                sync.findChanges(space.internalId(), accountId, requested, size);
+        long next = changes.isEmpty() ? requested : changes.get(changes.size() - 1).cursor();
+        return new PullResponse(changes, next, changes.size() == size, false, baseline);
     }
 
     public record PullResponse(
-            List<SyncRepository.Change> changes, long nextCursor, boolean hasMore) {}
+            List<SyncRepository.Change> changes,
+            long nextCursor,
+            boolean hasMore,
+            boolean resetRequired,
+            long baselineCursor) {}
 
     public record PushOperation(
             UUID operationId,

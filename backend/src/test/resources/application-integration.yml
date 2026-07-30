@@ -16,6 +16,14 @@ jwt:
   access-expiration: 900000
 
 app:
+  cache:
+    enabled: false
+  outbox:
+    enabled: false
+  ai-schedules:
+    enabled: false
+  retention:
+    enabled: false
   invitation:
     bootstrap-code: integration-invite-code
     encryption-key: integration-invitation-encryption-key-0000000000000000
@@ -25,12 +33,15 @@ app:
     step-up-minutes: 10
   mail:
     enabled: false
+  push:
+    validate-public-dns: false
   storage:
     provider: local
     local-root: ${java.io.tmpdir}/baby-diary-integration/objects/
   media:
     processing-enabled: false
   reminders:
+    enabled: false
     delivery-delay-ms: 3600000
 
 ai:

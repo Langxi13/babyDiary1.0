@@ -7,6 +7,8 @@ import java.util.UUID;
 public interface SyncRepository {
     List<Change> findChanges(long spaceId, long accountId, long cursor, int limit);
 
+    long baselineCursor(long spaceId);
+
     OperationResult findOperation(UUID operationId, long accountId, long spaceId);
 
     boolean insertOperation(

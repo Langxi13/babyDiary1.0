@@ -114,6 +114,7 @@
 | `PUT` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}` | 按 `If-Match` 版本更新日记 |
 | `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}` | 移入回收站 |
 | `POST` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/restore` | 从回收站恢复 |
+| `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/permanent` | 永久删除回收站日记，要求 `If-Match`；锁定日记还要求 step-up |
 | `GET` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions` | 查看修订历史 |
 | `POST` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions/{revisionId}/restore` | 恢复指定版本 |
 | `GET` | `/api/v3/spaces/{spaceId}/diaries/calendar?month=YYYY-MM` | 月历粗略摘要 |
@@ -122,7 +123,7 @@
 | `GET` | `/api/v3/spaces/{spaceId}/search?query=&limit=` | 空间全文搜索 |
 | `GET` | `/api/v3/spaces/{spaceId}/insights/yearly?year=` | 年度洞察和心情统计 |
 
-创建或更新日记的媒体顺序由请求中的 `mediaIds` 决定；服务端在一次事务中更新关系，删除旧媒体关系不会延迟到下一次编辑。
+创建或更新日记的媒体顺序由请求中的 `mediaIds` 决定；服务端在一次事务中更新关系，删除旧媒体关系不会延迟到下一次编辑。回收站默认保留30天，永久删除只移除日记及其关系，媒体资产仍保留在媒体库，避免误删仍被其他内容引用的文件。
 
 ### 互动、草稿与模板
 
@@ -146,6 +147,7 @@
 | `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 查看媒体资产元数据；锁定媒体需要 step-up |
 | `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}/variants/{variant}` | 获取受保护派生资源 |
 | `PUT` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 更新媒体元数据 |
+| `POST` | `/api/v3/spaces/{spaceId}/media/{assetId}/transfer` | 资产所有者将媒体归属转移给同空间有效成员 |
 | `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
 | `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
@@ -197,6 +199,8 @@ ZIP 导出按同一确定性顺序读取可用原图，因此迁移保留的 `OR
 | `POST` | `/api/v3/public/shares/{token}/open` | 打开公开分享 |
 
 AI 报告从第三方观察视角生成，可使用“你”或“你们”，不会以模型第一人称冒充用户；锁定日记不会进入 AI 输入，API Key 永不回显。
+
+`sync/pull` 返回 `changes`、`nextCursor`、`hasMore`、`resetRequired` 和 `baselineCursor`。服务端清理超过保留期的增量日志后，过旧游标会收到 `resetRequired=true`；客户端必须清理该账户的离线读缓存，以 `baselineCursor` 重建游标，但不得丢弃仍待上传的离线操作。
 
 ## OpenAPI 与调试
 

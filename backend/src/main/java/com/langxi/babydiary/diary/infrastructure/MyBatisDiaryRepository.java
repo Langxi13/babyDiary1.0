@@ -74,6 +74,29 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     }
 
     @Override
+    public boolean permanentlyDelete(long diaryId, int expectedVersion) {
+        if (mapper.lockDeleted(diaryId, expectedVersion) == null) return false;
+        mapper.deleteReportLinks(diaryId);
+        mapper.deleteProposalLinks(diaryId);
+        return mapper.permanentlyDelete(diaryId, expectedVersion) == 1;
+    }
+
+    @Override
+    public List<PurgeCandidate> findPurgeCandidates(LocalDateTime deletedBefore, int limit) {
+        return mapper.findPurgeCandidates(deletedBefore, limit).stream()
+                .map(
+                        row ->
+                                new PurgeCandidate(
+                                        row.diaryId(),
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        row.spaceId(),
+                                        BinaryUuid.fromBytes(row.spacePublicId()),
+                                        row.authorId(),
+                                        row.version()))
+                .toList();
+    }
+
+    @Override
     public List<Long> resolveTagIds(long spaceId, List<UUID> publicIds) {
         return resolve(
                 publicIds,

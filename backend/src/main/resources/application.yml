@@ -1,4 +1,10 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6380}
+      timeout: 500ms
+      connect-timeout: 500ms
   datasource:
     url: ${V3_DB_URL:jdbc:mysql://127.0.0.1:3306/baby_diary_v3?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${V3_DB_USERNAME:${DB_USERNAME:baby_diary}}
@@ -60,6 +66,8 @@ app:
     public-url: ${PUBLIC_URL:http://localhost:5173}
   push:
     vapid-public-key: ${VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:admin@example.com}
   storage:
     provider: ${OBJECT_STORAGE_PROVIDER:local}
     local-root: ${DIARY_OBJECT_PATH:${user.dir}/data/objects/}
@@ -84,6 +92,26 @@ app:
     poll-delay-ms: ${V3_JOB_POLL_DELAY_MS:2000}
     stale-after-minutes: ${V3_JOB_STALE_MINUTES:30}
     recovery-delay-ms: ${V3_JOB_RECOVERY_DELAY_MS:300000}
+  cache:
+    enabled: ${V3_CACHE_ENABLED:true}
+    prefix: ${CACHE_PREFIX:baby-diary:v3:cache:}
+  outbox:
+    enabled: ${V3_OUTBOX_ENABLED:true}
+    poll-delay-ms: ${V3_OUTBOX_POLL_DELAY_MS:2000}
+    stale-after-minutes: ${V3_OUTBOX_STALE_MINUTES:10}
+    recovery-delay-ms: ${V3_OUTBOX_RECOVERY_DELAY_MS:300000}
+  reminders:
+    enabled: ${V3_REMINDERS_ENABLED:true}
+    delivery-delay-ms: ${REMINDER_DELIVERY_DELAY_MS:60000}
+  ai-schedules:
+    enabled: ${V3_AI_SCHEDULES_ENABLED:true}
+    poll-delay-ms: ${V3_AI_SCHEDULE_POLL_DELAY_MS:60000}
+  retention:
+    enabled: ${V3_RETENTION_ENABLED:true}
+    diary-trash-days: ${V3_DIARY_TRASH_DAYS:30}
+    sync-days: ${V3_SYNC_RETENTION_DAYS:90}
+    diary-purge-cron: ${V3_DIARY_PURGE_CRON:0 25 4 * * *}
+    data-cleanup-cron: ${V3_DATA_CLEANUP_CRON:0 45 4 * * *}
   rate-limit:
     enabled: ${V3_RATE_LIMIT_ENABLED:true}
     redis-enabled: ${V3_RATE_LIMIT_REDIS_ENABLED:false}
