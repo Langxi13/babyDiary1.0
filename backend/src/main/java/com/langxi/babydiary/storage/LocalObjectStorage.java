@@ -1,7 +1,6 @@
 package com.langxi.babydiary.storage;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -11,7 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 @Service
-@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class LocalObjectStorage implements ObjectStorage {
     private final Path root;
 
@@ -50,8 +48,23 @@ public class LocalObjectStorage implements ObjectStorage {
     }
 
     @Override
+    public StoredObjectInfo stat(String key) throws IOException {
+        Path path = resolve(key);
+        if (!Files.isRegularFile(path)) throw new IOException("Object not found");
+        return new StoredObjectInfo(Files.size(path), Files.probeContentType(path));
+    }
+
+    @Override
     public void delete(String key) throws IOException {
         Files.deleteIfExists(resolve(key));
+    }
+
+    @Override
+    public void verifyReady() throws IOException {
+        Files.createDirectories(root);
+        if (!Files.isDirectory(root) || !Files.isWritable(root)) {
+            throw new IOException("Local object storage is not writable");
+        }
     }
 
     private Path resolve(String key) {

@@ -14,6 +14,10 @@ public interface MediaRepository {
 
     List<MediaAsset> findByPublicIds(long spaceId, List<UUID> publicIds, long accountId);
 
+    List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds);
+
+    Optional<MediaAsset> findInSpace(UUID spaceId, UUID publicId, boolean includeDeleted);
+
     Optional<MediaAsset.Variant> findVariant(long spaceId, UUID publicId, String type, String profile,
                                              long accountId);
 
@@ -25,13 +29,33 @@ public interface MediaRepository {
 
     long insertAsset(NewAsset asset);
 
-    void insertVariant(NewVariant variant);
+    boolean insertVariant(NewVariant variant);
 
     boolean reserveStorage(long spaceId, long sizeBytes);
 
+    boolean reserveStorage(UUID spaceId, long sizeBytes);
+
     void releaseStorage(long spaceId, long sizeBytes);
 
+    void releaseStorage(UUID spaceId, long sizeBytes);
+
     boolean softDelete(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt);
+
+    boolean markDeletePending(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt);
+
+    void finalizeDeletion(long assetId, UUID spaceId, long releasedBytes, LocalDateTime deletedAt);
+
+    void failUpload(long assetId, LocalDateTime failedAt);
+
+    void markReady(long assetId);
+
+    void updateTechnicalMetadata(long assetId, Integer width, Integer height, Long durationMillis);
+
+    boolean hasVariant(long assetId, String type, String profile);
+
+    ReferenceCounts references(long assetId);
+
+    void removeFavorites(long assetId);
 
     boolean updateMetadata(long spaceId, UUID publicId, long accountId, String caption,
                            LocalDateTime takenAt, String accessScope, boolean libraryVisible);
@@ -46,6 +70,14 @@ public interface MediaRepository {
     }
 
     record NewVariant(long assetId, String type, String profile, String storageProvider, String storageKey,
-                      String contentType, long sizeBytes, byte[] checksumSha256, String status) {
+                      String contentType, long sizeBytes, byte[] checksumSha256, Integer width,
+                      Integer height, Long durationMillis, String status) {
+    }
+
+    record ReferenceCounts(long diaries, long albums, long albumCovers, long anniversaries,
+                           long avatars, long aiProposals) {
+        public long blockingTotal() {
+            return diaries + albums + albumCovers + anniversaries + avatars + aiProposals;
+        }
     }
 }

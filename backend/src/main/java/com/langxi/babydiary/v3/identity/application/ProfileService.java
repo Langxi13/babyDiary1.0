@@ -1,6 +1,8 @@
 package com.langxi.babydiary.v3.identity.application;
 
 import com.langxi.babydiary.v3.media.application.MediaRepository;
+import com.langxi.babydiary.v3.media.application.MediaAccessPolicy;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
 import com.langxi.babydiary.v3.media.domain.MediaAsset;
 import com.langxi.babydiary.v3.platform.application.V3Exception;
 import com.langxi.babydiary.v3.space.application.SpaceAccess;
@@ -24,13 +26,15 @@ public class ProfileService {
     private final SpaceAccess spaces;
     private final MediaRepository media;
     private final PasswordEncoder passwords;
+    private final MediaAccessPolicy mediaAccess;
 
     public ProfileService(ProfileRepository profiles, SpaceAccess spaces, MediaRepository media,
-                          PasswordEncoder passwords) {
+                          PasswordEncoder passwords,MediaAccessPolicy mediaAccess) {
         this.profiles = profiles;
         this.spaces = spaces;
         this.media = media;
         this.passwords = passwords;
+        this.mediaAccess=mediaAccess;
     }
 
     public ProfileRepository.Profile profile(long accountId) {
@@ -62,8 +66,9 @@ public class ProfileService {
     }
 
     @Transactional
-    public ProfileRepository.Profile setAvatar(long accountId, UUID spaceId, UUID assetId) {
+    public ProfileRepository.Profile setAvatar(long accountId, UUID spaceId, UUID assetId,boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        mediaAccess.require(spaceId,assetId, MediaAccessContext.direct(accountId,elevated));
         MediaAsset asset = media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream().findFirst()
                 .filter(value -> value.ownerId() == accountId && "IMAGE".equals(value.mediaType()))
                 .orElseThrow(() -> V3Exception.badRequest("AVATAR_MEDIA_INVALID", "头像图片不存在、不是图片或不属于当前账户"));

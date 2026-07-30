@@ -33,6 +33,7 @@ public record DiaryEntry(
     }
 
     public record MediaRef(UUID id, String mediaType, String caption, LocalDateTime takenAt,
-                           int position, String status, String originalProfile, String thumbnailProfile) {
+                           int position, String status, String originalProfile, String thumbnailProfile,
+                           boolean protectedContent) {
     }
 }

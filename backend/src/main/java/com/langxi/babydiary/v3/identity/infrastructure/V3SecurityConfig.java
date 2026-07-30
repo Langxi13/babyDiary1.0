@@ -80,10 +80,11 @@ public class V3SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.stream((webOrigins + "," + nativeOrigins).split(","))
                 .map(String::trim).filter(value -> !value.isBlank()).distinct().toList());
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "If-Match", "X-Device-Name",
                 "X-Step-Up-Token"));
-        configuration.setExposedHeaders(List.of("ETag", "Location", "X-Request-Id"));
+        configuration.setExposedHeaders(List.of("ETag", "Location", "X-Request-Id", "Accept-Ranges",
+                "Content-Range", "Content-Length"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

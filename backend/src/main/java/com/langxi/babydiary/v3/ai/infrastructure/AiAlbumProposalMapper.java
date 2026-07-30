@@ -78,8 +78,13 @@ public interface AiAlbumProposalMapper {
             FROM diary d JOIN diary_media dm ON dm.diary_id=d.diary_id
             JOIN media_asset a ON a.asset_id=dm.asset_id
             WHERE d.space_id=#{spaceId} AND d.deleted_at IS NULL AND d.diary_date BETWEEN #{startDate} AND #{endDate}
+              AND d.locked=0
               AND (d.visibility='SHARED' OR d.author_id=#{accountId})
               AND a.media_type='IMAGE' AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND NOT EXISTS (SELECT 1 FROM diary_media protected_dm JOIN diary protected_d
+                ON protected_d.diary_id=protected_dm.diary_id
+                WHERE protected_dm.asset_id=a.asset_id AND protected_d.locked=1)
             ORDER BY d.diary_date,d.diary_id,dm.position,a.asset_id
             """)
     List<DiaryMediaRow> findDiaryMedia(@Param("spaceId") long spaceId, @Param("accountId") long accountId,
@@ -87,20 +92,32 @@ public interface AiAlbumProposalMapper {
 
     @Select("""
             <script>
-            SELECT diary_id AS internal_id,public_id FROM diary WHERE space_id=#{spaceId} AND public_id IN
+            SELECT diary_id AS internal_id,public_id FROM diary WHERE space_id=#{spaceId}
+              AND deleted_at IS NULL AND locked=0 AND (visibility='SHARED' OR author_id=#{accountId}) AND public_id IN
             <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>
             </script>
             """)
-    List<IdRow> resolveDiaries(@Param("spaceId") long spaceId, @Param("ids") List<byte[]> ids);
+    List<IdRow> resolveDiaries(@Param("spaceId") long spaceId,@Param("accountId")long accountId,
+                                @Param("ids") List<byte[]> ids);
 
     @Select("""
             <script>
-            SELECT asset_id AS internal_id,public_id FROM media_asset WHERE space_id=#{spaceId} AND deleted_at IS NULL
-              AND status='READY' AND media_type='IMAGE' AND public_id IN
+            SELECT DISTINCT a.asset_id AS internal_id,a.public_id FROM media_asset a
+            JOIN diary_media dm ON dm.asset_id=a.asset_id JOIN diary d ON d.diary_id=dm.diary_id
+            WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL AND a.status='READY' AND a.media_type='IMAGE'
+              AND d.deleted_at IS NULL AND d.locked=0 AND (d.visibility='SHARED' OR d.author_id=#{accountId})
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND NOT EXISTS (SELECT 1 FROM diary_media protected_dm JOIN diary protected_d
+                ON protected_d.diary_id=protected_dm.diary_id
+                WHERE protected_dm.asset_id=a.asset_id AND protected_d.locked=1)
+              AND d.public_id IN
+            <foreach collection='diaryIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>
+              AND a.public_id IN
             <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>
             </script>
             """)
-    List<IdRow> resolveMedia(@Param("spaceId") long spaceId, @Param("ids") List<byte[]> ids);
+    List<IdRow> resolveMedia(@Param("spaceId") long spaceId,@Param("accountId")long accountId,
+                             @Param("diaryIds")List<byte[]>diaryIds,@Param("ids") List<byte[]> ids);
 
     final class ProposalInsert {
         private Long proposalId; private final byte[] publicId; private final long spaceId; private final long createdBy;

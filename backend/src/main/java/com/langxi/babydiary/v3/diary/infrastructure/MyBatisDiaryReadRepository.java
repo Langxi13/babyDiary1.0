@@ -18,7 +18,7 @@ public class MyBatisDiaryReadRepository implements DiaryReadRepository {
     @Override
     public List<CalendarRow> findCalendar(long spaceId, long accountId, LocalDate start, LocalDate end) {
         return mapper.findCalendar(spaceId, accountId, start, end).stream().map(row -> new CalendarRow(
-                BinaryUuid.fromBytes(row.publicId()), row.diaryDate(), row.title(), row.moodKey(), row.mediaCount())).toList();
+                BinaryUuid.fromBytes(row.publicId()), row.diaryDate(), row.title(), row.moodKey(), row.mediaCount(),row.locked())).toList();
     }
 
     @Override

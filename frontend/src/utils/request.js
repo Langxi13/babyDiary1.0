@@ -177,7 +177,12 @@ request.interceptors.response.use(
                 userId: refreshed.userInfo.id || refreshed.userInfo.accountId,
                 systemRole: refreshed.userInfo.systemRole || refreshed.userInfo.role
               } : null
-              localStorage.setItem('userInfo', JSON.stringify(refreshedUser))
+              localStorage.setItem('userInfo', JSON.stringify(refreshedUser ? {
+                ...refreshedUser,
+                avatarMedia: refreshedUser.avatarMedia
+                  ? { ...refreshedUser.avatarMedia, contentUrl: undefined }
+                  : null
+              } : null))
               localStorage.setItem('token', refreshed.token)
               window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: { ...refreshed, userInfo: refreshedUser } }))
               originalRequest.headers = originalRequest.headers || {}

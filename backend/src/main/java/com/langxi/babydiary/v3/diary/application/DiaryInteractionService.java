@@ -2,10 +2,12 @@ package com.langxi.babydiary.v3.diary.application;
 
 import com.langxi.babydiary.v3.diary.infrastructure.DiaryInteractionMapper;
 import com.langxi.babydiary.v3.media.application.MediaUrlSigner;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
 import com.langxi.babydiary.v3.platform.application.BinaryUuid;
 import com.langxi.babydiary.v3.platform.application.V3Exception;
 import com.langxi.babydiary.v3.space.application.SpaceAccess;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -22,48 +24,48 @@ public class DiaryInteractionService {
         this.spaces = spaces; this.mapper = mapper; this.mediaUrls = mediaUrls;
     }
 
-    public List<Comment> comments(UUID spaceId, UUID diaryId, long accountId) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
-        return mapper.findComments(internalId).stream().map(this::comment).toList();
+    public List<Comment> comments(UUID spaceId, UUID diaryId, long accountId, boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
+        return mapper.findComments(internalId).stream().map(row -> comment(row, accountId)).toList();
     }
 
     @Transactional
-    public Comment addComment(UUID spaceId, UUID diaryId, long accountId, String content) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
+    public Comment addComment(UUID spaceId, UUID diaryId, long accountId, String content, boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
         String value = content(content);
         UUID publicId = UUID.randomUUID();
         mapper.insertComment(new DiaryInteractionMapper.CommentInsert(
                 BinaryUuid.toBytes(publicId), internalId, accountId, value));
         return mapper.findComments(internalId).stream()
                 .filter(row -> java.util.Arrays.equals(row.getPublicId(), BinaryUuid.toBytes(publicId)))
-                .findFirst().map(this::comment).orElseThrow();
+                .findFirst().map(row -> comment(row, accountId)).orElseThrow();
     }
 
     @Transactional
-    public void updateComment(UUID spaceId, UUID diaryId, UUID commentId, long accountId, String content) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
+    public void updateComment(UUID spaceId, UUID diaryId, UUID commentId, long accountId, String content,boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
         if (mapper.updateComment(internalId, BinaryUuid.toBytes(commentId), accountId, content(content)) != 1) {
             throw V3Exception.notFound("COMMENT_NOT_FOUND", "评论不存在或无权修改");
         }
     }
 
     @Transactional
-    public void deleteComment(UUID spaceId, UUID diaryId, UUID commentId, long accountId) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
+    public void deleteComment(UUID spaceId, UUID diaryId, UUID commentId, long accountId,boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
         if (mapper.deleteComment(internalId, BinaryUuid.toBytes(commentId), accountId) != 1) {
             throw V3Exception.notFound("COMMENT_NOT_FOUND", "评论不存在或无权删除");
         }
     }
 
-    public List<Reaction> reactions(UUID spaceId, UUID diaryId, long accountId) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
+    public List<Reaction> reactions(UUID spaceId, UUID diaryId, long accountId,boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
         return mapper.findReactions(internalId, accountId).stream()
                 .map(row -> new Reaction(row.emoji(), row.reactionCount(), row.reactedByMe())).toList();
     }
 
     @Transactional
-    public void setReaction(UUID spaceId, UUID diaryId, long accountId, String emoji, boolean active) {
-        long internalId = requireDiary(spaceId, diaryId, accountId);
+    public void setReaction(UUID spaceId, UUID diaryId, long accountId, String emoji, boolean active,boolean elevated) {
+        long internalId = requireDiary(spaceId, diaryId, accountId,elevated);
         String value = emoji == null ? "" : emoji.trim();
         if (value.isBlank() || value.length() > 16) {
             throw V3Exception.badRequest("REACTION_INVALID", "表情无效");
@@ -72,21 +74,23 @@ public class DiaryInteractionService {
         else mapper.deleteReaction(internalId, accountId, value);
     }
 
-    private long requireDiary(UUID spaceId, UUID diaryId, long accountId) {
+    private long requireDiary(UUID spaceId, UUID diaryId, long accountId,boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        Long id = mapper.findVisibleDiary(space.internalId(), BinaryUuid.toBytes(diaryId), accountId);
-        if (id == null) throw V3Exception.notFound("DIARY_NOT_FOUND", "日记不存在或无权访问");
-        return id;
+        DiaryInteractionMapper.DiaryAccessRow row = mapper.findVisibleDiary(space.internalId(), BinaryUuid.toBytes(diaryId), accountId);
+        if (row == null) throw V3Exception.notFound("DIARY_NOT_FOUND", "日记不存在或无权访问");
+        if(row.isLocked()&&!elevated)throw new V3Exception(HttpStatus.LOCKED,"STEP_UP_REQUIRED","请先完成二次验证");
+        return row.getDiaryId();
     }
 
-    private Comment comment(DiaryInteractionMapper.CommentRow row) {
+    private Comment comment(DiaryInteractionMapper.CommentRow row, long viewerAccountId) {
         AvatarMedia avatar = null;
         if (row.getAvatarAssetPublicId() != null && row.getAvatarSpacePublicId() != null
                 && row.getAvatarVariantType() != null && row.getAvatarVariantProfile() != null) {
             UUID assetId = BinaryUuid.fromBytes(row.getAvatarAssetPublicId());
             UUID spaceId = BinaryUuid.fromBytes(row.getAvatarSpacePublicId());
+            UUID authorPublicId=BinaryUuid.fromBytes(row.getAuthorPublicId());
             avatar = new AvatarMedia(assetId, mediaUrls.url(spaceId, assetId, row.getAvatarVariantType(),
-                    row.getAvatarVariantProfile()));
+                    row.getAvatarVariantProfile(), MediaAccessContext.avatar(viewerAccountId,authorPublicId,false)).url());
         }
         UUID authorId = BinaryUuid.fromBytes(row.getAuthorPublicId());
         return new Comment(BinaryUuid.fromBytes(row.getPublicId()), authorId, authorId, row.getUsername(),

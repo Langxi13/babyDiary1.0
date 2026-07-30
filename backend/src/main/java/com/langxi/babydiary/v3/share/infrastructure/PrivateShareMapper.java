@@ -34,11 +34,11 @@ public interface PrivateShareMapper {
     List<ShareRow> findActive(@Param("diaryId") long diaryId,@Param("accountId") long accountId);
 
     @Select("""
-            SELECT ps.share_id,ps.public_id,ps.password_hash,ps.expires_at,ps.max_views,ps.view_count,ps.created_at,
+            SELECT ps.share_id,ps.public_id,ps.password_hash,ps.expires_at,ps.max_views,ps.view_count,ps.created_at,ps.space_id,
                    d.diary_id,d.author_id,d.locked,d.title,d.diary_date,d.content_html,d.mood_key,s.public_id AS space_public_id
             FROM private_share ps JOIN diary d ON d.diary_id=ps.diary_id
             JOIN diary_space s ON s.space_id=ps.space_id
-            WHERE ps.token_hash=#{tokenHash} FOR UPDATE
+            WHERE ps.token_hash=#{tokenHash} AND ps.revoked_at IS NULL AND d.deleted_at IS NULL FOR UPDATE
             """)
     OpenRow findForOpen(byte[] tokenHash);
 
@@ -51,23 +51,8 @@ public interface PrivateShareMapper {
     int revoke(@Param("publicId") byte[] publicId,@Param("accountId") long accountId);
 
     @Select("""
-            SELECT a.public_id,a.media_type,a.caption,a.taken_at,dm.position,
-                   ov.profile AS original_profile,tv.profile AS thumbnail_profile
+            SELECT a.public_id,a.media_type,a.caption,a.taken_at,dm.position
             FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
-            LEFT JOIN media_variant ov ON ov.variant_id=(
-                SELECT candidate.variant_id FROM media_variant candidate
-                WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='ORIGINAL'
-                  AND candidate.status='READY' AND candidate.deleted_at IS NULL
-                ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
-                         candidate.variant_id LIMIT 1
-            )
-            LEFT JOIN media_variant tv ON tv.variant_id=(
-                SELECT candidate.variant_id FROM media_variant candidate
-                WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='THUMBNAIL'
-                  AND candidate.status='READY' AND candidate.deleted_at IS NULL
-                ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
-                         candidate.variant_id LIMIT 1
-            )
             WHERE dm.diary_id=#{diaryId} AND a.deleted_at IS NULL AND a.status='READY'
             ORDER BY dm.position,a.asset_id
             """)
@@ -99,12 +84,12 @@ public interface PrivateShareMapper {
         public void setMaxViews(Integer v){maxViews=v;}public void setViewCount(int v){viewCount=v;}public void setCreatedAt(LocalDateTime v){createdAt=v;}
     }
     class OpenRow extends ShareRow {
-        private long diaryId;private long authorId;private boolean locked;private String title;private LocalDate diaryDate;private String contentHtml;private String moodKey;private byte[] spacePublicId;
+        private long spaceId;private long diaryId;private long authorId;private boolean locked;private String title;private LocalDate diaryDate;private String contentHtml;private String moodKey;private byte[] spacePublicId;
+        public long getSpaceId(){return spaceId;}public void setSpaceId(long v){spaceId=v;}
         public long getDiaryId(){return diaryId;}public long getAuthorId(){return authorId;}public boolean isLocked(){return locked;}public String getTitle(){return title;}public LocalDate getDiaryDate(){return diaryDate;}
         public String getContentHtml(){return contentHtml;}public String getMoodKey(){return moodKey;}public byte[] getSpacePublicId(){return spacePublicId;}
         public void setDiaryId(long v){diaryId=v;}public void setAuthorId(long v){authorId=v;}public void setLocked(boolean v){locked=v;}public void setTitle(String v){title=v;}public void setDiaryDate(LocalDate v){diaryDate=v;}
         public void setContentHtml(String v){contentHtml=v;}public void setMoodKey(String v){moodKey=v;}public void setSpacePublicId(byte[] v){spacePublicId=v;}
     }
-    record MediaRow(byte[] publicId,String mediaType,String caption,LocalDateTime takenAt,int position,
-                    String originalProfile,String thumbnailProfile){}
+    record MediaRow(byte[] publicId,String mediaType,String caption,LocalDateTime takenAt,int position){}
 }

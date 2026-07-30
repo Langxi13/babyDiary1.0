@@ -2,6 +2,8 @@ package com.langxi.babydiary.v3.album.application;
 
 import com.langxi.babydiary.v3.album.domain.AlbumCatalog;
 import com.langxi.babydiary.v3.media.application.MediaRepository;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
+import com.langxi.babydiary.v3.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.v3.media.domain.MediaAsset;
 import com.langxi.babydiary.v3.platform.application.V3Exception;
 import com.langxi.babydiary.v3.space.application.SpaceAccess;
@@ -20,11 +22,14 @@ public class AlbumService {
     private final SpaceAccess spaces;
     private final AlbumRepository albums;
     private final MediaRepository media;
+    private final MediaAccessPolicy mediaAccess;
 
-    public AlbumService(SpaceAccess spaces, AlbumRepository albums, MediaRepository media) {
+    public AlbumService(SpaceAccess spaces, AlbumRepository albums, MediaRepository media,
+                        MediaAccessPolicy mediaAccess) {
         this.spaces = spaces;
         this.albums = albums;
         this.media = media;
+        this.mediaAccess = mediaAccess;
     }
 
     public AlbumCatalog catalog(UUID spaceId, long accountId) {
@@ -32,19 +37,22 @@ public class AlbumService {
         List<AlbumCatalog.Group> groups = new ArrayList<>();
         groups.add(new AlbumCatalog.Group(null, "SYSTEM", "默认相册", List.of(
                 new AlbumCatalog.Album(null, null, "all", "SYSTEM", "所有图片", "", null, null, null,
-                        albums.countLibraryImages(space.internalId(), accountId)),
+                        albums.countLibraryImages(space.internalId(), accountId), null),
                 new AlbumCatalog.Album(null, null, "favorites", "SYSTEM", "收藏", "", null, null, null,
-                        albums.countFavoriteMedia(space.internalId(), accountId))
+                        albums.countFavoriteMedia(space.internalId(), accountId), null)
         )));
         Map<Long, List<AlbumCatalog.Album>> byGroup = new LinkedHashMap<>();
-        for (AlbumRepository.GroupRow group : albums.findGroups(space.internalId())) {
+        List<AlbumRepository.GroupRow> groupRows = albums.findGroups(space.internalId());
+        for (AlbumRepository.GroupRow group : groupRows) {
             byGroup.put(group.internalId(), new ArrayList<>());
             groups.add(new AlbumCatalog.Group(group.id(), "CUSTOM", group.name(), byGroup.get(group.internalId())));
         }
-        Map<Long, UUID> groupPublicIds = new LinkedHashMap<>();
-        albums.findGroups(space.internalId()).forEach(group -> groupPublicIds.put(group.internalId(), group.id()));
+        List<AlbumRepository.AlbumRow> albumRows = albums.findAlbums(space.internalId());
+        Map<UUID, MediaAsset> covers = media.findByPublicIdsInSpace(space.internalId(), albumRows.stream()
+                        .map(AlbumRepository.AlbumRow::coverAssetId).filter(java.util.Objects::nonNull).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
         boolean hasUngrouped = false;
-        for (AlbumRepository.AlbumRow album : albums.findAlbums(space.internalId())) {
+        for (AlbumRepository.AlbumRow album : albumRows) {
             List<AlbumCatalog.Album> target = album.groupInternalId() == null ? null : byGroup.get(album.groupInternalId());
             if (target == null) {
                 target = byGroup.computeIfAbsent(0L, ignored -> new ArrayList<>());
@@ -53,7 +61,7 @@ public class AlbumService {
                     hasUngrouped = true;
                 }
             }
-            target.add(toAlbum(album, album.groupId()));
+            target.add(toAlbum(album, album.groupId(), covers.get(album.coverAssetId())));
         }
         return new AlbumCatalog(List.copyOf(groups));
     }
@@ -64,8 +72,10 @@ public class AlbumService {
                 .orElseThrow(() -> V3Exception.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问"));
         PageBounds bounds = PageBounds.of(page, size);
         List<UUID> ids = albums.findMediaPublicIds(space.internalId(), albumId, accountId, bounds.offset(), bounds.size());
-        return new AlbumCatalog.Detail(toAlbum(row, row.groupId()),
-                media.findByPublicIds(space.internalId(), ids, accountId),
+        List<MediaAsset> items = media.findByPublicIdsInSpace(space.internalId(), ids);
+        MediaAsset cover = row.coverAssetId() == null ? null : media.findByPublicIdsInSpace(
+                space.internalId(), List.of(row.coverAssetId())).stream().findFirst().orElse(null);
+        return new AlbumCatalog.Detail(toAlbum(row, row.groupId(), cover), items,
                 albums.countMedia(space.internalId(), albumId, accountId));
     }
 
@@ -83,7 +93,7 @@ public class AlbumService {
                 ? albums.countFavoriteMedia(space.internalId(), accountId)
                 : albums.countLibraryImages(space.internalId(), accountId);
         AlbumCatalog.Album album = new AlbumCatalog.Album(null, null, key, "SYSTEM",
-                "favorites".equals(key) ? "收藏" : "所有图片", "", null, null, null, total);
+                "favorites".equals(key) ? "收藏" : "所有图片", "", null, null, null, total, null);
         return new AlbumCatalog.Detail(album, items, total);
     }
 
@@ -135,11 +145,11 @@ public class AlbumService {
 
     @Transactional
     public AlbumCatalog.Album createAlbum(UUID spaceId, long accountId, UUID groupId, String name,
-                                          String description, List<UUID> mediaIds) {
+                                          String description, List<UUID> mediaIds, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         String value = normalizeName(name);
         Long groupInternalId = resolveGroup(space.internalId(), groupId);
-        List<MediaAsset> assets = validateMedia(space.internalId(), accountId, mediaIds);
+        List<MediaAsset> assets = validateMedia(spaceId, space.internalId(), accountId, mediaIds, elevated);
         Long cover = assets.isEmpty() ? null : assets.get(0).internalId();
         UUID publicId = UUID.randomUUID();
         long albumId;
@@ -153,7 +163,7 @@ public class AlbumService {
         MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
         return new AlbumCatalog.Album(publicId, groupId, null, "CUSTOM", value, description,
                 assets.isEmpty() ? null : assets.get(0).id(), coverVariant == null ? null : coverVariant.type(),
-                coverVariant == null ? null : coverVariant.profile(), assets.size());
+                coverVariant == null ? null : coverVariant.profile(), assets.size(), assets.isEmpty() ? null : assets.get(0));
     }
 
     @Transactional
@@ -161,7 +171,7 @@ public class AlbumService {
                                             String description, List<UUID> mediaIds) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         String value = normalizeName(name);
-        List<MediaAsset> assets = validateMedia(space.internalId(), accountId, mediaIds);
+        List<MediaAsset> assets = validateMedia(spaceId, space.internalId(), accountId, mediaIds, false);
         AlbumRepository.GroupRow group = findOrCreateAiGroup(space.internalId(), accountId);
         UUID publicId = UUID.randomUUID();
         long albumId = albums.insertAlbum(new AlbumRepository.NewAlbum(publicId, space.internalId(), group.internalId(),
@@ -173,7 +183,7 @@ public class AlbumService {
         MediaAsset.Variant coverVariant = assets.isEmpty() ? null : coverVariant(assets.get(0));
         return new AlbumCatalog.Album(publicId, group.id(), null, "AI", value, description,
                 assets.isEmpty() ? null : assets.get(0).id(), coverVariant == null ? null : coverVariant.type(),
-                coverVariant == null ? null : coverVariant.profile(), assets.size());
+                coverVariant == null ? null : coverVariant.profile(), assets.size(), assets.isEmpty() ? null : assets.get(0));
     }
 
     private AlbumRepository.GroupRow findOrCreateAiGroup(long spaceId, long accountId) {
@@ -207,7 +217,9 @@ public class AlbumService {
             throw new V3Exception(org.springframework.http.HttpStatus.CONFLICT, "ALBUM_EXISTS", "当前空间已存在同名相册");
         }
         AlbumRepository.AlbumRow row = albums.findAlbum(space.internalId(), albumId).orElseThrow();
-        return toAlbum(row, row.groupId());
+        MediaAsset cover = row.coverAssetId() == null ? null : media.findByPublicIdsInSpace(space.internalId(),
+                List.of(row.coverAssetId())).stream().findFirst().orElse(null);
+        return toAlbum(row, row.groupId(), cover);
     }
 
     @Transactional
@@ -219,11 +231,11 @@ public class AlbumService {
     }
 
     @Transactional
-    public void addMedia(UUID spaceId, UUID albumId, long accountId, List<UUID> mediaIds) {
+    public void addMedia(UUID spaceId, UUID albumId, long accountId, List<UUID> mediaIds, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         AlbumRepository.AlbumRow album = albums.findAlbum(space.internalId(), albumId)
                 .orElseThrow(() -> V3Exception.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问"));
-        List<MediaAsset> assets = validateMedia(space.internalId(), accountId, mediaIds);
+        List<MediaAsset> assets = validateMedia(spaceId, space.internalId(), accountId, mediaIds, elevated);
         List<UUID> current = albums.findMediaPublicIds(space.internalId(), albumId, accountId);
         int position = current.size();
         for (MediaAsset asset : assets) {
@@ -233,12 +245,13 @@ public class AlbumService {
     }
 
     @Transactional
-    public void removeMedia(UUID spaceId, UUID albumId, UUID assetId, long accountId) {
+    public void removeMedia(UUID spaceId, UUID albumId, UUID assetId, long accountId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         AlbumRepository.AlbumRow album = albums.findAlbum(space.internalId(), albumId)
                 .orElseThrow(() -> V3Exception.notFound("ALBUM_NOT_FOUND", "相册不存在或无权访问"));
-        MediaAsset asset = media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream().findFirst()
+        MediaAsset asset = media.findByPublicIdsInSpace(space.internalId(), List.of(assetId)).stream().findFirst()
                 .orElseThrow(() -> V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
+        mediaAccess.require(spaceId, assetId, MediaAccessContext.album(accountId, albumId, elevated));
         albums.deleteMedia(space.internalId(), album.internalId(), asset.internalId());
         if (assetId.equals(album.coverAssetId())) {
             UUID replacement = albums.findMediaPublicIds(space.internalId(), albumId, accountId, 0, 1)
@@ -250,10 +263,11 @@ public class AlbumService {
     }
 
     @Transactional
-    public void favorite(UUID spaceId, UUID assetId, long accountId, boolean value) {
+    public void favorite(UUID spaceId, UUID assetId, long accountId, boolean value, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         MediaAsset asset = media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream().findFirst()
                 .orElseThrow(() -> V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
+        mediaAccess.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
         if (value) albums.addFavorite(space.internalId(), accountId, asset.internalId());
         else albums.removeFavorite(space.internalId(), accountId, asset.internalId());
     }
@@ -265,10 +279,13 @@ public class AlbumService {
                 .orElseThrow(() -> V3Exception.badRequest("ALBUM_GROUP_NOT_FOUND", "相册组不存在或不属于当前空间"));
     }
 
-    private List<MediaAsset> validateMedia(long spaceId, long accountId, List<UUID> ids) {
+    private List<MediaAsset> validateMedia(UUID spacePublicId, long spaceId, long accountId, List<UUID> ids,
+                                           boolean elevated) {
         List<UUID> values = ids == null ? List.of() : ids.stream().distinct().toList();
         List<MediaAsset> assets = media.findByPublicIds(spaceId, values, accountId);
         if (assets.size() != values.size()) throw V3Exception.badRequest("MEDIA_NOT_FOUND", "部分媒体不存在或不属于当前空间");
+        assets.forEach(asset -> mediaAccess.require(spacePublicId, asset.id(),
+                MediaAccessContext.direct(accountId, elevated)));
         return assets;
     }
 
@@ -279,9 +296,9 @@ public class AlbumService {
         return value;
     }
 
-    private AlbumCatalog.Album toAlbum(AlbumRepository.AlbumRow row, UUID groupId) {
+    private AlbumCatalog.Album toAlbum(AlbumRepository.AlbumRow row, UUID groupId, MediaAsset cover) {
         return new AlbumCatalog.Album(row.id(), groupId, null, row.type(), row.name(), row.description(),
-                row.coverAssetId(), row.coverVariantType(), row.coverVariantProfile(), row.mediaCount());
+                row.coverAssetId(), row.coverVariantType(), row.coverVariantProfile(), row.mediaCount(), cover);
     }
 
     private MediaAsset.Variant coverVariant(MediaAsset asset) {

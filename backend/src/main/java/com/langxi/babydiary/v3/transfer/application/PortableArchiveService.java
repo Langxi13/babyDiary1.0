@@ -2,13 +2,15 @@ package com.langxi.babydiary.v3.transfer.application;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.langxi.babydiary.storage.ObjectStorage;
+import com.langxi.babydiary.storage.ObjectStorageRegistry;
 import com.langxi.babydiary.storage.StoredObject;
 import com.langxi.babydiary.v3.diary.application.DiaryInteractionService;
 import com.langxi.babydiary.v3.diary.application.DiaryService;
 import com.langxi.babydiary.v3.identity.application.StepUpService;
 import com.langxi.babydiary.v3.identity.application.V3Principal;
 import com.langxi.babydiary.v3.media.application.MediaService;
+import com.langxi.babydiary.v3.media.application.MediaRepository;
+import com.langxi.babydiary.v3.media.application.MediaVariantPolicy;
 import com.langxi.babydiary.v3.media.domain.MediaAsset;
 import com.langxi.babydiary.v3.platform.application.BinaryUuid;
 import com.langxi.babydiary.v3.platform.application.V3Exception;
@@ -56,23 +58,27 @@ public class PortableArchiveService {
 
     private final SpaceAccess spaces;
     private final TransferMapper mapper;
-    private final ObjectStorage storage;
+    private final ObjectStorageRegistry storages;
     private final ObjectMapper json;
     private final StepUpService stepUp;
     private final MediaService media;
+    private final MediaRepository mediaRepository;
+    private final MediaVariantPolicy variants;
     private final DiaryService diaries;
     private final DiaryInteractionService interactions;
     private final TagService tags;
 
-    public PortableArchiveService(SpaceAccess spaces, TransferMapper mapper, ObjectStorage storage,
+    public PortableArchiveService(SpaceAccess spaces, TransferMapper mapper, ObjectStorageRegistry storages,
                                   ObjectMapper json, StepUpService stepUp, MediaService media,
+                                  MediaRepository mediaRepository,MediaVariantPolicy variants,
                                   DiaryService diaries, DiaryInteractionService interactions, TagService tags) {
         this.spaces = spaces;
         this.mapper = mapper;
-        this.storage = storage;
+        this.storages = storages;
         this.json = json;
         this.stepUp = stepUp;
         this.media = media;
+        this.mediaRepository=mediaRepository;this.variants=variants;
         this.diaries = diaries;
         this.interactions = interactions;
         this.tags = tags;
@@ -96,7 +102,7 @@ public class PortableArchiveService {
                             || written + item.sizeBytes > MAX_UNCOMPRESSED_BYTES) {
                         throw V3Exception.badRequest("EXPORT_SIZE_LIMIT", "归档中的媒体文件超过导出限制");
                     }
-                    try (StoredObject object = storage.get(item.storageKey)) {
+                    try (StoredObject object = storages.require(item.storageProvider).get(item.storageKey)) {
                         if (object.length() != item.sizeBytes) {
                             throw new IOException("Stored media size does not match metadata: " + item.path);
                         }
@@ -109,6 +115,7 @@ public class PortableArchiveService {
                     }
                     written += item.sizeBytes;
                     item.storageKey = null;
+                    item.storageProvider=null;
                 }
             }
             byte[] bytes = json.writerWithDefaultPrettyPrinter().writeValueAsBytes(manifest);
@@ -136,7 +143,7 @@ public class PortableArchiveService {
         if (archive == null || archive.isEmpty()) {
             throw V3Exception.badRequest("ARCHIVE_REQUIRED", "请选择要导入的归档文件");
         }
-        List<String> uploadedKeys = new ArrayList<>();
+        List<VariantLocation> uploadedKeys = new ArrayList<>();
         try (ArchiveContents contents = readArchive(archive)) {
             ArchiveManifest manifest = parseAndValidate(contents);
             if (manifest.diaries.stream().anyMatch(value -> value.locked)) {
@@ -161,7 +168,7 @@ public class PortableArchiveService {
                             new PathUpload(item.originalFilename, item.contentType, path), item.caption, item.takenAt);
                     mediaIds.add(uploaded.id());
                     uploaded.variants().stream().filter(value -> "ORIGINAL".equals(value.type()))
-                            .map(MediaAsset.Variant::storageKey).forEach(uploadedKeys::add);
+                            .map(value->new VariantLocation(value.storageProvider(),value.storageKey())).forEach(uploadedKeys::add);
                     importedMedia++;
                 }
                 List<UUID> tagIds = new ArrayList<>();
@@ -180,14 +187,14 @@ public class PortableArchiveService {
                     String author = item.author == null || item.author.isBlank() ? "原成员" : item.author.trim();
                     String content = "[" + author + "] " + item.content;
                     interactions.addComment(spaceId, diaryId, principal.accountId(),
-                            content.substring(0, Math.min(content.length(), 2000)));
+                            content.substring(0, Math.min(content.length(), 2000)),true);
                 }
                 importedDiaries++;
             }
             return new ImportResult(importedDiaries, importedMedia, skippedDiaries);
         } catch (IOException | RuntimeException exception) {
-            for (String key : uploadedKeys) {
-                try { storage.delete(key); } catch (IOException ignored) { }
+            for (VariantLocation value : uploadedKeys) {
+                try { storages.require(value.provider()).delete(value.key()); } catch (IOException ignored) { }
             }
             throw exception;
         }
@@ -204,13 +211,20 @@ public class PortableArchiveService {
         if (!ids.isEmpty()) {
             mapper.findTags(ids).forEach(row -> tagsByDiary.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
                     .add(new ArchiveTag(row.name(), row.color())));
-            mapper.findMedia(ids).forEach(row -> {
+            List<TransferMapper.MediaRow> mediaRows=mapper.findMedia(ids);
+            Map<UUID,MediaAsset> assets=mediaRepository.findByPublicIdsInSpace(internalSpaceId,mediaRows.stream()
+                    .map(row->BinaryUuid.fromBytes(row.publicId())).distinct().toList()).stream()
+                    .collect(java.util.stream.Collectors.toMap(MediaAsset::id,value->value));
+            mediaRows.forEach(row -> {
                 UUID assetId = BinaryUuid.fromBytes(row.publicId());
+                MediaAsset asset=assets.get(assetId);
+                MediaAsset.Variant original=asset==null?null:variants.select(asset.variants(),"ORIGINAL",null).orElse(null);
+                if(original==null)throw new IllegalStateException("Media original variant is missing: "+assetId);
                 String path = "objects/" + publicIdByDiary.get(row.diaryId())
-                        + "/" + assetId + extension(row.originalFilename(), row.contentType());
+                        + "/" + assetId + extension(row.originalFilename(), original.contentType());
                 mediaByDiary.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>()).add(new ArchiveMedia(
-                        assetId, path, row.originalFilename(), row.mediaType(), row.contentType(), row.sizeBytes(),
-                        row.caption(), row.takenAt(), row.position(), row.storageKey()));
+                        assetId, path, row.originalFilename(), row.mediaType(), original.contentType(), original.sizeBytes(),
+                        row.caption(), row.takenAt(), row.position(), original.storageProvider(),original.storageKey()));
             });
             mapper.findComments(ids).forEach(row -> commentsByDiary.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
                     .add(new ArchiveComment(row.username(), row.content(), row.createdAt())));
@@ -402,6 +416,7 @@ public class PortableArchiveService {
     }
 
     public record ImportResult(int importedDiaries, int importedMedia, int skippedDiaries) {}
+    private record VariantLocation(String provider,String key){}
 
     public static final class ArchiveManifest {
         public int version; public Instant exportedAt; public UUID sourceSpaceId; public String spaceName;
@@ -431,13 +446,13 @@ public class PortableArchiveService {
     public static final class ArchiveMedia {
         public UUID id; public String path; public String originalFilename; public String mediaType;
         public String contentType; public long sizeBytes; public String caption; public LocalDateTime takenAt;
-        public int position; public transient String storageKey;
+        public int position; public transient String storageProvider;public transient String storageKey;
         public ArchiveMedia() {}
         ArchiveMedia(UUID id,String path,String originalFilename,String mediaType,String contentType,long sizeBytes,
-                     String caption,LocalDateTime takenAt,int position,String storageKey) {
+                     String caption,LocalDateTime takenAt,int position,String storageProvider,String storageKey) {
             this.id=id;this.path=path;this.originalFilename=originalFilename;this.mediaType=mediaType;
             this.contentType=contentType;this.sizeBytes=sizeBytes;this.caption=caption;this.takenAt=takenAt;
-            this.position=position;this.storageKey=storageKey;
+            this.position=position;this.storageProvider=storageProvider;this.storageKey=storageKey;
         }
     }
     public static final class ArchiveComment {

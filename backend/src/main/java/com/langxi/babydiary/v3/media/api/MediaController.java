@@ -1,12 +1,15 @@
 package com.langxi.babydiary.v3.media.api;
 
-import com.langxi.babydiary.storage.StoredObject;
+import com.langxi.babydiary.v3.identity.application.StepUpService;
 import com.langxi.babydiary.v3.identity.application.V3Principal;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
+import com.langxi.babydiary.v3.media.application.MediaRepresentationService;
 import com.langxi.babydiary.v3.media.application.MediaService;
-import com.langxi.babydiary.v3.media.application.MediaUrlSigner;
-import com.langxi.babydiary.v3.media.domain.MediaAsset;
+import com.langxi.babydiary.v3.media.application.MediaView;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,12 +19,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -34,93 +39,88 @@ import java.util.UUID;
 @RequestMapping("/api/v3/spaces/{spaceId}/media")
 public class MediaController {
     private final MediaService media;
-    private final MediaUrlSigner urls;
+    private final MediaRepresentationService representations;
+    private final StepUpService stepUp;
 
-    public MediaController(MediaService media, MediaUrlSigner urls) {
+    public MediaController(MediaService media, MediaRepresentationService representations, StepUpService stepUp) {
         this.media = media;
-        this.urls = urls;
+        this.representations = representations;
+        this.stepUp = stepUp;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<MediaResponse> upload(@AuthenticationPrincipal V3Principal principal,
-                                                 @PathVariable UUID spaceId,
-                                                 @RequestParam("file") MultipartFile file,
-                                                 @RequestParam(required = false) @Size(max = 500) String caption,
-                                                 @RequestParam(required = false) LocalDateTime takenAt) throws IOException {
-        MediaAsset asset = media.upload(spaceId, principal.accountId(), file, caption, takenAt);
-        return ResponseEntity.status(HttpStatus.CREATED).body(MediaResponse.from(asset, spaceId, urls));
+    public ResponseEntity<MediaView> upload(@AuthenticationPrincipal V3Principal principal,
+                                            @PathVariable UUID spaceId,
+                                            @RequestParam("file") MultipartFile file,
+                                            @RequestParam(required = false) @Size(max = 500) String caption,
+                                            @RequestParam(required = false) LocalDateTime takenAt) throws IOException {
+        return ResponseEntity.status(HttpStatus.CREATED).body(representations.view(
+                media.upload(spaceId, principal.accountId(), file, caption, takenAt),
+                MediaAccessContext.direct(principal.accountId(), false)));
     }
 
     @GetMapping
-    public MediaPageResponse list(@AuthenticationPrincipal V3Principal principal,
-                                  @PathVariable UUID spaceId,
+    public MediaPageResponse list(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
                                   @RequestParam(required = false) String mediaType,
                                   @RequestParam(defaultValue = "true") boolean libraryOnly,
                                   @RequestParam(defaultValue = "30") int size,
-                                  @RequestParam(required = false) String cursor) {
+                                  @RequestParam(required = false) String cursor,
+                                  @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        boolean elevated = stepUp.valid(principal, stepToken);
         MediaService.Page page = media.page(spaceId, principal.accountId(),
                 new MediaService.Query(mediaType, libraryOnly, cursor, size));
-        return new MediaPageResponse(page.items().stream().map(asset -> MediaResponse.from(asset, spaceId, urls)).toList(),
-                page.nextCursor());
+        return new MediaPageResponse(representations.views(page.items(),
+                MediaAccessContext.direct(principal.accountId(), elevated)), page.nextCursor());
     }
 
     @GetMapping("/{assetId}")
-    public MediaResponse detail(@AuthenticationPrincipal V3Principal principal,
-                                @PathVariable UUID spaceId, @PathVariable UUID assetId) {
-        return MediaResponse.from(media.detail(spaceId, assetId, principal.accountId()), spaceId, urls);
+    public MediaView detail(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
+                            @PathVariable UUID assetId,
+                            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        boolean elevated = stepUp.valid(principal, stepToken);
+        return representations.view(media.detail(spaceId, assetId, principal.accountId(), elevated),
+                MediaAccessContext.direct(principal.accountId(), elevated));
     }
 
-    @GetMapping("/{assetId}/variants/{variant}")
+    @RequestMapping(value = "/{assetId}/variants/{variant}", method = {RequestMethod.GET, RequestMethod.HEAD})
     public ResponseEntity<StreamingResponseBody> content(@AuthenticationPrincipal V3Principal principal,
                                                           @PathVariable UUID spaceId, @PathVariable UUID assetId,
                                                           @PathVariable String variant,
-                                                          @RequestParam(required = false) String profile) throws IOException {
-        StoredObject object = media.openVariant(spaceId, assetId, variant, profile, principal.accountId());
-        String contentType = object.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : object.contentType();
-        StreamingResponseBody body = output -> {
-            try (object) {
-                object.stream().transferTo(output);
-            }
-        };
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType))
-                .contentLength(object.length()).cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(15)).cachePrivate())
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline").body(body);
+                                                          @RequestParam(required = false) String profile,
+                                                          @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken,
+                                                          @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
+                                                          @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+                                                          HttpServletRequest request) {
+        boolean elevated = stepUp.valid(principal, stepToken);
+        MediaService.ResolvedVariant resolved = media.resolveVariant(spaceId, assetId, variant, profile,
+                principal.accountId(), elevated);
+        return MediaContentResponse.create(media, resolved, range, ifNoneMatch,
+                "HEAD".equals(request.getMethod()), elevated);
     }
 
     @DeleteMapping("/{assetId}")
-    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@AuthenticationPrincipal V3Principal principal,
-                       @PathVariable UUID spaceId, @PathVariable UUID assetId) {
-        media.delete(spaceId, assetId, principal.accountId());
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
+                       @PathVariable UUID assetId,
+                       @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        media.delete(spaceId, assetId, principal.accountId(), stepUp.valid(principal, stepToken));
     }
 
     @PutMapping("/{assetId}")
-    public MediaResponse update(@AuthenticationPrincipal V3Principal principal,@PathVariable UUID spaceId,
-                                @PathVariable UUID assetId,@Valid @RequestBody MetadataRequest request) {
-        return MediaResponse.from(media.update(spaceId,assetId,principal.accountId(),request.caption(),
-                request.takenAt(),request.accessScope(),request.libraryVisible()),spaceId,urls);
+    public MediaView update(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
+                            @PathVariable UUID assetId, @Valid @RequestBody MetadataRequest request,
+                            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        boolean elevated = stepUp.valid(principal, stepToken);
+        return representations.view(media.update(spaceId, assetId, principal.accountId(), request.caption(),
+                        request.takenAt(), request.accessScope(), request.libraryVisible(), elevated),
+                MediaAccessContext.direct(principal.accountId(), elevated));
     }
 
-    public record MediaPageResponse(List<MediaResponse> items, String nextCursor) {
+    public record MediaPageResponse(List<MediaView> items, String nextCursor) {
     }
 
-    public record MetadataRequest(@Size(max=500) String caption,LocalDateTime takenAt,String accessScope,
-                                  boolean libraryVisible) {}
-
-    public record MediaResponse(UUID id, UUID spaceId, String mediaType, String originalFilename,
-                                String caption, LocalDateTime takenAt, String accessScope,
-                                boolean libraryVisible, String status, LocalDateTime createdAt,
-                                List<VariantResponse> variants) {
-        public static MediaResponse from(MediaAsset asset, UUID spaceId, MediaUrlSigner urls) {
-            return new MediaResponse(asset.id(), spaceId, asset.mediaType(), asset.originalFilename(), asset.caption(),
-                    asset.takenAt(), asset.accessScope(), asset.libraryVisible(), asset.status(), asset.createdAt(),
-                    asset.variants().stream().map(value -> new VariantResponse(value.type(), value.profile(),
-                            urls.url(spaceId, asset.id(), value.type(), value.profile()),
-                            value.contentType(), value.sizeBytes(), value.width(), value.height(), value.status())).toList());
-        }
-    }
-
-    public record VariantResponse(String type, String profile, String contentUrl, String contentType,
-                                  long sizeBytes, Integer width, Integer height, String status) {
+    public record MetadataRequest(@Size(max = 500) String caption, LocalDateTime takenAt,
+                                  @Pattern(regexp = "LINKED|SPACE") String accessScope,
+                                  boolean libraryVisible) {
     }
 }

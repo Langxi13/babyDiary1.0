@@ -20,6 +20,12 @@ public interface MediaMapper {
     List<MediaRow> findByPublicIds(@Param("spaceId") long spaceId, @Param("publicIds") List<byte[]> publicIds,
                                    @Param("accountId") long accountId);
 
+    List<MediaRow> findByPublicIdsInSpace(@Param("spaceId") long spaceId,
+                                          @Param("publicIds") List<byte[]> publicIds);
+
+    List<MediaRow> findInSpace(@Param("spaceId") byte[] spaceId, @Param("publicId") byte[] publicId,
+                               @Param("includeDeleted") boolean includeDeleted);
+
     VariantRow findVariant(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId,
                            @Param("type") String type, @Param("profile") String profile,
                            @Param("accountId") long accountId);
@@ -43,12 +49,12 @@ public interface MediaMapper {
     void insertAsset(AssetInsert row);
 
     @Insert("""
-            INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,
-              size_bytes,checksum_sha256,status,created_at,updated_at)
+            INSERT IGNORE INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,
+              size_bytes,checksum_sha256,width,height,duration_millis,status,created_at,updated_at)
             VALUES(#{assetId},#{type},#{profile},#{storageProvider},#{storageKey},#{contentType},
-              #{sizeBytes},#{checksumSha256},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
+              #{sizeBytes},#{checksumSha256},#{width},#{height},#{durationMillis},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
             """)
-    void insertVariant(MediaRepository.NewVariant variant);
+    int insertVariant(MediaRepository.NewVariant variant);
 
     @Update("""
             UPDATE space_storage_usage u JOIN diary_space s ON s.space_id=u.space_id
@@ -58,10 +64,24 @@ public interface MediaMapper {
     int reserveStorage(@Param("spaceId") long spaceId, @Param("sizeBytes") long sizeBytes);
 
     @Update("""
+            UPDATE space_storage_usage u JOIN diary_space s ON s.space_id=u.space_id
+            SET u.used_bytes=u.used_bytes+#{sizeBytes},u.updated_at=UTC_TIMESTAMP(6)
+            WHERE s.public_id=#{spaceId} AND u.used_bytes+#{sizeBytes}<=s.storage_quota_bytes
+            """)
+    int reserveStorageByPublicId(@Param("spaceId") byte[] spaceId, @Param("sizeBytes") long sizeBytes);
+
+    @Update("""
             UPDATE space_storage_usage SET used_bytes=GREATEST(used_bytes-#{sizeBytes},0),updated_at=UTC_TIMESTAMP(6)
             WHERE space_id=#{spaceId}
             """)
     void releaseStorage(@Param("spaceId") long spaceId, @Param("sizeBytes") long sizeBytes);
+
+    @Update("""
+            UPDATE space_storage_usage u JOIN diary_space s ON s.space_id=u.space_id
+            SET u.used_bytes=GREATEST(u.used_bytes-#{sizeBytes},0),u.updated_at=UTC_TIMESTAMP(6)
+            WHERE s.public_id=#{spaceId}
+            """)
+    void releaseStorageByPublicId(@Param("spaceId") byte[] spaceId, @Param("sizeBytes") long sizeBytes);
 
     @Update("""
             UPDATE media_asset SET deleted_at=#{deletedAt},updated_at=UTC_TIMESTAMP(6)
@@ -69,6 +89,55 @@ public interface MediaMapper {
             """)
     int softDelete(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId,
                    @Param("accountId") long accountId, @Param("deletedAt") LocalDateTime deletedAt);
+
+    @Update("""
+            UPDATE media_asset SET status='DELETE_PENDING',deleted_at=#{deletedAt},updated_at=UTC_TIMESTAMP(6)
+            WHERE space_id=#{spaceId} AND public_id=#{publicId} AND owner_id=#{accountId}
+              AND status='READY' AND deleted_at IS NULL
+            """)
+    int markDeletePending(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId,
+                          @Param("accountId") long accountId, @Param("deletedAt") LocalDateTime deletedAt);
+
+    @Update("UPDATE media_variant SET deleted_at=COALESCE(deleted_at,#{deletedAt}),updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId}")
+    void markVariantsDeleted(@Param("assetId") long assetId, @Param("deletedAt") LocalDateTime deletedAt);
+
+    @Update("UPDATE media_asset SET status='DELETED',deleted_at=COALESCE(deleted_at,#{deletedAt}),updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId}")
+    void markAssetDeleted(@Param("assetId") long assetId, @Param("deletedAt") LocalDateTime deletedAt);
+
+    @Update("UPDATE media_asset SET status='FAILED',deleted_at=#{failedAt},updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId}")
+    void failUpload(@Param("assetId") long assetId, @Param("failedAt") LocalDateTime failedAt);
+
+    @Update("UPDATE media_asset SET status='READY',updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId} AND status IN ('UPLOADING','PROCESSING')")
+    void markReady(long assetId);
+
+    @Update("""
+            UPDATE media_variant SET width=COALESCE(width,#{width}),height=COALESCE(height,#{height}),
+              duration_millis=COALESCE(duration_millis,#{durationMillis}),updated_at=UTC_TIMESTAMP(6)
+            WHERE asset_id=#{assetId} AND variant_type='ORIGINAL' AND status='READY' AND deleted_at IS NULL
+            """)
+    void updateTechnicalMetadata(@Param("assetId") long assetId, @Param("width") Integer width,
+                                 @Param("height") Integer height, @Param("durationMillis") Long durationMillis);
+
+    @org.apache.ibatis.annotations.Select("SELECT COUNT(*)>0 FROM media_variant WHERE asset_id=#{assetId} AND variant_type=#{type} AND profile=#{profile} AND status='READY' AND deleted_at IS NULL")
+    boolean hasVariant(@Param("assetId") long assetId, @Param("type") String type,
+                       @Param("profile") String profile);
+
+    @org.apache.ibatis.annotations.Select("""
+            SELECT
+              (SELECT COUNT(*) FROM diary_media WHERE asset_id=#{assetId}) AS diaries,
+              (SELECT COUNT(*) FROM album_media am JOIN album al ON al.album_id=am.album_id
+                 WHERE am.asset_id=#{assetId} AND al.deleted_at IS NULL) AS albums,
+              (SELECT COUNT(*) FROM album WHERE cover_asset_id=#{assetId} AND deleted_at IS NULL) AS album_covers,
+              (SELECT COUNT(*) FROM anniversary WHERE cover_asset_id=#{assetId} AND deleted_at IS NULL) AS anniversaries,
+              (SELECT COUNT(*) FROM user_avatar WHERE asset_id=#{assetId}) AS avatars,
+              (SELECT COUNT(*) FROM ai_album_candidate_media acm JOIN ai_album_candidate ac ON ac.candidate_id=acm.candidate_id
+                 JOIN ai_album_proposal ap ON ap.proposal_id=ac.proposal_id
+                 WHERE acm.asset_id=#{assetId} AND ap.status='PENDING') AS ai_proposals
+            """)
+    MediaRepository.ReferenceCounts references(long assetId);
+
+    @org.apache.ibatis.annotations.Delete("DELETE FROM favorite_media WHERE asset_id=#{assetId}")
+    void removeFavorites(long assetId);
 
     @Update("UPDATE media_asset SET caption=#{caption},taken_at=#{takenAt},access_scope=#{accessScope}," +
             "library_visible=#{libraryVisible},updated_at=UTC_TIMESTAMP(6) WHERE space_id=#{spaceId} " +

@@ -25,51 +25,60 @@ class MediaUrlSignerTest {
     private static final Instant NOW = Instant.parse("2026-07-30T03:00:00Z");
     private static final UUID SPACE_ID = UUID.fromString("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     private static final UUID ASSET_ID = UUID.fromString("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    private static final UUID DIARY_ID = UUID.fromString("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
 
     @Test
     void signsAndVerifiesTheExactVariantProfile() {
         MediaUrlSigner signer = signer();
-        URI uri = URI.create(signer.url(SPACE_ID, ASSET_ID, "original", "source"));
+        MediaAccessContext context = MediaAccessContext.diary(42, DIARY_ID, true);
+        URI uri = URI.create(signer.url(SPACE_ID, ASSET_ID, "original", "source", context).url());
         Map<String, String> query = query(uri);
 
         assertThat(query.get("profile")).isEqualTo("source");
+        assertThat(Long.parseLong(query.get("expires"))).isGreaterThanOrEqualTo(NOW.plusSeconds(300).getEpochSecond());
         MediaUrlSigner.VerifiedVariant verified = signer.verify(SPACE_ID, ASSET_ID, "original",
-                query.get("profile"), Long.parseLong(query.get("expires")), query.get("signature"));
-        assertThat(verified).isEqualTo(new MediaUrlSigner.VerifiedVariant("ORIGINAL", "source", false));
+                query.get("profile"), query.get("ticket"), Long.parseLong(query.get("expires")),
+                query.get("signature"));
+        assertThat(verified.type()).isEqualTo("ORIGINAL");
+        assertThat(verified.profile()).isEqualTo("source");
+        assertThat(verified.context()).isEqualTo(context);
+        assertThat(verified.expiresAt()).isEqualTo(Instant.ofEpochSecond(Long.parseLong(query.get("expires"))));
 
         assertThatThrownBy(() -> signer.verify(SPACE_ID, ASSET_ID, "original", "default",
-                Long.parseLong(query.get("expires")), query.get("signature")))
+                query.get("ticket"), Long.parseLong(query.get("expires")), query.get("signature")))
                 .isInstanceOfSatisfying(V3Exception.class,
                         exception -> assertThat(exception.code()).isEqualTo("MEDIA_URL_INVALID"));
     }
 
     @Test
-    void acceptsLegacySignaturesWithoutChoosingAnUnboundProfile() throws Exception {
+    void rejectsLegacySignaturesWithoutAnAccessContext() throws Exception {
         MediaUrlSigner signer = signer();
         long expires = NOW.plusSeconds(3600).getEpochSecond();
         String payload = SPACE_ID + "\n" + ASSET_ID + "\nORIGINAL\n" + expires;
 
-        MediaUrlSigner.VerifiedVariant verified = signer.verify(SPACE_ID, ASSET_ID, "original", null,
-                expires, hmac(payload));
-
-        assertThat(verified).isEqualTo(new MediaUrlSigner.VerifiedVariant("ORIGINAL", null, true));
+        assertThatThrownBy(() -> signer.verify(SPACE_ID, ASSET_ID, "original", "source", "",
+                expires, hmac(payload)))
+                .isInstanceOfSatisfying(V3Exception.class,
+                        exception -> assertThat(exception.code()).isEqualTo("MEDIA_URL_INVALID"));
     }
 
     @Test
     void rejectsExpiredAndInvalidProfileUrls() {
         MediaUrlSigner signer = signer();
 
-        assertThatThrownBy(() -> signer.url(SPACE_ID, ASSET_ID, "original", "../source"))
+        assertThatThrownBy(() -> signer.url(SPACE_ID, ASSET_ID, "original", "../source",
+                MediaAccessContext.direct(42, false)))
                 .isInstanceOfSatisfying(V3Exception.class,
                         exception -> assertThat(exception.code()).isEqualTo("MEDIA_URL_INVALID"));
-        assertThatThrownBy(() -> signer.verify(SPACE_ID, ASSET_ID, "original", null,
+        assertThatThrownBy(() -> signer.verify(SPACE_ID, ASSET_ID, "original", "source", "ticket",
                 NOW.minusSeconds(1).getEpochSecond(), "invalid"))
                 .isInstanceOfSatisfying(V3Exception.class,
                         exception -> assertThat(exception.code()).isEqualTo("MEDIA_URL_EXPIRED"));
     }
 
     private MediaUrlSigner signer() {
-        MediaUrlSigner signer = new MediaUrlSigner(SECRET, Duration.ofHours(1), Clock.fixed(NOW, ZoneOffset.UTC));
+        MediaUrlSigner signer = new MediaUrlSigner(SECRET, Duration.ofHours(1), Duration.ofMinutes(5),
+                Clock.fixed(NOW, ZoneOffset.UTC));
         signer.initialize();
         return signer;
     }

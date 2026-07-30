@@ -22,7 +22,7 @@ public class DiaryReadService {
         this.reads = reads;
     }
 
-    public CalendarMonth calendar(UUID spaceId, long accountId, YearMonth month) {
+    public CalendarMonth calendar(UUID spaceId, long accountId, YearMonth month,boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         if (month == null) throw V3Exception.badRequest("MONTH_REQUIRED", "请选择月份");
         Map<LocalDate, List<DiaryReadRepository.CalendarRow>> grouped = new LinkedHashMap<>();
@@ -30,7 +30,8 @@ public class DiaryReadService {
                 .forEach(row -> grouped.computeIfAbsent(row.date(), ignored -> new ArrayList<>()).add(row));
         List<CalendarDay> days = grouped.entrySet().stream().map(entry -> new CalendarDay(entry.getKey(),
                 entry.getValue().size(), entry.getValue().stream().limit(3).map(row ->
-                new CalendarEntry(row.diaryId(), ellipsis(row.title(), 18), row.mood(), row.mediaCount())).toList())).toList();
+                new CalendarEntry(row.diaryId(),row.locked()&&!elevated?null:ellipsis(row.title(), 18),
+                        row.locked()&&!elevated?null:row.mood(),row.locked()&&!elevated?0:row.mediaCount(),row.locked())).toList())).toList();
         return new CalendarMonth(month, days);
     }
 
@@ -65,7 +66,7 @@ public class DiaryReadService {
     public record CalendarDay(LocalDate date, int count, List<CalendarEntry> entries) {
     }
 
-    public record CalendarEntry(UUID diaryId, String title, String mood, int mediaCount) {
+    public record CalendarEntry(UUID diaryId, String title, String mood, int mediaCount,boolean locked) {
     }
 
     public record TimelineIndex(List<YearSummary> years) {

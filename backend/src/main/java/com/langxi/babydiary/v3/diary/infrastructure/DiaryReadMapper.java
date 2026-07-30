@@ -10,7 +10,7 @@ import java.util.List;
 @Mapper
 public interface DiaryReadMapper {
     @Select("""
-            SELECT d.public_id,d.diary_date,d.title,d.mood_key,
+            SELECT d.public_id,d.diary_date,d.title,d.mood_key,d.locked,
                    (SELECT COUNT(*) FROM diary_media dm WHERE dm.diary_id=d.diary_id) AS media_count
             FROM diary d
             WHERE d.space_id=#{spaceId} AND d.deleted_at IS NULL
@@ -49,6 +49,7 @@ public interface DiaryReadMapper {
         private String title;
         private String moodKey;
         private int mediaCount;
+        private boolean locked;
 
         public CalendarRow() {
         }
@@ -58,12 +59,14 @@ public interface DiaryReadMapper {
         public String title() { return title; }
         public String moodKey() { return moodKey; }
         public int mediaCount() { return mediaCount; }
+        public boolean locked(){return locked;}
 
         public void setPublicId(byte[] publicId) { this.publicId = publicId; }
         public void setDiaryDate(LocalDate diaryDate) { this.diaryDate = diaryDate; }
         public void setTitle(String title) { this.title = title; }
         public void setMoodKey(String moodKey) { this.moodKey = moodKey; }
         public void setMediaCount(int mediaCount) { this.mediaCount = mediaCount; }
+        public void setLocked(boolean locked){this.locked=locked;}
     }
 
     record MonthCountRow(int diaryYear, int diaryMonth, long diaryCount) {

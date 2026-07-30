@@ -53,6 +53,15 @@ public class StepUpService {
         }
     }
 
+    public boolean valid(V3Principal principal, String token) {
+        try {
+            require(principal, token);
+            return true;
+        } catch (V3Exception exception) {
+            return false;
+        }
+    }
+
     private ProfileRepository.Profile requireProfile(V3Principal principal) {
         if (principal == null) throw invalid();
         return profiles.find(principal.accountId())

@@ -6,6 +6,7 @@ import {
   setOfflineMeta
 } from '@/utils/offlineDb'
 import { chunkOperations } from '@/utils/offlineQueue'
+import { getStepUpToken } from '@/utils/stepUp'
 
 const syncingSpaces = new Set()
 
@@ -19,7 +20,7 @@ export async function syncWorkspace(spaceId) {
     const queued = await listOfflineOperations(spaceId)
     const diaryOperations = queued.filter(item => item.kind === 'diary')
     for (const batch of chunkOperations(diaryOperations)) {
-      const response = await workspaceApi.sync.push(spaceId, batch.map(toSyncOperation))
+      const response = await workspaceApi.sync.push(spaceId, batch.map(toSyncOperation), getStepUpToken())
       const appliedIds = []
       let retryable = false
       response.data.forEach(result => {
@@ -55,12 +56,13 @@ export async function syncWorkspace(spaceId) {
           const response = await workspaceApi.media.upload(spaceId, formData)
           uploaded.push(response.data.assetId)
         }
-        const current = (await workspaceApi.diaries.get(spaceId, diaryId)).data
+        const stepUpToken = getStepUpToken()
+        const current = (await workspaceApi.diaries.get(spaceId, diaryId, stepUpToken)).data
         const mediaIds = [
           ...(current.media || []).map(item => item.assetId).filter(Boolean),
           ...uploaded
         ]
-        await workspaceApi.diaries.update(spaceId, diaryId, { ...current, mediaIds })
+        await workspaceApi.diaries.update(spaceId, diaryId, { ...current, mediaIds }, stepUpToken)
         await removeOfflineOperations(items.map(item => item.id))
         synced += items.length
       } catch {

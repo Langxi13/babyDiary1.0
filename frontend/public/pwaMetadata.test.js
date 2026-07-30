@@ -21,7 +21,7 @@ test('manifest has installable app shell metadata', () => {
 })
 
 test('service worker cache version is bumped when the app shell metadata changes', () => {
-  assert.match(serviceWorker, /baby-diary-shell-v12/)
+  assert.match(serviceWorker, /baby-diary-shell-v13/)
   assert.match(serviceWorker, /\/app-icon\.png/)
 })
 
@@ -36,6 +36,9 @@ test('manifest and service worker no longer register a system share target', () 
 
 test('service worker only caches successful same-origin responses and limits shell fallback to navigation', () => {
   assert.match(serviceWorker, /requestUrl\.origin !== self\.location\.origin/)
+  assert.match(serviceWorker, /requestUrl\.pathname\.startsWith\('\/api'\)/)
+  assert.match(serviceWorker, /SHELL_ASSET_PATHS\.has\(requestUrl\.pathname\)/)
+  assert.match(serviceWorker, /requestUrl\.pathname\.startsWith\('\/assets\/'\)/)
   assert.match(serviceWorker, /if \(response\.ok\)/)
   assert.match(serviceWorker, /event\.request\.mode === 'navigate'/)
   assert.match(serviceWorker, /return Response\.error\(\)/)

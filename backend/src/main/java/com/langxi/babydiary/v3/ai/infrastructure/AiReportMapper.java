@@ -51,6 +51,7 @@ public interface AiReportMapper {
             SELECT d.diary_id,d.public_id,d.diary_date,d.title,d.content_text,d.mood_key
             FROM diary d
             WHERE d.space_id=#{spaceId} AND d.deleted_at IS NULL
+              AND d.locked=0
               AND d.diary_date BETWEEN #{start} AND #{end}
               AND (d.visibility='SHARED' OR d.author_id=#{accountId})
             ORDER BY d.diary_date,d.diary_id

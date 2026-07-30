@@ -1,6 +1,7 @@
 package com.langxi.babydiary.v3.platform.api;
 
 import com.langxi.babydiary.v3.platform.application.V3Exception;
+import com.langxi.babydiary.v3.media.api.MediaRangeException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,15 @@ public class V3ExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ProblemDetail> denied(AccessDeniedException exception) {
         return problem(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "没有权限执行该操作", null);
+    }
+
+    @ExceptionHandler(MediaRangeException.class)
+    ResponseEntity<ProblemDetail> range(MediaRangeException exception) {
+        ProblemDetail detail = base(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE,
+                "MEDIA_RANGE_INVALID", "请求的媒体范围无效", traceId());
+        return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                .header(org.springframework.http.HttpHeaders.CONTENT_RANGE, "bytes */" + exception.total())
+                .body(detail);
     }
 
     @ExceptionHandler(Exception.class)

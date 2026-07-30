@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.v3.ai.application.V3AiClient;
 import com.langxi.babydiary.v3.identity.application.InvitationCodeService;
+import com.langxi.babydiary.v3.media.application.StorageGcJobHandler;
 import com.langxi.babydiary.v3.platform.infrastructure.BackgroundJobMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +106,9 @@ class V3ApiIntegrationTest {
 
     @Autowired
     InvitationCodeService invitationCodes;
+
+    @Autowired
+    StorageGcJobHandler storageGc;
 
     @MockBean
     V3AiClient aiClient;
@@ -394,8 +398,7 @@ class V3ApiIntegrationTest {
     @Test
     void mediaUploadListReadAndDeleteUseTheUnifiedVariantModel() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "memory.jpg", "image/jpeg",
-                "v3-media-content".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile file = imageFile("memory.png");
 
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file)
@@ -403,8 +406,9 @@ class V3ApiIntegrationTest {
                         .param("caption", "A test image"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.mediaType").value("IMAGE"))
-                .andExpect(jsonPath("$.variants[0].type").value("ORIGINAL"))
-                .andExpect(jsonPath("$.variants[0].sizeBytes").value(16))
+                .andExpect(jsonPath("$.representations.original.variantType").value("ORIGINAL"))
+                .andExpect(jsonPath("$.representations.original.profile").value("source"))
+                .andExpect(jsonPath("$.representations.original.sizeBytes").value(file.getSize()))
                 .andReturn();
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
         mvc.perform(put("/api/v3/spaces/{spaceId}/media/{assetId}", OWNER_SPACE_ID, assetId)
@@ -426,8 +430,8 @@ class V3ApiIntegrationTest {
                         OWNER_SPACE_ID, assetId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
-                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, "16"));
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
+                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(file.getSize())));
 
         mvc.perform(delete("/api/v3/spaces/{spaceId}/media/{assetId}", OWNER_SPACE_ID, assetId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
@@ -436,6 +440,8 @@ class V3ApiIntegrationTest {
         mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}", OWNER_SPACE_ID, assetId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isNotFound());
+        storageGc.handle(json.valueToTree(Map.of("spaceId", OWNER_SPACE_ID.toString(),
+                "assetId", assetId.toString())));
         assertThat(jdbc.queryForObject("SELECT used_bytes FROM space_storage_usage WHERE space_id=11", Long.class))
                 .isZero();
     }
@@ -443,18 +449,17 @@ class V3ApiIntegrationTest {
     @Test
     void signedMediaUrlsArePublicButCannotBeTamperedWith() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "signed.jpg", "image/jpeg",
-                "signed-media-content".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile file = imageFile("signed.png");
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
-        String contentUrl = body(uploaded).path("variants").get(0).path("contentUrl").asText();
+        String contentUrl = body(uploaded).path("representations").path("original").path("url").asText();
         assertThat(contentUrl).startsWith("/api/v3/public/media/");
 
         mvc.perform(get(URI.create(contentUrl)))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
-                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, "20"));
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/png"))
+                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(file.getSize())));
 
         char last = contentUrl.charAt(contentUrl.length() - 1);
         String tampered = contentUrl.substring(0, contentUrl.length() - 1) + (last == '0' ? '1' : '0');
@@ -466,10 +471,10 @@ class V3ApiIntegrationTest {
     @Test
     void migratedSourceOriginalsAndDefaultThumbnailsRemainReadableFromDiaries() throws Exception {
         String token = accessToken(login("owner"));
-        byte[] originalBytes = "migrated-original".getBytes(StandardCharsets.UTF_8);
-        byte[] thumbnailBytes = "migrated-thumb".getBytes(StandardCharsets.UTF_8);
+        byte[] originalBytes = imageBytes();
+        byte[] thumbnailBytes = imageBytes();
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
-                        .file(new MockMultipartFile("file", "migrated.jpg", "image/jpeg", originalBytes))
+                        .file(new MockMultipartFile("file", "migrated.png", "image/png", originalBytes))
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
@@ -482,7 +487,7 @@ class V3ApiIntegrationTest {
         jdbc.update("""
                 INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,
                   content_type,size_bytes,status)
-                VALUES(?,'THUMBNAIL','default','LOCAL',?,'image/jpeg',?,'READY')
+                VALUES(?,'THUMBNAIL','default','LOCAL',?,'image/png',?,'READY')
                 """, internalId, thumbnailKey, thumbnailBytes.length);
 
         MvcResult created = mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
@@ -496,8 +501,10 @@ class V3ApiIntegrationTest {
         MvcResult detail = mvc.perform(get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.media[0].contentUrl").value(org.hamcrest.Matchers.containsString("profile=source")))
-                .andExpect(jsonPath("$.media[0].thumbnailUrl").value(org.hamcrest.Matchers.containsString("profile=default")))
+                .andExpect(jsonPath("$.media[0].contentUrl")
+                        .value(org.hamcrest.Matchers.containsString("profile=source")))
+                .andExpect(jsonPath("$.media[0].thumbnailUrl")
+                        .value(org.hamcrest.Matchers.containsString("profile=default")))
                 .andReturn();
         String contentUrl = body(detail).path("media").get(0).path("contentUrl").asText();
         String thumbnailUrl = body(detail).path("media").get(0).path("thumbnailUrl").asText();
@@ -520,14 +527,13 @@ class V3ApiIntegrationTest {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("MEDIA_URL_INVALID"));
 
         mvc.perform(get(URI.create(legacyMediaUrl(OWNER_SPACE_ID, assetId, "ORIGINAL"))))
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.CONTENT_LENGTH, String.valueOf(originalBytes.length)));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void privateSharesProtectPasswordsViewsAndSignedMediaWithoutAuthentication() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "shared.jpg", "image/jpeg", "shared-photo".getBytes());
+        MockMultipartFile file = imageFile("shared.png");
         MvcResult upload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
@@ -566,6 +572,149 @@ class V3ApiIntegrationTest {
         mvc.perform(post("/api/v3/public/shares/{token}/open", rawToken)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"share-pass\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void linkedAndSpaceMediaScopesRespectDirectParentAndLibraryAccess() throws Exception {
+        String ownerToken = accessToken(login("owner"));
+        String otherToken = accessToken(login("other"));
+        UUID sharedSpaceId = createSharedSpaceWithOther(ownerToken, otherToken);
+
+        MvcResult upload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", sharedSpaceId)
+                        .file(imageFile("shared-scope.png"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.accessScope").value("LINKED"))
+                .andExpect(jsonPath("$.libraryVisible").value(true))
+                .andReturn();
+        UUID assetId = UUID.fromString(body(upload).path("id").asText());
+
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}", sharedSpaceId, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v3/spaces/{spaceId}/albums/system/all", sharedSpaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media").isEmpty());
+
+        MvcResult diary = mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", sharedSpaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "title", "Shared parent", "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>Parent grants read access.</p>", "visibility", "SHARED",
+                                "locked", false, "tagIds", List.of(), "mediaIds", List.of(assetId)))))
+                .andExpect(status().isCreated()).andReturn();
+        UUID diaryId = UUID.fromString(body(diary).path("id").asText());
+        MvcResult otherView = mvc.perform(get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", sharedSpaceId, diaryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media[0].id").value(assetId.toString()))
+                .andReturn();
+        mvc.perform(get(URI.create(body(otherView).path("media").get(0).path("contentUrl").asText())))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", sharedSpaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "title", "Illegal reuse", "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>Must not reuse linked media.</p>", "visibility", "SHARED",
+                                "locked", false, "tagIds", List.of(), "mediaIds", List.of(assetId)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MEDIA_NOT_FOUND"));
+
+        mvc.perform(put("/api/v3/spaces/{spaceId}/media/{assetId}", sharedSpaceId, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "caption", "Reusable", "accessScope", "SPACE", "libraryVisible", true))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}", sharedSpaceId, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v3/spaces/{spaceId}/albums/system/all", sharedSpaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media[0].id").value(assetId.toString()));
+        mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", sharedSpaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "title", "Allowed reuse", "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>Space media can be reused.</p>", "visibility", "SHARED",
+                                "locked", false, "tagIds", List.of(), "mediaIds", List.of(assetId)))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void lockedDiariesAndTheirMediaRequireStepUpWithoutLeakingSearchContent() throws Exception {
+        String token = accessToken(login("owner"));
+        MvcResult upload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                        .file(imageFile("locked.png"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isCreated()).andReturn();
+        UUID assetId = UUID.fromString(body(upload).path("id").asText());
+        MvcResult created = mvc.perform(post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "title", "vaultsecret", "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>private locked content</p>", "visibility", "PRIVATE",
+                                "locked", true, "tagIds", List.of(), "mediaIds", List.of(assetId)))))
+                .andExpect(status().isCreated()).andReturn();
+        UUID diaryId = UUID.fromString(body(created).path("id").asText());
+
+        MvcResult list = mvc.perform(get("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].locked").value(true))
+                .andExpect(jsonPath("$.items[0].media").isEmpty())
+                .andReturn();
+        assertThat(body(list).path("items").get(0).path("title").isNull()).isTrue();
+        mvc.perform(get("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                        .queryParam("keyword", "vaultsecret")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].protectedContent").value(true))
+                .andExpect(jsonPath("$.items[0].representations.original.url").value(
+                        org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}", OWNER_SPACE_ID, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+        mvc.perform(post("/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares", OWNER_SPACE_ID, diaryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("expiresInHours", 24))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOCKED_CONTENT_NOT_SHAREABLE"));
+
+        String stepToken = stepUp(token);
+        MvcResult detail = mvc.perform(get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("vaultsecret"))
+                .andExpect(jsonPath("$.media[0].contentUrl").isNotEmpty())
+                .andReturn();
+        mvc.perform(get(URI.create(body(detail).path("media").get(0).path("contentUrl").asText())))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
+        mvc.perform(get("/api/v3/spaces/{spaceId}/media/{assetId}", OWNER_SPACE_ID, assetId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.representations.original.url").isNotEmpty());
     }
 
     @Test
@@ -666,15 +815,13 @@ class V3ApiIntegrationTest {
     @Test
     void albumCatalogIncludesSystemFavoritesAndCustomAlbumDetails() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "album.jpg", "image/jpeg",
-                "album-image".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile file = imageFile("album.png");
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
         setOriginalProfile(assetId, "source");
-        MockMultipartFile secondFile = new MockMultipartFile("file", "album-second.jpg", "image/jpeg",
-                "album-image-second".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile secondFile = imageFile("album-second.png");
         MvcResult secondUpload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(secondFile).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
@@ -710,7 +857,7 @@ class V3ApiIntegrationTest {
                                 "mediaIds", List.of(assetId.toString(), secondAssetId.toString())))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.coverAssetId").value(assetId.toString()))
-                .andExpect(jsonPath("$.coverContentUrl",
+                .andExpect(jsonPath("$.coverMedia.representations.original.url",
                         org.hamcrest.Matchers.containsString("profile=source")))
                 .andExpect(jsonPath("$.mediaCount").value(2))
                 .andReturn();
@@ -809,7 +956,7 @@ class V3ApiIntegrationTest {
     @Test
     void anniversaryCoverUsesTheSameMediaAssetAcrossCreateUpdateAndDelete() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "cover.jpg", "image/jpeg", "cover".getBytes());
+        MockMultipartFile file = imageFile("cover.png");
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
@@ -823,6 +970,7 @@ class V3ApiIntegrationTest {
                                 "coverAssetId", assetId.toString(), "sortOrder", 0))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.coverAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.coverMedia.id").value(assetId.toString()))
                 .andReturn();
         UUID anniversaryId = UUID.fromString(body(created).path("id").asText());
 
@@ -999,8 +1147,7 @@ class V3ApiIntegrationTest {
                 .andExpect(status().isOk());
 
         String token = accessToken(login("owner"));
-        MockMultipartFile file = new MockMultipartFile("file", "europe.jpg", "image/jpeg",
-                "europe-photo".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile file = imageFile("europe.png");
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(file).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
@@ -1065,7 +1212,7 @@ class V3ApiIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Renamed family space"))
                 .andExpect(jsonPath("$.defaultVisibility").value("PRIVATE"));
 
-        MockMultipartFile avatar = new MockMultipartFile("file", "avatar.jpg", "image/jpeg", "avatar".getBytes());
+        MockMultipartFile avatar = imageFile("avatar.png");
         MvcResult uploaded = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(avatar).header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isCreated()).andReturn();
@@ -1209,8 +1356,7 @@ class V3ApiIntegrationTest {
     @Test
     void portableArchiveRoundTripPreservesDiaryMediaAndRejectsDuplicateImport() throws Exception {
         String token = accessToken(login("owner"));
-        MockMultipartFile image = new MockMultipartFile("file", "memory.jpg", "image/jpeg",
-                new byte[]{1, 2, 3, 4, 5});
+        MockMultipartFile image = imageFile("memory.png");
         MvcResult upload = mvc.perform(multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
                         .file(image).header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isCreated()).andReturn();
@@ -1310,11 +1456,19 @@ class V3ApiIntegrationTest {
     void backgroundJobsClaimAtomicallyRetryAndRecoverStaleWork() {
         jdbc.update("""
                 INSERT INTO background_job(public_id,job_type,payload,max_attempts,available_at)
-                VALUES(UUID_TO_BIN(UUID()),'STORAGE_GC','{}',2,DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 1 MINUTE))
+                VALUES(UUID_TO_BIN(UUID()),'AI_REPORT','{}',2,DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 1 MINUTE))
                 """);
         LocalDateTime now = LocalDateTime.now(java.time.ZoneOffset.UTC);
-        assertThat(backgroundJobs.claim("worker:first", now)).isEqualTo(1);
-        assertThat(backgroundJobs.claim("worker:second", now)).isZero();
+        assertThat(backgroundJobs.claim("worker:unsupported", now,
+                List.of("MEDIA_PROCESS", "STORAGE_GC"))).isZero();
+        jdbc.update("DELETE FROM background_job WHERE job_type='AI_REPORT'");
+
+        jdbc.update("""
+                INSERT INTO background_job(public_id,job_type,payload,max_attempts,available_at)
+                VALUES(UUID_TO_BIN(UUID()),'STORAGE_GC','{}',2,DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 1 MINUTE))
+                """);
+        assertThat(backgroundJobs.claim("worker:first", now, List.of("STORAGE_GC"))).isEqualTo(1);
+        assertThat(backgroundJobs.claim("worker:second", now, List.of("STORAGE_GC"))).isZero();
         BackgroundJobMapper.JobRow first = backgroundJobs.findClaimed("worker:first");
         assertThat(first).isNotNull();
         assertThat(first.attemptCount()).isEqualTo(1);
@@ -1322,7 +1476,7 @@ class V3ApiIntegrationTest {
                 "retry", now)).isEqualTo(1);
         jdbc.update("UPDATE background_job SET available_at=DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 1 SECOND) WHERE job_id=?",
                 first.jobId());
-        assertThat(backgroundJobs.claim("worker:retry", now.plusSeconds(1))).isEqualTo(1);
+        assertThat(backgroundJobs.claim("worker:retry", now.plusSeconds(1), List.of("STORAGE_GC"))).isEqualTo(1);
         BackgroundJobMapper.JobRow retried = backgroundJobs.findClaimed("worker:retry");
         assertThat(retried.attemptCount()).isEqualTo(2);
         assertThat(backgroundJobs.fail(retried.jobId(), "worker:retry", true, now, "failed", now)).isEqualTo(1);
@@ -1370,6 +1524,51 @@ class V3ApiIntegrationTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andReturn();
+    }
+
+    private UUID createSharedSpaceWithOther(String ownerToken, String otherToken) throws Exception {
+        MvcResult created = mvc.perform(post("/api/v3/spaces")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Shared permission space", "defaultVisibility", "SHARED"))))
+                .andExpect(status().isCreated()).andReturn();
+        UUID spaceId = UUID.fromString(body(created).path("id").asText());
+        MvcResult invitation = mvc.perform(post("/api/v3/spaces/{spaceId}/invitations", spaceId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "other@example.com", "role", "MEMBER"))))
+                .andExpect(status().isCreated()).andReturn();
+        mvc.perform(post("/api/v3/invitations/{token}/accept", body(invitation).path("token").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isNoContent());
+        return spaceId;
+    }
+
+    private String stepUp(String token) throws Exception {
+        MvcResult result = mvc.perform(post("/api/v3/auth/step-up")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("password", PASSWORD))))
+                .andExpect(status().isOk()).andReturn();
+        return body(result).path("token").asText();
+    }
+
+    private MockMultipartFile imageFile(String filename) throws Exception {
+        return new MockMultipartFile("file", filename, "image/png", imageBytes());
+    }
+
+    private byte[] imageBytes() throws Exception {
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+                2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, 0xff6f61);
+        image.setRGB(1, 0, 0x4f86c6);
+        image.setRGB(0, 1, 0xf2c14e);
+        image.setRGB(1, 1, 0x4c956c);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        assertThat(javax.imageio.ImageIO.write(image, "png", output)).isTrue();
+        return output.toByteArray();
     }
 
     private UUID createDiary(String token, String title, String date) throws Exception {

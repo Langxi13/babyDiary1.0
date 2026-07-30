@@ -4,6 +4,8 @@ import com.langxi.babydiary.v3.identity.application.ProfileRepository;
 import com.langxi.babydiary.v3.identity.application.ProfileService;
 import com.langxi.babydiary.v3.identity.application.V3Principal;
 import com.langxi.babydiary.v3.media.application.MediaUrlSigner;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
+import com.langxi.babydiary.v3.identity.application.StepUpService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.UUID;
 
@@ -26,10 +29,12 @@ import java.util.UUID;
 public class ProfileController {
     private final ProfileService profiles;
     private final MediaUrlSigner mediaUrls;
+    private final StepUpService stepUp;
 
-    public ProfileController(ProfileService profiles, MediaUrlSigner mediaUrls) {
+    public ProfileController(ProfileService profiles, MediaUrlSigner mediaUrls,StepUpService stepUp) {
         this.profiles = profiles;
         this.mediaUrls = mediaUrls;
+        this.stepUp=stepUp;
     }
 
     @GetMapping("/profile")
@@ -45,8 +50,9 @@ public class ProfileController {
 
     @PutMapping("/avatar")
     public ProfileResponse avatar(@AuthenticationPrincipal V3Principal principal,
-                                  @Valid @RequestBody AvatarRequest request) {
-        return ProfileResponse.from(profiles.setAvatar(principal.accountId(), request.spaceId(), request.assetId()), mediaUrls);
+                                  @Valid @RequestBody AvatarRequest request,
+                                  @RequestHeader(value="X-Step-Up-Token",required=false)String token) {
+        return ProfileResponse.from(profiles.setAvatar(principal.accountId(), request.spaceId(), request.assetId(),stepUp.valid(principal,token)), mediaUrls);
     }
 
     @DeleteMapping("/avatar")
@@ -80,7 +86,8 @@ public class ProfileController {
                     profile.avatarAssetId() == null || profile.avatarVariantType() == null
                             || profile.avatarVariantProfile() == null ? null : new AvatarMedia(profile.avatarAssetId(),
                     mediaUrls.url(profile.avatarSpaceId(), profile.avatarAssetId(), profile.avatarVariantType(),
-                            profile.avatarVariantProfile())));
+                            profile.avatarVariantProfile(), MediaAccessContext.avatar(profile.accountId(),
+                                    profile.id(), false)).url()));
         }
     }
 

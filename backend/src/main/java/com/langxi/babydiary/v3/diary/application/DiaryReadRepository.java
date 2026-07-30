@@ -11,7 +11,7 @@ public interface DiaryReadRepository {
 
     List<WeekCount> findWeekCounts(long spaceId, long accountId, LocalDate start, LocalDate end);
 
-    record CalendarRow(UUID diaryId, LocalDate date, String title, String mood, int mediaCount) {
+    record CalendarRow(UUID diaryId, LocalDate date, String title, String mood, int mediaCount,boolean locked) {
     }
 
     record MonthCount(int year, int month, long count) {

@@ -2,9 +2,10 @@
 
 ## 2026-07-30
 
-- Fixed migrated diary images returning `MEDIA_VARIANT_NOT_FOUND` by carrying each media variant's real profile through diary, share, album-cover, avatar, comment-avatar, direct-media, and signed-public-media responses.
-- Bound new media signatures to both variant type and profile, retained expiry-bounded verification for already issued profile-less signatures, and made profile-less authenticated reads choose `default`, then `source`, then other profiles deterministically.
-- Updated frontend media normalization and diary preview filtering, repaired portable exports for `ORIGINAL/source`, and strengthened migration verification and regression coverage for mixed source/default media assets.
+- Unified V3 media storage, representations, provider-aware reads, profile selection, signed access contexts, Range/HEAD/ETag delivery, and diary/signed-media regression coverage. Migrated diary images now retain their real `ORIGINAL/source` and `THUMBNAIL/default` profiles across diary, share, album cover, avatar, comment avatar, direct-media, and public-media responses.
+- Rejected old profile-less media signatures instead of retaining an ambiguous compatibility path; every new URL binds variant type, actual profile, expiry, and an HMAC-protected access context ticket.
+- Added real MIME/header and image-dimension validation, single-threaded idempotent media processing, unique derived-object keys, `DELETE_PENDING`/`DELETED` lifecycle states, reference checks, quota-safe storage GC, and MySQL migration V2 indexes/dedupe constraints.
+- Added account-scoped IndexedDB v2 migration/quarantine tests, strict Service Worker shell-only caching, protected-media step-up tests, shared-space LINKED/SPACE authorization tests, Range/HEAD/304/416 tests, and generic mobile MIME handling.
 - Aligned deployment backups with the V3 datasource credentials and JDBC target so a retained legacy datasource cannot cause the current V3 database export to fail.
 - Promoted the V3 UUID-based runtime to production with an isolated `baby_diary_v3` database and a verified migration of the existing accounts, spaces, diaries, media, albums, favorites, avatars, anniversaries, templates, and AI history.
 - Made `/api/v3` the only documented business API and switched local Compose, staging, Docker, systemd, health checks, media policy, and native bootstrap documentation to the V3 runtime.

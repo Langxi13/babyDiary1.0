@@ -74,7 +74,7 @@ public class AiAlbumProposalService {
                 BinaryUuid.toBytes(proposalId), space.internalId(), accountId, start, end,
                 trim(prompt, 1000), config.model());
         mapper.insertProposal(insert);
-        replaceCandidates(space.internalId(), insert.getProposalId(), start, end, commands);
+        replaceCandidates(space.internalId(),accountId, insert.getProposalId(), start, end, commands);
         return detail(spaceId, accountId, proposalId);
     }
 
@@ -91,7 +91,7 @@ public class AiAlbumProposalService {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         AiAlbumProposalMapper.ProposalRow proposal = requirePending(space.internalId(), accountId, proposalId);
         mapper.deleteCandidates(proposal.getProposalId());
-        replaceCandidates(space.internalId(), proposal.getProposalId(), proposal.getStartDate(),
+        replaceCandidates(space.internalId(),accountId, proposal.getProposalId(), proposal.getStartDate(),
                 proposal.getEndDate(), commands);
         return detail(spaceId, accountId, proposalId);
     }
@@ -113,7 +113,7 @@ public class AiAlbumProposalService {
                 AlbumRepository.AlbumRow target = albumRepository.findAlbum(space.internalId(), targetId)
                         .filter(album -> "AI".equals(album.type()))
                         .orElseThrow(() -> V3Exception.badRequest("AI_ALBUM_TARGET_INVALID", "目标 AI 相册不存在"));
-                albums.addMedia(spaceId, target.id(), accountId, assetIds);
+                albums.addMedia(spaceId, target.id(), accountId, assetIds, false);
             } else {
                 albums.createAiAlbum(spaceId, accountId, row.getTitle(), row.getDescription(), assetIds);
             }
@@ -132,14 +132,14 @@ public class AiAlbumProposalService {
     private Candidate candidate(long spaceId, long accountId, AiAlbumProposalMapper.CandidateRow row) {
         List<UUID> diaryIds = uuids(mapper.findCandidateDiaries(row.getCandidateId()));
         List<UUID> assetIds = uuids(mapper.findCandidateMedia(row.getCandidateId()));
-        List<MediaAsset> photos = media.findByPublicIds(spaceId, assetIds, accountId);
+        List<MediaAsset> photos = media.findByPublicIdsInSpace(spaceId, assetIds);
         UUID targetId = row.getTargetAlbumPublicId() == null
                 ? null : BinaryUuid.fromBytes(row.getTargetAlbumPublicId());
         return new Candidate(row.getMode(), targetId, row.getTargetAlbumName(), row.getTitle(),
                 row.getDescription(), diaryIds, assetIds, photos, row.isDiscarded());
     }
 
-    private void replaceCandidates(long spaceId, long proposalId, LocalDate start, LocalDate end,
+    private void replaceCandidates(long spaceId,long accountId, long proposalId, LocalDate start, LocalDate end,
                                    List<CandidateCommand> commands) {
         if (commands == null || commands.isEmpty() || commands.size() > 50) {
             throw V3Exception.badRequest("AI_ALBUM_CANDIDATES_INVALID", "相册推荐不能为空且最多包含50项");
@@ -160,9 +160,9 @@ public class AiAlbumProposalService {
             List<UUID> diaryIds = distinct(command.diaryIds(), 500);
             List<UUID> assetIds = distinct(command.assetIds(), 500);
             Map<UUID, Long> diaryRefs = diaryIds.isEmpty()
-                    ? Map.of() : resolve(mapper.resolveDiaries(spaceId, bytes(diaryIds)));
-            Map<UUID, Long> assetRefs = assetIds.isEmpty()
-                    ? Map.of() : resolve(mapper.resolveMedia(spaceId, bytes(assetIds)));
+                    ? Map.of() : resolve(mapper.resolveDiaries(spaceId,accountId, bytes(diaryIds)));
+            Map<UUID, Long> assetRefs = assetIds.isEmpty()||diaryIds.isEmpty()
+                    ? Map.of() : resolve(mapper.resolveMedia(spaceId,accountId,bytes(diaryIds), bytes(assetIds)));
             if (diaryRefs.size() != diaryIds.size() || assetRefs.size() != assetIds.size()) {
                 throw V3Exception.badRequest("AI_ALBUM_REFS_INVALID", "部分日记或图片不属于当前空间");
             }

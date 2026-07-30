@@ -4,6 +4,9 @@ import {
 } from '@/api/v3Adapters'
 import { invalidateDiaryReads } from '@/api/diary'
 import { cachedRequest, invalidateApiCache, stableStringify } from '@/utils/apiCache'
+import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
+
+const stepHeader = token => token ? { 'X-Step-Up-Token': token } : {}
 
 export const tagApi = {
   list(options = {}) {
@@ -30,27 +33,18 @@ const anniversaryPayload = value => ({
   sortOrder: Number(value.sortOrder ?? value.sort) || 0
 })
 
-const loadCover = async (spaceId, item) => {
-  if (!item.coverAssetId) return normalizeAnniversary(item)
-  try {
-    const response = await request.get(`/api/v3/spaces/${spaceId}/media/${item.coverAssetId}`, { __silentError: true })
-    return normalizeAnniversary(item, response.data)
-  } catch {
-    return normalizeAnniversary(item)
-  }
-}
-
 export const anniversaryApi = {
   list(options = {}) {
     return cachedRequest('anniversaries:list', async () => {
       const spaceId = await activeSpaceId()
-      const response = await request.get(`/api/v3/spaces/${spaceId}/anniversaries`)
-      return { ...response, data: await Promise.all((response.data || []).map(item => loadCover(spaceId, item))) }
+      const response = await request.get(`/api/v3/spaces/${spaceId}/anniversaries`, { headers: stepHeader(getStepUpToken()) })
+      return { ...response, data: (response.data || []).map(item => normalizeAnniversary(item)) }
     }, { ttl: options.ttl ?? 600000, force: options.force })
   },
   async create(payload) {
     const spaceId = await activeSpaceId()
-    const response = await request.post(`/api/v3/spaces/${spaceId}/anniversaries`, anniversaryPayload(payload))
+    const response = await withStepUpRetry(token => request.post(`/api/v3/spaces/${spaceId}/anniversaries`,
+      anniversaryPayload(payload), { headers: stepHeader(token) }))
     invalidateApiCache('anniversaries:')
     return response
   },
@@ -64,7 +58,8 @@ export const anniversaryApi = {
   },
   async update(id, payload) {
     const spaceId = await activeSpaceId()
-    const response = await request.put(`/api/v3/spaces/${spaceId}/anniversaries/${id}`, anniversaryPayload(payload))
+    const response = await withStepUpRetry(token => request.put(`/api/v3/spaces/${spaceId}/anniversaries/${id}`,
+      anniversaryPayload(payload), { headers: stepHeader(token) }))
     invalidateApiCache('anniversaries:')
     return response
   },
@@ -95,7 +90,7 @@ const mediaPage = async (params = {}) => {
     const page = Math.max(0, Number(params.page) || 0)
     const size = Math.max(1, Math.min(60, Number(params.size) || 30))
     const response = await request.get(`/api/v3/spaces/${spaceId}/albums/system/favorites`, {
-      params: { page, size }
+      params: { page, size }, headers: stepHeader(getStepUpToken())
     })
     const content = (response.data.media || []).map(item => mediaPhoto(item, true))
     const total = Number(response.data.totalMedia ?? response.data.album?.mediaCount ?? content.length)
@@ -104,7 +99,8 @@ const mediaPage = async (params = {}) => {
       totalPages: Math.ceil(total / size) } }
   }
   const response = await request.get(`/api/v3/spaces/${spaceId}/media`, {
-    params: { mediaType: 'IMAGE', libraryOnly: true, size: Math.min(60, Number(params.size) || 30), cursor: params.cursor }
+    params: { mediaType: 'IMAGE', libraryOnly: true, size: Math.min(60, Number(params.size) || 30), cursor: params.cursor },
+    headers: stepHeader(getStepUpToken())
   })
   const content = (response.data.items || []).map(item => mediaPhoto(item, false))
   return { ...response, data: { content, pageNumber: Number(params.page) || 0, pageSize: Number(params.size) || 30,
@@ -125,14 +121,16 @@ export const photoApi = {
   },
   async favorite(assetId) {
     const spaceId = await activeSpaceId()
-    const response = await request.put(`/api/v3/spaces/${spaceId}/media/${assetId}/favorite`)
+    const response = await withStepUpRetry(token => request.put(`/api/v3/spaces/${spaceId}/media/${assetId}/favorite`,
+      null, { headers: stepHeader(token) }))
     invalidateApiCache('photos:')
     invalidateApiCache('albums:')
     return { ...response, data: { assetId, favorite: true } }
   },
   async unfavorite(assetId) {
     const spaceId = await activeSpaceId()
-    const response = await request.delete(`/api/v3/spaces/${spaceId}/media/${assetId}/favorite`)
+    const response = await withStepUpRetry(token => request.delete(`/api/v3/spaces/${spaceId}/media/${assetId}/favorite`,
+      { headers: stepHeader(token) }))
     invalidateApiCache('photos:')
     invalidateApiCache('albums:')
     return response

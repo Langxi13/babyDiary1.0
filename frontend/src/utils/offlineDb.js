@@ -1,10 +1,12 @@
 import { mergeQueuedDiaryOperation } from '@/utils/offlineQueue'
+import { getAccountCacheScope } from '@/utils/sessionScope'
 
 const DB_NAME = 'baby-diary-offline'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const OPERATIONS = 'operations'
 const META = 'meta'
 const CACHE = 'cache'
+const QUARANTINE = 'quarantine'
 
 let dbPromise
 
@@ -13,20 +15,55 @@ function openDb() {
   if (dbPromise) return dbPromise
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = event => {
       const db = request.result
+      const transaction = request.transaction
+      const quarantine = db.objectStoreNames.contains(QUARANTINE)
+        ? transaction.objectStore(QUARANTINE)
+        : db.createObjectStore(QUARANTINE, { keyPath: 'id' })
+
       if (!db.objectStoreNames.contains(OPERATIONS)) {
         const store = db.createObjectStore(OPERATIONS, { keyPath: 'id' })
-        store.createIndex('spaceId', 'spaceId', { unique: false })
-        store.createIndex('createdAt', 'createdAt', { unique: false })
+        createOperationIndexes(store)
+      } else {
+        const store = transaction.objectStore(OPERATIONS)
+        createOperationIndexes(store)
+        if (event.oldVersion < 2) {
+          const cursorRequest = store.openCursor()
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result
+            if (!cursor) return
+            if (!cursor.value.accountScope) {
+              quarantine.put({ ...cursor.value, quarantinedAt: Date.now(), reason: 'legacy-account-scope-unknown' })
+              cursor.delete()
+            }
+            cursor.continue()
+          }
+        }
       }
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'key' })
+      else if (event.oldVersion < 2) transaction.objectStore(META).clear()
       if (!db.objectStoreNames.contains(CACHE)) db.createObjectStore(CACHE, { keyPath: 'key' })
+      else if (event.oldVersion < 2) transaction.objectStore(CACHE).clear()
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
   return dbPromise
+}
+
+function createOperationIndexes(store) {
+  if (!store.indexNames.contains('accountScope')) store.createIndex('accountScope', 'accountScope', { unique: false })
+  if (!store.indexNames.contains('scopeSpace')) store.createIndex('scopeSpace', ['accountScope', 'spaceId'], { unique: false })
+  if (!store.indexNames.contains('createdAt')) store.createIndex('createdAt', 'createdAt', { unique: false })
+}
+
+function currentScope() {
+  const scope = getAccountCacheScope()
+  if (scope === 'anonymous' || scope === 'authenticated:unresolved') {
+    throw new Error('无法确定当前离线数据所属账户')
+  }
+  return scope
 }
 
 function requestResult(request) {
@@ -37,11 +74,9 @@ function requestResult(request) {
 }
 
 export async function queueOfflineOperation(operation) {
-  const value = {
-    ...operation,
-    id: operation.id || crypto.randomUUID(),
-    createdAt: operation.createdAt || Date.now()
-  }
+  const accountScope = currentScope()
+  const value = { ...operation, accountScope, id: operation.id || crypto.randomUUID(),
+    createdAt: operation.createdAt || Date.now() }
   const db = await openDb()
   if (!db) return value
   const transaction = db.transaction(OPERATIONS, 'readwrite')
@@ -54,37 +89,28 @@ export async function queueOfflineOperation(operation) {
 
 export async function queueOfflineDiaryOperation(operation) {
   const db = await openDb()
-  const value = {
-    ...operation,
-    kind: 'diary',
-    id: operation.id || crypto.randomUUID(),
-    createdAt: operation.createdAt || Date.now()
-  }
+  const accountScope = currentScope()
+  const value = { ...operation, accountScope, kind: 'diary', id: operation.id || crypto.randomUUID(),
+    createdAt: operation.createdAt || Date.now() }
   if (!db) return value
 
   const merged = await new Promise((resolve, reject) => {
     const transaction = db.transaction(OPERATIONS, 'readwrite')
     const target = transaction.objectStore(OPERATIONS)
     let mergeResult
-    const request = target.getAll()
+    const request = target.index('accountScope').getAll(accountScope)
     request.onsuccess = () => {
       const all = request.result
-      const previous = all
-        .filter(item => item.kind === 'diary' && item.spaceId === value.spaceId && item.entityId === value.entityId)
-        .sort((left, right) => left.createdAt - right.createdAt)
-        .at(-1)
+      const previous = all.filter(item => item.kind === 'diary' && item.spaceId === value.spaceId
+          && item.entityId === value.entityId).sort((left, right) => left.createdAt - right.createdAt).at(-1)
       mergeResult = mergeQueuedDiaryOperation(previous, value)
-      if (mergeResult.action === 'replace') {
-        target.put(mergeResult.operation)
-      } else if (mergeResult.action === 'cancel-create') {
+      if (mergeResult.action === 'replace') target.put({ ...mergeResult.operation, accountScope })
+      else if (mergeResult.action === 'cancel-create') {
         all.filter(item => item.spaceId === value.spaceId
             && (item.entityId === value.entityId || item.diaryId === value.entityId))
           .forEach(item => target.delete(item.id))
-      } else if (mergeResult.action === 'remove-previous') {
-        target.delete(previous.id)
-      } else {
-        target.put(value)
-      }
+      } else if (mergeResult.action === 'remove-previous') target.delete(previous.id)
+      else target.put(value)
     }
     request.onerror = () => reject(request.error)
     transaction.oncomplete = () => resolve(mergeResult)
@@ -96,18 +122,25 @@ export async function queueOfflineDiaryOperation(operation) {
 }
 
 export async function listOfflineOperations(spaceId) {
-  const values = await readStore(OPERATIONS, target => target.getAll(), [])
-  return values
-    .filter(value => !spaceId || value.spaceId === spaceId)
+  const accountScope = currentScope()
+  const values = await readStore(OPERATIONS, target => target.index('accountScope').getAll(accountScope), [])
+  return values.filter(value => !spaceId || value.spaceId === spaceId)
     .sort((left, right) => left.createdAt - right.createdAt)
+}
+
+export async function listQuarantinedOfflineOperations() {
+  return readStore(QUARANTINE, target => target.getAll(), [])
 }
 
 export async function removeOfflineOperations(ids) {
   const db = await openDb()
   if (!db || !ids?.length) return
+  const accountScope = currentScope()
+  const existing = await readStore(OPERATIONS, target => target.index('accountScope').getAll(accountScope), [])
+  const allowed = new Set(existing.map(item => item.id))
   const transaction = db.transaction(OPERATIONS, 'readwrite')
   const target = transaction.objectStore(OPERATIONS)
-  ids.forEach(id => target.delete(id))
+  ids.filter(id => allowed.has(id)).forEach(id => target.delete(id))
   await transactionDone(transaction)
   notifyQueueChanged()
 }
@@ -121,33 +154,53 @@ function transactionDone(transaction) {
 }
 
 export async function pendingOfflineCount(spaceIds) {
-  if (!Array.isArray(spaceIds)) {
-    return readStore(OPERATIONS, target => target.count(), 0)
-  }
+  const values = await listOfflineOperations()
+  if (!Array.isArray(spaceIds)) return values.length
   if (!spaceIds.length) return 0
-
   const allowedSpaces = new Set(spaceIds)
-  const values = await readStore(OPERATIONS, target => target.getAll(), [])
   return values.filter(value => allowedSpaces.has(value.spaceId)).length
 }
 
 export async function setOfflineMeta(key, value) {
-  await writeStore(META, target => target.put({ key, value }))
+  const accountScope = currentScope()
+  await writeStore(META, target => target.put({ key: scopedKey(accountScope, key), rawKey: key, accountScope, value }))
 }
 
 export async function getOfflineMeta(key, fallback = null) {
-  const value = await readStore(META, target => target.get(key), null)
+  const accountScope = currentScope()
+  const value = await readStore(META, target => target.get(scopedKey(accountScope, key)), null)
   return value?.value ?? fallback
 }
 
 export async function setOfflineCache(key, value) {
-  await writeStore(CACHE, target => target.put({ key, value, updatedAt: Date.now() }))
+  const accountScope = currentScope()
+  await writeStore(CACHE, target => target.put({ key: scopedKey(accountScope, key), rawKey: key,
+    accountScope, value: stripEphemeralUrls(value), updatedAt: Date.now() }))
 }
 
 export async function getOfflineCache(key, maxAge = 7 * 24 * 60 * 60 * 1000) {
-  const value = await readStore(CACHE, target => target.get(key), null)
+  const accountScope = currentScope()
+  const value = await readStore(CACHE, target => target.get(scopedKey(accountScope, key)), null)
   if (!value || Date.now() - value.updatedAt > maxAge) return null
   return value.value
+}
+
+export async function clearOfflineSessionCache(accountScope = getAccountCacheScope()) {
+  if (!accountScope || accountScope === 'anonymous') return
+  const db = await openDb()
+  if (!db) return
+  const transaction = db.transaction([CACHE, META], 'readwrite')
+  for (const name of [CACHE, META]) {
+    const target = transaction.objectStore(name)
+    const request = target.openCursor()
+    request.onsuccess = () => {
+      const cursor = request.result
+      if (!cursor) return
+      if (cursor.value.accountScope === accountScope) cursor.delete()
+      cursor.continue()
+    }
+  }
+  await transactionDone(transaction)
 }
 
 export async function clearOfflineData() {
@@ -162,6 +215,22 @@ export async function clearOfflineData() {
     request.onblocked = resolve
   })
   notifyQueueChanged()
+}
+
+function scopedKey(scope, key) {
+  return `${scope}|${key}`
+}
+
+function stripEphemeralUrls(value) {
+  if (Array.isArray(value)) return value.map(stripEphemeralUrls)
+  if (!value || typeof value !== 'object') return value
+  const result = {}
+  for (const [key, item] of Object.entries(value)) {
+    if (['contentUrl', 'thumbnailUrl', 'posterUrl', 'waveformUrl', 'transcodedUrl', 'url', 'expiresAt',
+      'mediaUrlExpiresAt'].includes(key)) continue
+    result[key] = stripEphemeralUrls(item)
+  }
+  return result
 }
 
 async function readStore(name, operation, fallback) {

@@ -3,6 +3,15 @@ import { ref, computed } from 'vue'
 import router from '@/router'
 import { resetClientSession } from '@/utils/sessionBoundary'
 import { getClientSessionGeneration } from '@/utils/sessionScope'
+import { getAccountCacheScope } from '@/utils/sessionScope'
+import { clearOfflineSessionCache } from '@/utils/offlineDb'
+
+const persistedUserInfo = user => user ? {
+  ...user,
+  avatarMedia: user.avatarMedia ? { ...user.avatarMedia, contentUrl: undefined } : null
+} : null
+
+const persistUserInfo = user => localStorage.setItem('userInfo', JSON.stringify(persistedUserInfo(user)))
 
 const readUserInfo = () => {
   try {
@@ -36,7 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
         sessionVersion.value = resetClientSession('login')
         token.value = response.data.token
         userInfo.value = response.data.userInfo
-        localStorage.setItem('userInfo', JSON.stringify(response.data.userInfo))
+        persistUserInfo(response.data.userInfo)
         localStorage.setItem('token', response.data.token)
         lastUserInfoFetchAt = Date.now()
         return { success: true }
@@ -61,10 +70,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clearAuth(reason = 'session-cleared') {
+    const previousScope = getAccountCacheScope()
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
+    clearOfflineSessionCache(previousScope).catch(() => {})
     userInfoRequest = null
     lastUserInfoFetchAt = 0
     sessionVersion.value = resetClientSession(reason)
@@ -106,7 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
         const response = await authApi.getUserInfo()
         if (response.code === 200 && token.value === requestedToken) {
           userInfo.value = response.data
-          localStorage.setItem('userInfo', JSON.stringify(response.data))
+          persistUserInfo(response.data)
           lastUserInfoFetchAt = Date.now()
           return response.data
         }
@@ -133,7 +144,7 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await authApi.uploadAvatar(formData)
     if (response.code === 200) {
       userInfo.value = response.data
-      localStorage.setItem('userInfo', JSON.stringify(response.data))
+      persistUserInfo(response.data)
       lastUserInfoFetchAt = Date.now()
     }
     return response

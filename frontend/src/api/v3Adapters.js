@@ -22,26 +22,33 @@ export async function activeSpaceId() {
   return first.id
 }
 
-const profileRank = profile => profile === 'default' ? 0 : profile === 'source' ? 1 : 2
+const profileRank = (type, profile) => type === 'ORIGINAL'
+  ? profile === 'source' ? 0 : profile === 'default' ? 1 : 2
+  : profile === 'default' ? 0 : profile === 'source' ? 1 : 2
 const variant = (media, type) => (media?.variants || [])
   .filter(item => item.type === type && item.status === 'READY')
-  .sort((left, right) => profileRank(left.profile) - profileRank(right.profile)
+  .sort((left, right) => profileRank(type, left.profile) - profileRank(type, right.profile)
     || String(left.profile || '').localeCompare(String(right.profile || '')))[0]
 const mediaUrl = value => value ? resolveServerUrl(value) : ''
 
 export const normalizeMedia = (media = {}) => {
-  const original = variant(media, 'ORIGINAL')
-  const thumbnail = variant(media, 'THUMBNAIL') || original
-  const poster = variant(media, 'POSTER')
-  const transcoded = variant(media, 'TRANSCODED')
-  const contentUrl = mediaUrl(media.contentUrl || original?.contentUrl)
+  const representations = media.representations || {}
+  const original = representations.original || variant(media, 'ORIGINAL')
+  const thumbnail = representations.thumbnail || variant(media, 'THUMBNAIL') || original
+  const poster = representations.poster || variant(media, 'POSTER')
+  const waveform = representations.waveform || variant(media, 'WAVEFORM')
+  const transcoded = representations.transcoded || variant(media, 'TRANSCODED')
+  const representationUrl = value => value?.url || value?.contentUrl
+  const contentUrl = mediaUrl(media.contentUrl || representationUrl(original))
   return {
     ...media,
     assetId: media.id,
     contentUrl,
-    thumbnailUrl: mediaUrl(media.thumbnailUrl || thumbnail?.contentUrl) || contentUrl,
-    posterUrl: mediaUrl(poster?.contentUrl),
-    transcodedUrl: mediaUrl(transcoded?.contentUrl),
+    thumbnailUrl: mediaUrl(media.thumbnailUrl || representationUrl(thumbnail)) || contentUrl,
+    posterUrl: mediaUrl(representationUrl(poster)),
+    waveformUrl: mediaUrl(representationUrl(waveform)),
+    transcodedUrl: mediaUrl(representationUrl(transcoded)),
+    mediaUrlExpiresAt: original?.expiresAt || null,
     filename: media.originalFilename
   }
 }
@@ -90,7 +97,7 @@ export const normalizeAnniversary = (item = {}, coverMedia = null) => {
   return {
     ...item,
     anniversaryId: item.id,
-    coverMedia: coverMedia ? normalizeMedia(coverMedia) : null,
+    coverMedia: (coverMedia || item.coverMedia) ? normalizeMedia(coverMedia || item.coverMedia) : null,
     daysUntil,
     daysPassed: Math.max(0, Math.floor((today - original) / 86400000))
   }

@@ -41,16 +41,8 @@ public interface TransferMapper {
 
     @Select("""
             <script>
-            SELECT dm.diary_id,a.public_id,a.original_filename,a.media_type,a.caption,a.taken_at,
-                   dm.position,v.storage_key,v.content_type,v.size_bytes
+            SELECT dm.diary_id,a.public_id,a.original_filename,a.media_type,a.caption,a.taken_at,dm.position
             FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
-            JOIN media_variant v ON v.variant_id=(
-                SELECT candidate.variant_id FROM media_variant candidate
-                WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='ORIGINAL'
-                  AND candidate.status='READY' AND candidate.deleted_at IS NULL
-                ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
-                         candidate.variant_id LIMIT 1
-            )
             WHERE a.deleted_at IS NULL AND a.status='READY' AND dm.diary_id IN
             <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             ORDER BY dm.diary_id,dm.position,a.asset_id
@@ -76,6 +68,6 @@ public interface TransferMapper {
                     String moodKey, String visibility, boolean locked) {}
     record TagRow(long diaryId, String name, String color) {}
     record MediaRow(long diaryId, byte[] publicId, String originalFilename, String mediaType, String caption,
-                    LocalDateTime takenAt, int position, String storageKey, String contentType, long sizeBytes) {}
+                    LocalDateTime takenAt, int position) {}
     record CommentRow(long diaryId, String username, String content, LocalDateTime createdAt) {}
 }

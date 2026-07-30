@@ -41,6 +41,21 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
+    public List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds) {
+        if (publicIds == null || publicIds.isEmpty()) return List.of();
+        Map<UUID, MediaAsset> hydrated = hydrate(mapper.findByPublicIdsInSpace(spaceId,
+                publicIds.stream().map(BinaryUuid::toBytes).toList())).stream()
+                .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        return publicIds.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
+    }
+
+    @Override
+    public Optional<MediaAsset> findInSpace(UUID spaceId, UUID publicId, boolean includeDeleted) {
+        return hydrate(mapper.findInSpace(BinaryUuid.toBytes(spaceId), BinaryUuid.toBytes(publicId), includeDeleted))
+                .stream().findFirst();
+    }
+
+    @Override
     public Optional<MediaAsset.Variant> findVariant(long spaceId, UUID publicId, String type, String profile,
                                                     long accountId) {
         return Optional.ofNullable(mapper.findVariant(spaceId, BinaryUuid.toBytes(publicId), type, profile, accountId))
@@ -79,8 +94,8 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
-    public void insertVariant(NewVariant variant) {
-        mapper.insertVariant(variant);
+    public boolean insertVariant(NewVariant variant) {
+        return mapper.insertVariant(variant) == 1;
     }
 
     @Override
@@ -89,14 +104,63 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
+    public boolean reserveStorage(UUID spaceId, long sizeBytes) {
+        return mapper.reserveStorageByPublicId(BinaryUuid.toBytes(spaceId), sizeBytes) == 1;
+    }
+
+    @Override
     public void releaseStorage(long spaceId, long sizeBytes) {
         if (sizeBytes > 0) mapper.releaseStorage(spaceId, sizeBytes);
+    }
+
+    @Override
+    public void releaseStorage(UUID spaceId, long sizeBytes) {
+        if (sizeBytes > 0) mapper.releaseStorageByPublicId(BinaryUuid.toBytes(spaceId), sizeBytes);
     }
 
     @Override
     public boolean softDelete(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
         return mapper.softDelete(spaceId, BinaryUuid.toBytes(publicId), accountId, deletedAt) == 1;
     }
+
+    @Override
+    public boolean markDeletePending(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
+        return mapper.markDeletePending(spaceId, BinaryUuid.toBytes(publicId), accountId, deletedAt) == 1;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void finalizeDeletion(long assetId, UUID spaceId, long releasedBytes, LocalDateTime deletedAt) {
+        mapper.markVariantsDeleted(assetId, deletedAt);
+        mapper.markAssetDeleted(assetId, deletedAt);
+        if (releasedBytes > 0) mapper.releaseStorageByPublicId(BinaryUuid.toBytes(spaceId), releasedBytes);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void failUpload(long assetId, LocalDateTime failedAt) {
+        mapper.markVariantsDeleted(assetId,failedAt);
+        mapper.failUpload(assetId, failedAt);
+    }
+
+    @Override
+    public void markReady(long assetId) { mapper.markReady(assetId); }
+
+    @Override
+    public void updateTechnicalMetadata(long assetId, Integer width, Integer height, Long durationMillis) {
+        mapper.updateTechnicalMetadata(assetId, width, height, durationMillis);
+    }
+
+    @Override
+    public boolean hasVariant(long assetId, String type, String profile) {
+        return mapper.hasVariant(assetId, type, profile);
+    }
+
+    @Override
+    public ReferenceCounts references(long assetId) { return mapper.references(assetId); }
+
+    @Override
+    public void removeFavorites(long assetId) { mapper.removeFavorites(assetId); }
 
     @Override
     public boolean updateMetadata(long spaceId, UUID publicId, long accountId, String caption,

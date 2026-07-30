@@ -17,7 +17,7 @@ describe('V3 media normalization', () => {
     expect(media.thumbnailUrl).toContain('profile=default')
   })
 
-  it('prefers the default profile deterministically when profiles share a type', () => {
+  it('prefers the source original deterministically when profiles share a type', () => {
     const media = normalizeMedia({
       id: 'asset-2',
       variants: [
@@ -27,7 +27,7 @@ describe('V3 media normalization', () => {
       ]
     })
 
-    expect(media.contentUrl).toBe('/media/default')
-    expect(media.thumbnailUrl).toBe('/media/default')
+    expect(media.contentUrl).toBe('/media/source')
+    expect(media.thumbnailUrl).toBe('/media/source')
   })
 })

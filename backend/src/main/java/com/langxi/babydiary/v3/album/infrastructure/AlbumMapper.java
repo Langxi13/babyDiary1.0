@@ -17,44 +17,26 @@ public interface AlbumMapper {
 
     @Select("""
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
-                   ca.public_id AS cover_public_id,cv.variant_type AS cover_variant_type,
-                   cv.profile AS cover_variant_profile,COUNT(am.asset_id) AS media_count
+                   ca.public_id AS cover_public_id,NULL AS cover_variant_type,
+                   NULL AS cover_variant_profile,COUNT(am.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
-            LEFT JOIN media_variant cv ON cv.variant_id=(
-                SELECT candidate.variant_id FROM media_variant candidate
-                WHERE candidate.asset_id=ca.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
-                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
-                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
-                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
-                         candidate.variant_id LIMIT 1
-            )
             WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
-            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id,
-                     cv.variant_type,cv.profile
+            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
             ORDER BY a.sort_order,a.album_id
             """)
     List<AlbumRow> findAlbums(long spaceId);
 
     @Select("""
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
-                   ca.public_id AS cover_public_id,cv.variant_type AS cover_variant_type,
-                   cv.profile AS cover_variant_profile,COUNT(am.asset_id) AS media_count
+                   ca.public_id AS cover_public_id,NULL AS cover_variant_type,
+                   NULL AS cover_variant_profile,COUNT(am.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
-            LEFT JOIN media_variant cv ON cv.variant_id=(
-                SELECT candidate.variant_id FROM media_variant candidate
-                WHERE candidate.asset_id=ca.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
-                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
-                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
-                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
-                         candidate.variant_id LIMIT 1
-            )
             WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND a.deleted_at IS NULL
-            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id,
-                     cv.variant_type,cv.profile
+            GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
             """)
     AlbumRow findAlbum(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId);
 
@@ -64,7 +46,6 @@ public interface AlbumMapper {
             JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
             WHERE a.space_id=#{spaceId} AND a.public_id=#{albumId} AND a.deleted_at IS NULL
               AND ma.deleted_at IS NULL AND ma.status='READY'
-              AND (ma.owner_id=#{accountId} OR ma.access_scope='SPACE' OR ma.library_visible=true)
             ORDER BY am.position,am.asset_id
             LIMIT #{limit} OFFSET #{offset}
             """)
@@ -75,8 +56,7 @@ public interface AlbumMapper {
     @Select("SELECT COUNT(*) FROM album a JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id " +
             "JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id " +
             "WHERE a.space_id=#{spaceId} AND a.public_id=#{albumId} AND a.deleted_at IS NULL " +
-            "AND ma.deleted_at IS NULL AND ma.status='READY' " +
-            "AND (ma.owner_id=#{accountId} OR ma.access_scope='SPACE' OR ma.library_visible=true)")
+            "AND ma.deleted_at IS NULL AND ma.status='READY'")
     long countMedia(@Param("spaceId") long spaceId, @Param("albumId") byte[] albumId,
                     @Param("accountId") long accountId);
 
@@ -151,7 +131,7 @@ public interface AlbumMapper {
             SELECT a.public_id FROM media_asset a
             WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
               AND a.deleted_at IS NULL AND a.status='READY'
-              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE' OR a.library_visible=true)
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
             ORDER BY a.created_at DESC,a.asset_id DESC
             LIMIT #{limit} OFFSET #{offset}
             """)
@@ -160,7 +140,7 @@ public interface AlbumMapper {
 
     @Select("SELECT COUNT(*) FROM media_asset a WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' " +
             "AND a.library_visible=true AND a.deleted_at IS NULL AND a.status='READY' " +
-            "AND (a.owner_id=#{accountId} OR a.access_scope='SPACE' OR a.library_visible=true)")
+            "AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')")
     long countLibraryImages(@Param("spaceId") long spaceId, @Param("accountId") long accountId);
 
     final class GroupInsert {

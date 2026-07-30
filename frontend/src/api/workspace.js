@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import { diaryPayload, normalizeDiary, normalizeMedia, normalizeSpace, normalizeTag } from '@/api/v3Adapters'
+import { getStepUpToken } from '@/utils/stepUp'
 
 export const workspaceApi = {
   spaces: {
@@ -21,14 +22,14 @@ export const workspaceApi = {
     createTag: async (spaceId, data) => { const response = await request.post(`/api/v3/spaces/${spaceId}/tags`, data); return { ...response, data: normalizeTag(response.data) } }
   },
   diaries: {
-    list: async (spaceId, params) => { const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, { params }); return { ...response, data: { content: (response.data.items || []).map(normalizeDiary), nextCursor: response.data.nextCursor, totalElements: response.data.totalElements } } },
-    get: async (spaceId, diaryId) => { const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`); return { ...response, data: normalizeDiary(response.data) } },
+    list: async (spaceId, params) => { const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, { params, headers: stepHeader(getStepUpToken()) }); return { ...response, data: { content: (response.data.items || []).map(normalizeDiary), nextCursor: response.data.nextCursor, totalElements: response.data.totalElements } } },
+    get: async (spaceId, diaryId, stepUpToken) => { const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`, { headers: stepHeader(stepUpToken) }); return { ...response, data: normalizeDiary(response.data) } },
     create: async (spaceId, data) => { const response = await request.post(`/api/v3/spaces/${spaceId}/diaries`, diaryPayload(data)); return { ...response, data: normalizeDiary(response.data) } },
-    update: async (spaceId, diaryId, data) => { const response = await request.put(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`, diaryPayload(data), { headers: { 'If-Match': `"${data.version ?? data.baseVersion}"` } }); return { ...response, data: normalizeDiary(response.data) } },
+    update: async (spaceId, diaryId, data, stepUpToken) => { const response = await request.put(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`, diaryPayload(data), { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${data.version ?? data.baseVersion}"` } }); return { ...response, data: normalizeDiary(response.data) } },
     remove: (spaceId, diaryId, version, stepUpToken) => request.delete(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`, { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }),
     restore: (spaceId, diaryId, version, stepUpToken) => request.post(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/restore`, null, { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }),
-    revisions: (spaceId, diaryId) => request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/revisions`),
-    restoreRevision: (spaceId, diaryId, revisionId, version) => request.post(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/revisions/${revisionId}/restore`, null, { headers: { 'If-Match': `"${version}"` } }),
+    revisions: (spaceId, diaryId, stepUpToken) => request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/revisions`, { headers: stepHeader(stepUpToken) }),
+    restoreRevision: (spaceId, diaryId, revisionId, version, stepUpToken) => request.post(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/revisions/${revisionId}/restore`, null, { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }),
     comments: (spaceId, diaryId, stepUpToken) => request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/comments`, { headers: stepHeader(stepUpToken) }),
     addComment: (spaceId, diaryId, content, stepUpToken) => request.post(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/comments`, { content }, { headers: stepHeader(stepUpToken) }),
     updateComment: (spaceId, diaryId, commentId, content, stepUpToken) => request.put(`/api/v3/spaces/${spaceId}/diaries/${diaryId}/comments/${commentId}`, { content }, { headers: stepHeader(stepUpToken) }),

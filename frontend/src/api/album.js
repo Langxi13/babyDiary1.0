@@ -1,6 +1,9 @@
 import request from '@/utils/request'
 import { activeSpaceId, normalizeAlbum, normalizeAlbumGroup, normalizeMedia } from '@/api/v3Adapters'
 import { invalidateApiCache, cachedRequest, stableStringify } from '@/utils/apiCache'
+import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
+
+const stepHeader = token => token ? { 'X-Step-Up-Token': token } : {}
 
 const photo = (media, favorite = false) => {
   const value = normalizeMedia(media)
@@ -23,7 +26,7 @@ const pageResult = (response, items, page, size, total, nextCursor = null) => ({
 const albumDetailPage = async (path, params, favorite = false) => {
   const page = Math.max(0, Number(params.page) || 0)
   const size = Math.max(1, Math.min(60, Number(params.size) || 24))
-  const response = await request.get(path, { params: { page, size } })
+  const response = await request.get(path, { params: { page, size }, headers: stepHeader(getStepUpToken()) })
   const all = (response.data.media || []).map(item => photo(item, favorite))
   const total = Number(response.data.totalMedia ?? response.data.album?.mediaCount ?? all.length)
   return pageResult(response, all, Number(response.data.pageNumber ?? page),
@@ -34,7 +37,7 @@ export const albumApi = {
   getGroups(options = {}) {
     return cachedRequest('albums:groups', async () => {
       const spaceId = await activeSpaceId()
-      const response = await request.get(`/api/v3/spaces/${spaceId}/album-groups`)
+      const response = await request.get(`/api/v3/spaces/${spaceId}/album-groups`, { headers: stepHeader(getStepUpToken()) })
       return { ...response, data: (response.data.groups || []).map(normalizeAlbumGroup) }
     }, { ttl: options.ttl ?? 30000, force: options.force })
   },
@@ -73,7 +76,8 @@ export const albumApi = {
   },
   async createAlbum(payload) {
     const spaceId = await activeSpaceId()
-    const response = await request.post(`/api/v3/spaces/${spaceId}/albums`, { ...payload, mediaIds: payload.mediaIds || [] })
+    const response = await withStepUpRetry(token => request.post(`/api/v3/spaces/${spaceId}/albums`,
+      { ...payload, mediaIds: payload.mediaIds || [] }, { headers: stepHeader(token) }))
     invalidateApiCache('albums:')
     return { ...response, data: normalizeAlbum(response.data) }
   },
@@ -91,7 +95,8 @@ export const albumApi = {
   },
   async removeAlbumPhoto(albumId, assetId) {
     const spaceId = await activeSpaceId()
-    const response = await request.delete(`/api/v3/spaces/${spaceId}/albums/${albumId}/media/${assetId}`)
+    const response = await withStepUpRetry(token => request.delete(
+      `/api/v3/spaces/${spaceId}/albums/${albumId}/media/${assetId}`, { headers: stepHeader(token) }))
     invalidateApiCache('albums:')
     return response
   },

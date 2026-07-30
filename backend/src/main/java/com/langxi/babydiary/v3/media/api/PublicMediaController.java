@@ -1,21 +1,19 @@
 package com.langxi.babydiary.v3.media.api;
 
-import com.langxi.babydiary.storage.StoredObject;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
 import com.langxi.babydiary.v3.media.application.MediaService;
 import com.langxi.babydiary.v3.media.application.MediaUrlSigner;
-import org.springframework.http.CacheControl;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.IOException;
-import java.time.Duration;
 import java.util.UUID;
 
 @RestController
@@ -29,22 +27,23 @@ public class PublicMediaController {
         this.signer = signer;
     }
 
-    @GetMapping("/{spaceId}/{assetId}/{variant}")
+    @RequestMapping(value = "/{spaceId}/{assetId}/{variant}", method = {RequestMethod.GET, RequestMethod.HEAD})
     public ResponseEntity<StreamingResponseBody> content(@PathVariable UUID spaceId, @PathVariable UUID assetId,
                                                           @PathVariable String variant,
-                                                          @RequestParam(required = false) String profile,
+                                                          @RequestParam String profile,
+                                                          @RequestParam String ticket,
                                                           @RequestParam long expires,
-                                                          @RequestParam String signature) throws IOException {
-        MediaUrlSigner.VerifiedVariant verified = signer.verify(spaceId, assetId, variant, profile, expires, signature);
-        StoredObject object = media.openSignedVariant(spaceId, assetId, verified.type(), verified.profile());
-        String contentType = object.contentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : object.contentType();
-        StreamingResponseBody body = output -> {
-            try (object) {
-                object.stream().transferTo(output);
-            }
-        };
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType)).contentLength(object.length())
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(55)).cachePrivate())
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline").body(body);
+                                                          @RequestParam String signature,
+                                                          @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
+                                                          @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
+                                                          HttpServletRequest request) {
+        MediaUrlSigner.VerifiedVariant verified = signer.verify(spaceId, assetId, variant, profile,
+                ticket, expires, signature);
+        MediaService.ResolvedVariant resolved = media.resolveSignedVariant(spaceId, assetId, verified.type(),
+                verified.profile(), verified.context());
+        MediaAccessContext context = verified.context();
+        boolean noStore = context.elevated() || context.source() == MediaAccessContext.Source.SHARE;
+        return MediaContentResponse.create(media, resolved, range, ifNoneMatch,
+                "HEAD".equals(request.getMethod()), noStore);
     }
 }

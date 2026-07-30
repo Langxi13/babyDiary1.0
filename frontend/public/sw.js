@@ -1,5 +1,6 @@
-const CACHE_NAME = 'baby-diary-shell-v12'
+const CACHE_NAME = 'baby-diary-shell-v13'
 const SHELL_ASSETS = ['/', '/index.html', '/favicon.svg', '/app-icon.png', '/manifest.webmanifest']
+const SHELL_ASSET_PATHS = new Set(SHELL_ASSETS)
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -26,6 +27,17 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(async () => (await caches.match('/index.html')) || Response.error())
+    )
+    return
+  }
+
+  const isStaticShellAsset = SHELL_ASSET_PATHS.has(requestUrl.pathname)
+    || requestUrl.pathname.startsWith('/assets/')
+  if (!isStaticShellAsset) return
+
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -40,9 +52,6 @@ self.addEventListener('fetch', event => {
       .catch(async () => {
         const cached = await caches.match(event.request)
         if (cached) return cached
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html')
-        }
         return Response.error()
       })
   )

@@ -1,11 +1,14 @@
 package com.langxi.babydiary.v3.media.application;
 
 import com.langxi.babydiary.storage.ObjectStorage;
+import com.langxi.babydiary.storage.ObjectStorageRegistry;
 import com.langxi.babydiary.storage.StoredObject;
 import com.langxi.babydiary.v3.media.domain.MediaAsset;
+import com.langxi.babydiary.v3.platform.application.BackgroundJobQueue;
 import com.langxi.babydiary.v3.platform.application.V3Exception;
 import com.langxi.babydiary.v3.space.application.SpaceAccess;
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,63 +25,80 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class MediaService {
-    private static final long DEFAULT_MAX_UPLOAD_BYTES = 100L * 1024 * 1024;
-    private static final List<String> IMAGE_TYPES = List.of("image/jpeg", "image/png", "image/gif", "image/webp");
-    private static final List<String> VIDEO_TYPES = List.of("video/mp4", "video/webm", "video/quicktime");
-    private static final List<String> AUDIO_TYPES = List.of("audio/mpeg", "audio/mp4", "audio/ogg", "audio/wav", "audio/x-wav");
-
+    private static final Logger log = LoggerFactory.getLogger(MediaService.class);
     private final SpaceAccess spaces;
     private final MediaRepository media;
-    private final ObjectStorage storage;
-    private final long maxUploadBytes;
+    private final ObjectStorageRegistry storages;
+    private final MediaFileInspector inspector;
+    private final MediaVariantPolicy variants;
+    private final MediaAccessPolicy access;
+    private final BackgroundJobQueue jobs;
 
-    public MediaService(SpaceAccess spaces, MediaRepository media, ObjectStorage storage,
-                        @Value("${app.v3.media.max-upload-bytes:104857600}") long maxUploadBytes) {
+    public MediaService(SpaceAccess spaces, MediaRepository media, ObjectStorageRegistry storages,
+                        MediaFileInspector inspector, MediaVariantPolicy variants,
+                        MediaAccessPolicy access, BackgroundJobQueue jobs) {
         this.spaces = spaces;
         this.media = media;
-        this.storage = storage;
-        this.maxUploadBytes = maxUploadBytes > 0 ? maxUploadBytes : DEFAULT_MAX_UPLOAD_BYTES;
+        this.storages = storages;
+        this.inspector = inspector;
+        this.variants = variants;
+        this.access = access;
+        this.jobs = jobs;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public MediaAsset upload(UUID spaceId, long accountId, MultipartFile file, String caption,
                              LocalDateTime takenAt) throws IOException {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
-        validate(file);
+        if (file == null || file.isEmpty()) throw V3Exception.badRequest("MEDIA_FILE_REQUIRED", "请选择媒体文件");
+        if (file.getSize() > MediaFileInspector.AUDIO_VIDEO_MAX_BYTES) {
+            throw V3Exception.badRequest("MEDIA_SIZE_INVALID", "媒体文件超过上传限制");
+        }
         Path temporary = Files.createTempFile("baby-diary-v3-upload-", ".tmp");
         UUID publicId = UUID.randomUUID();
-        String contentType = normalizeContentType(file.getContentType());
-        String mediaType = mediaType(contentType);
-        String storageKey = "v3/media/" + spaceId + "/" + publicId + "/original";
+        ObjectStorage storage = storages.writer();
+        String storageKey = "v3/media/" + spaceId + "/" + publicId + "/original/source";
+        long assetId = 0;
         long size = 0;
-        boolean stored = false;
         boolean reserved = false;
+        boolean stored = false;
         try {
-            Files.copy(file.getInputStream(), temporary, StandardCopyOption.REPLACE_EXISTING);
-            size = Files.size(temporary);
-            if (size <= 0 || size > maxUploadBytes) {
-                throw V3Exception.badRequest("MEDIA_SIZE_INVALID", "媒体文件大小无效或超过上传限制");
+            try (InputStream input = file.getInputStream()) {
+                Files.copy(input, temporary, StandardCopyOption.REPLACE_EXISTING);
             }
+            MediaFileInspector.Inspection inspected = inspector.inspect(temporary, file.getContentType());
+            size = inspected.sizeBytes();
             if (!media.reserveStorage(space.internalId(), size)) {
                 throw new V3Exception(HttpStatus.INSUFFICIENT_STORAGE, "SPACE_QUOTA_EXCEEDED", "空间存储额度不足");
             }
             reserved = true;
+            assetId = media.insertAsset(new MediaRepository.NewAsset(publicId, space.internalId(), accountId,
+                    inspected.mediaType(), safeFilename(file.getOriginalFilename()), blankToNull(caption), takenAt,
+                    "LINKED", true, "UPLOADING"));
             try (InputStream input = Files.newInputStream(temporary)) {
-                storage.put(storageKey, input, size, contentType);
+                storage.put(storageKey, input, size, inspected.contentType());
                 stored = true;
             }
-            long assetId = media.insertAsset(new MediaRepository.NewAsset(publicId, space.internalId(), accountId,
-                    mediaType, safeFilename(file.getOriginalFilename()), blankToNull(caption), takenAt,
-                    "LINKED", true, "READY"));
-            media.insertVariant(new MediaRepository.NewVariant(assetId, "ORIGINAL", "default", storage.provider(),
-                    storageKey, contentType, size, checksum(temporary), "READY"));
+            if (!media.insertVariant(new MediaRepository.NewVariant(assetId, "ORIGINAL", "source",
+                    storage.provider(), storageKey, inspected.contentType(), size, checksum(temporary),
+                    inspected.width(), inspected.height(), inspected.durationMillis(), "READY"))) {
+                throw new IllegalStateException("Original media variant already exists");
+            }
+            media.markReady(assetId);
+            try {
+                jobs.enqueue(space.internalId(), accountId, "MEDIA_PROCESS", "asset:" + publicId,
+                        java.util.Map.of("spaceId", spaceId.toString(), "assetId", publicId.toString()), 5);
+            } catch (RuntimeException exception) {
+                log.error("Unable to enqueue media processing for asset {}", publicId, exception);
+            }
             return require(space.internalId(), publicId, accountId);
         } catch (IOException | RuntimeException exception) {
-            if (stored) deleteQuietly(storageKey);
+            if (assetId > 0) media.failUpload(assetId, now());
+            if (stored) deleteQuietly(storage, storageKey);
             if (reserved) media.releaseStorage(space.internalId(), size);
             throw exception;
         } finally {
@@ -90,9 +110,10 @@ public class MediaService {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         Cursor cursor = decodeCursor(query.cursor());
         int size = Math.max(1, Math.min(query.size(), 60));
-        List<MediaAsset> rows = media.findPage(new MediaRepository.Query(space.internalId(), accountId,
-                blankToNull(query.mediaType()), query.libraryOnly(), cursor == null ? null : cursor.createdAt(),
-                cursor == null ? null : cursor.id(), size + 1));
+        String mediaType = normalizeMediaType(query.mediaType());
+        List<MediaAsset> rows = new java.util.ArrayList<>(media.findPage(new MediaRepository.Query(
+                space.internalId(), accountId, mediaType, query.libraryOnly(),
+                cursor == null ? null : cursor.createdAt(), cursor == null ? null : cursor.id(), size + 1)));
         String next = null;
         if (rows.size() > size) {
             MediaAsset last = rows.remove(rows.size() - 1);
@@ -101,63 +122,70 @@ public class MediaService {
         return new Page(rows, next);
     }
 
-    public MediaAsset detail(UUID spaceId, UUID assetId, long accountId) {
+    public MediaAsset detail(UUID spaceId, UUID assetId, long accountId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        return require(space.internalId(), assetId, accountId);
+        MediaAsset asset = require(space.internalId(), assetId, accountId);
+        access.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        return asset;
     }
 
-    public StoredObject openVariant(UUID spaceId, UUID assetId, String variant, String profile,
-                                    long accountId) throws IOException {
-        SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        String normalized = variant == null || variant.isBlank() ? "ORIGINAL" : variant.trim().toUpperCase();
-        MediaAsset.Variant value = profile == null || profile.isBlank()
-                ? media.findPreferredVariant(space.internalId(), assetId, normalized, accountId)
-                    .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"))
-                : media.findVariant(space.internalId(), assetId, normalized, normalizeProfile(profile), accountId)
-                .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"));
-        try {
-            StoredObject object = storage.get(value.storageKey());
-            return object.contentType() == null
-                    ? new StoredObject(object.stream(), object.length(), value.contentType())
-                    : object;
-        } catch (IOException exception) {
-            throw new IOException("Media object is unavailable", exception);
-        }
+    public ResolvedVariant resolveVariant(UUID spaceId, UUID assetId, String variant, String profile,
+                                          long accountId, boolean elevated) {
+        spaces.requireMember(spaceId, accountId);
+        MediaAccessContext context = MediaAccessContext.direct(accountId, elevated);
+        access.require(spaceId, assetId, context);
+        MediaAsset asset = media.findInSpace(spaceId, assetId, false)
+                .orElseThrow(() -> V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
+        return resolve(asset, variant, profile);
     }
 
-    public StoredObject openSignedVariant(UUID spaceId, UUID assetId, String variant, String profile) throws IOException {
-        MediaAsset.Variant value = profile == null || profile.isBlank()
-                ? media.findPreferredPublicVariant(spaceId, assetId, variant)
-                    .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"))
-                : media.findPublicVariant(spaceId, assetId, variant, normalizeProfile(profile))
-                .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"));
-        try {
-            StoredObject object = storage.get(value.storageKey());
-            return object.contentType() == null
-                    ? new StoredObject(object.stream(), object.length(), value.contentType())
-                    : object;
-        } catch (IOException exception) {
-            throw new IOException("Media object is unavailable", exception);
+    public ResolvedVariant resolveSignedVariant(UUID spaceId, UUID assetId, String variant, String profile,
+                                                MediaAccessContext context) {
+        access.require(spaceId, assetId, context);
+        MediaAsset asset = media.findInSpace(spaceId, assetId, false)
+                .orElseThrow(() -> V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
+        return resolve(asset, variant, profile);
+    }
+
+    public StoredObject open(ResolvedVariant resolved, long offset, long length) throws IOException {
+        if (offset < 0 || length < 0 || offset + length > resolved.variant().sizeBytes()) {
+            throw new IllegalArgumentException("Invalid media byte range");
         }
+        return storages.require(resolved.variant().storageProvider())
+                .get(resolved.variant().storageKey(), offset, length);
     }
 
     @Transactional
-    public void delete(UUID spaceId, UUID assetId, long accountId) {
+    public void delete(UUID spaceId, UUID assetId, long accountId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         MediaAsset asset = require(space.internalId(), assetId, accountId);
-        if (media.softDelete(space.internalId(), assetId, accountId, LocalDateTime.now(ZoneOffset.UTC))) {
-            media.releaseStorage(space.internalId(), asset.variants().stream()
-                    .filter(variant -> "ORIGINAL".equals(variant.type()) && "READY".equals(variant.status()))
-                    .mapToLong(MediaAsset.Variant::sizeBytes).sum());
+        if (asset.ownerId() != accountId) {
+            throw V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权删除");
         }
+        access.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        MediaRepository.ReferenceCounts references = media.references(asset.internalId());
+        if (references != null && references.blockingTotal() > 0) {
+            throw V3Exception.conflict("MEDIA_IN_USE", "媒体仍被日记、相册、纪念日、头像或 AI 提案使用");
+        }
+        media.removeFavorites(asset.internalId());
+        if (!media.markDeletePending(space.internalId(), assetId, accountId, now())) {
+            throw V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权删除");
+        }
+        jobs.enqueue(space.internalId(), accountId, "STORAGE_GC", "asset:" + assetId,
+                java.util.Map.of("spaceId", spaceId.toString(), "assetId", assetId.toString()), 8);
     }
 
     @Transactional
     public MediaAsset update(UUID spaceId, UUID assetId, long accountId, String caption,
-                             LocalDateTime takenAt, String accessScope, boolean libraryVisible) {
+                             LocalDateTime takenAt, String accessScope, boolean libraryVisible,
+                             boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
-        require(space.internalId(), assetId, accountId);
-        String scope = "SPACE".equalsIgnoreCase(accessScope) ? "SPACE" : "PRIVATE";
+        MediaAsset asset = require(space.internalId(), assetId, accountId);
+        if (asset.ownerId() != accountId) {
+            throw V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权修改");
+        }
+        access.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        String scope = normalizeScope(accessScope);
         if (!media.updateMetadata(space.internalId(), assetId, accountId, blankToNull(caption),
                 takenAt, scope, libraryVisible)) {
             throw V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权修改");
@@ -165,35 +193,34 @@ public class MediaService {
         return require(space.internalId(), assetId, accountId);
     }
 
+    private ResolvedVariant resolve(MediaAsset asset, String variant, String profile) {
+        String type = variants.normalizeType(variant);
+        String selectedProfile = variants.normalizeProfile(profile);
+        MediaAsset.Variant value = variants.select(asset.variants(), type, selectedProfile)
+                .orElseThrow(() -> V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在"));
+        return new ResolvedVariant(asset, value, etag(value));
+    }
+
     private MediaAsset require(long spaceId, UUID publicId, long accountId) {
         return media.findByPublicId(spaceId, publicId, accountId)
                 .orElseThrow(() -> V3Exception.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
     }
 
-    private void validate(MultipartFile file) {
-        if (file == null || file.isEmpty()) throw V3Exception.badRequest("MEDIA_FILE_REQUIRED", "请选择媒体文件");
-        if (file.getSize() > maxUploadBytes) throw V3Exception.badRequest("MEDIA_SIZE_INVALID", "媒体文件超过上传限制");
-        normalizeContentType(file.getContentType());
-    }
-
-    private String normalizeContentType(String value) {
-        String type = value == null ? "" : value.trim().toLowerCase();
-        if (IMAGE_TYPES.contains(type) || VIDEO_TYPES.contains(type) || AUDIO_TYPES.contains(type)) return type;
-        throw V3Exception.badRequest("MEDIA_TYPE_UNSUPPORTED", "暂不支持该媒体类型");
-    }
-
-    private String mediaType(String contentType) {
-        if (contentType.startsWith("image/")) return "IMAGE";
-        if (contentType.startsWith("video/")) return "VIDEO";
-        return "AUDIO";
-    }
-
-    private String normalizeProfile(String profile) {
-        String normalized = profile.trim().toLowerCase(java.util.Locale.ROOT);
-        if (!normalized.matches("[a-z0-9][a-z0-9._-]{0,31}")) {
-            throw V3Exception.notFound("MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在");
+    private String normalizeScope(String value) {
+        String scope = value == null || value.isBlank() ? "LINKED" : value.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("LINKED", "SPACE").contains(scope)) {
+            throw V3Exception.badRequest("MEDIA_SCOPE_INVALID", "媒体访问范围无效");
         }
-        return normalized;
+        return scope;
+    }
+
+    private String normalizeMediaType(String value) {
+        if (value == null || value.isBlank()) return null;
+        String type = value.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("IMAGE", "VIDEO", "AUDIO").contains(type)) {
+            throw V3Exception.badRequest("MEDIA_TYPE_INVALID", "媒体类型无效");
+        }
+        return type;
     }
 
     private String safeFilename(String value) {
@@ -215,10 +242,9 @@ public class MediaService {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             try (InputStream input = Files.newInputStream(path)) {
-                input.transferTo(new java.io.OutputStream() {
-                    @Override public void write(int value) { digest.update((byte) value); }
-                    @Override public void write(byte[] bytes, int offset, int length) { digest.update(bytes, offset, length); }
-                });
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) if (read > 0) digest.update(buffer, 0, read);
             }
             return digest.digest();
         } catch (NoSuchAlgorithmException exception) {
@@ -226,11 +252,16 @@ public class MediaService {
         }
     }
 
-    private void deleteQuietly(String key) {
-        try {
-            storage.delete(key);
-        } catch (IOException ignored) {
+    private String etag(MediaAsset.Variant value) {
+        if (value.checksumSha256() != null) {
+            return "\"" + java.util.HexFormat.of().formatHex(value.checksumSha256()) + "\"";
         }
+        return "W/\"" + value.type().toLowerCase(Locale.ROOT) + '-' + value.profile() + '-'
+                + value.sizeBytes() + "\"";
+    }
+
+    private void deleteQuietly(ObjectStorage storage, String key) {
+        try { storage.delete(key); } catch (IOException ignored) { }
     }
 
     private Cursor decodeCursor(String value) {
@@ -249,6 +280,10 @@ public class MediaService {
                 (createdAt + ":" + id).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
+    private LocalDateTime now() {
+        return LocalDateTime.now(ZoneOffset.UTC);
+    }
+
     private record Cursor(LocalDateTime createdAt, long id) {
     }
 
@@ -256,5 +291,8 @@ public class MediaService {
     }
 
     public record Page(List<MediaAsset> items, String nextCursor) {
+    }
+
+    public record ResolvedVariant(MediaAsset asset, MediaAsset.Variant variant, String etag) {
     }
 }

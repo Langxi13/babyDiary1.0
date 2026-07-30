@@ -23,7 +23,7 @@ public class SyncOperationExecutor {
         this.diaries = diaries; this.operations = operations;
     }
 
-    public Result execute(UUID spaceId, long internalSpaceId, long accountId, Operation operation) {
+    public Result execute(UUID spaceId, long internalSpaceId, long accountId,boolean elevated, Operation operation) {
         SyncRepository.OperationResult previous = operations.findOperation(
                 operation.operationId(), accountId, internalSpaceId);
         if (previous != null) {
@@ -31,8 +31,12 @@ public class SyncOperationExecutor {
         }
         Result result;
         try {
-            result = apply(spaceId, accountId, operation);
+            result = apply(spaceId, accountId,elevated, operation);
         } catch (V3Exception exception) {
+            if(exception.status()==HttpStatus.LOCKED){
+                return new Result(operation.operationId(),"RETRYABLE",operation.entityId(),operation.baseVersion(),
+                        exception.code(),exception.getMessage());
+            }
             String status = exception.status() == HttpStatus.PRECONDITION_FAILED ? "CONFLICT" : "FAILED";
             result = new Result(operation.operationId(), status, operation.entityId(), operation.baseVersion(),
                     exception.code(), exception.getMessage());
@@ -51,16 +55,16 @@ public class SyncOperationExecutor {
         return result;
     }
 
-    private Result apply(UUID spaceId, long accountId, Operation operation) {
+    private Result apply(UUID spaceId, long accountId,boolean elevated, Operation operation) {
         DiaryEntry diary = switch (operation.action()) {
             case "CREATE" -> diaries.create(spaceId, accountId, command(operation.entityId(), operation.payload()));
             case "UPDATE" -> diaries.update(spaceId, requiredEntity(operation), accountId,
-                    requiredVersion(operation), command(null, operation.payload()));
+                    requiredVersion(operation), command(null, operation.payload()),elevated);
             case "DELETE" -> {
-                diaries.moveToTrash(spaceId, requiredEntity(operation), accountId, requiredVersion(operation));
+                diaries.moveToTrash(spaceId, requiredEntity(operation), accountId, requiredVersion(operation),elevated);
                 yield null;
             }
-            case "RESTORE" -> diaries.restore(spaceId, requiredEntity(operation), accountId, requiredVersion(operation));
+            case "RESTORE" -> diaries.restore(spaceId, requiredEntity(operation), accountId, requiredVersion(operation),elevated);
             default -> throw V3Exception.badRequest("SYNC_ACTION_INVALID", "同步动作无效");
         };
         UUID entityId = diary == null ? operation.entityId() : diary.id();

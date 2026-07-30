@@ -27,7 +27,16 @@ export function getAccountCacheScope() {
   }
 
   const token = readLocalStorage('token')
-  return token ? `token:${token}` : 'anonymous'
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      const subject = payload.sub ?? payload.aid
+      if (subject !== undefined && subject !== null && subject !== '') return `token-subject:${String(subject)}`
+    } catch {
+      return 'authenticated:unresolved'
+    }
+  }
+  return 'anonymous'
 }
 
 export function getClientSessionGeneration() {

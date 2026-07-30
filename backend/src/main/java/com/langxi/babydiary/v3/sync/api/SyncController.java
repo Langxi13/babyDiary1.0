@@ -1,6 +1,7 @@
 package com.langxi.babydiary.v3.sync.api;
 
 import com.langxi.babydiary.v3.identity.application.V3Principal;
+import com.langxi.babydiary.v3.identity.application.StepUpService;
 import com.langxi.babydiary.v3.sync.application.SyncService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -24,9 +26,11 @@ import java.util.UUID;
 @RequestMapping("/api/v3/spaces/{spaceId}/sync")
 public class SyncController {
     private final SyncService sync;
+    private final StepUpService stepUp;
 
-    public SyncController(SyncService sync) {
+    public SyncController(SyncService sync,StepUpService stepUp) {
         this.sync = sync;
+        this.stepUp=stepUp;
     }
 
     @GetMapping("/pull")
@@ -39,8 +43,9 @@ public class SyncController {
     @PostMapping("/push")
     public List<com.langxi.babydiary.v3.sync.application.SyncOperationExecutor.Result> push(
             @AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
-            @Valid @RequestBody PushRequest request) {
-        return sync.push(spaceId, principal.accountId(), request.operations().stream().map(OperationRequest::command).toList());
+            @Valid @RequestBody PushRequest request,
+            @RequestHeader(value="X-Step-Up-Token",required=false)String token) {
+        return sync.push(spaceId, principal.accountId(), request.operations().stream().map(OperationRequest::command).toList(),stepUp.valid(principal,token));
     }
 
     public record PushRequest(@NotEmpty @Size(max = 100) List<@Valid OperationRequest> operations) {}

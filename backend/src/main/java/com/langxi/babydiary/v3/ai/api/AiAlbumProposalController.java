@@ -2,8 +2,9 @@ package com.langxi.babydiary.v3.ai.api;
 
 import com.langxi.babydiary.v3.ai.application.AiAlbumProposalService;
 import com.langxi.babydiary.v3.identity.application.V3Principal;
-import com.langxi.babydiary.v3.media.api.MediaController;
-import com.langxi.babydiary.v3.media.application.MediaUrlSigner;
+import com.langxi.babydiary.v3.media.application.MediaAccessContext;
+import com.langxi.babydiary.v3.media.application.MediaRepresentationService;
+import com.langxi.babydiary.v3.media.application.MediaView;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -28,38 +29,38 @@ import java.util.UUID;
 @RequestMapping("/api/v3/spaces/{spaceId}/ai-album-proposals")
 public class AiAlbumProposalController {
     private final AiAlbumProposalService proposals;
-    private final MediaUrlSigner mediaUrls;
+    private final MediaRepresentationService media;
 
-    public AiAlbumProposalController(AiAlbumProposalService proposals, MediaUrlSigner mediaUrls) {
+    public AiAlbumProposalController(AiAlbumProposalService proposals, MediaRepresentationService media) {
         this.proposals = proposals;
-        this.mediaUrls = mediaUrls;
+        this.media = media;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProposalResponse generate(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
                                      @Valid @RequestBody GenerateRequest request) {
-        return response(spaceId, proposals.generate(spaceId, principal.accountId(), request.startDate(),
+        return response(principal.accountId(), proposals.generate(spaceId, principal.accountId(), request.startDate(),
                 request.endDate(), request.prompt()));
     }
 
     @GetMapping("/{proposalId}")
     public ProposalResponse detail(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
                                    @PathVariable UUID proposalId) {
-        return response(spaceId, proposals.detail(spaceId, principal.accountId(), proposalId));
+        return response(principal.accountId(), proposals.detail(spaceId, principal.accountId(), proposalId));
     }
 
     @PutMapping("/{proposalId}")
     public ProposalResponse update(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
                                    @PathVariable UUID proposalId, @Valid @RequestBody UpdateRequest request) {
-        return response(spaceId, proposals.update(spaceId, principal.accountId(), proposalId,
+        return response(principal.accountId(), proposals.update(spaceId, principal.accountId(), proposalId,
                 request.albums().stream().map(CandidateRequest::command).toList()));
     }
 
     @PostMapping("/{proposalId}/confirm")
     public ProposalResponse confirm(@AuthenticationPrincipal V3Principal principal, @PathVariable UUID spaceId,
                                     @PathVariable UUID proposalId) {
-        return response(spaceId, proposals.confirm(spaceId, principal.accountId(), proposalId));
+        return response(principal.accountId(), proposals.confirm(spaceId, principal.accountId(), proposalId));
     }
 
     @DeleteMapping("/{proposalId}")
@@ -69,12 +70,12 @@ public class AiAlbumProposalController {
         proposals.dismiss(spaceId, principal.accountId(), proposalId);
     }
 
-    private ProposalResponse response(UUID spaceId, AiAlbumProposalService.Proposal proposal) {
+    private ProposalResponse response(long accountId, AiAlbumProposalService.Proposal proposal) {
         return new ProposalResponse(proposal.proposalId(), proposal.status(), proposal.startDate(), proposal.endDate(),
                 proposal.prompt(), proposal.model(), proposal.albums().stream().map(candidate -> new CandidateResponse(
                 candidate.mode(), candidate.targetAlbumId(), candidate.targetAlbumName(), candidate.title(),
                 candidate.description(), candidate.diaryIds(), candidate.assetIds(), candidate.photos().stream()
-                .map(item -> new PhotoResponse(item.id(), MediaController.MediaResponse.from(item, spaceId, mediaUrls)))
+                .map(item -> new PhotoResponse(item.id(), media.view(item, MediaAccessContext.direct(accountId,false))))
                 .toList(), candidate.discarded())).toList(), proposal.createdAt(), proposal.updatedAt());
     }
 
@@ -95,5 +96,5 @@ public class AiAlbumProposalController {
     public record CandidateResponse(String mode, UUID targetAlbumId, String targetAlbumName, String title,
                                     String description, List<UUID> diaryIds, List<UUID> assetIds,
                                     List<PhotoResponse> photos, boolean discarded) {}
-    public record PhotoResponse(UUID assetId, MediaController.MediaResponse media) {}
+    public record PhotoResponse(UUID assetId, MediaView media) {}
 }

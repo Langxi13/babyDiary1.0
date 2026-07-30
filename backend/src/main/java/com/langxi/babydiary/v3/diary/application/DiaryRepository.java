@@ -23,7 +23,7 @@ public interface DiaryRepository {
 
     List<Long> resolveTagIds(long spaceId, List<UUID> publicIds);
 
-    List<Long> resolveMediaIds(long spaceId, List<UUID> publicIds);
+    List<Long> resolveMediaIds(long spaceId, long accountId, boolean locked, List<UUID> publicIds);
 
     void replaceTags(long spaceId, long diaryId, List<Long> tagIds);
 
@@ -36,7 +36,8 @@ public interface DiaryRepository {
     List<RevisionSummary> findRevisions(long diaryId);
 
     record Query(long spaceId, long accountId, LocalDate startDate, LocalDate endDate, String keyword,
-                 String mood, UUID tagId, boolean trash, LocalDate cursorDate, Long cursorId, int limit) {
+                 String mood, UUID tagId, boolean trash, boolean elevated,
+                 LocalDate cursorDate, Long cursorId, int limit) {
     }
 
     record NewDiary(UUID publicId, long spaceId, long authorId, String title, LocalDate diaryDate,

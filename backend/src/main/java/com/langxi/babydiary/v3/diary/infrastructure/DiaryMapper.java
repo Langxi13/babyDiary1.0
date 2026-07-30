@@ -29,7 +29,9 @@ public interface DiaryMapper {
 
     List<IdRow> resolveTagIds(@Param("spaceId") long spaceId, @Param("publicIds") List<byte[]> publicIds);
 
-    List<IdRow> resolveMediaIds(@Param("spaceId") long spaceId, @Param("publicIds") List<byte[]> publicIds);
+    List<IdRow> resolveMediaIds(@Param("spaceId") long spaceId, @Param("accountId") long accountId,
+                                @Param("locked") boolean locked,
+                                @Param("publicIds") List<byte[]> publicIds);
 
     @Insert("""
             INSERT INTO diary(public_id,space_id,author_id,title,diary_date,content_html,content_text,
@@ -180,6 +182,7 @@ public interface DiaryMapper {
         private String status;
         private String originalProfile;
         private String thumbnailProfile;
+        private boolean protectedContent;
 
         public MediaRow() {
         }
@@ -194,6 +197,7 @@ public interface DiaryMapper {
         public String status() { return status; }
         public String originalProfile() { return originalProfile; }
         public String thumbnailProfile() { return thumbnailProfile; }
+        public boolean protectedContent(){return protectedContent;}
 
         public void setDiaryId(long diaryId) { this.diaryId = diaryId; }
         public void setAssetId(long assetId) { this.assetId = assetId; }
@@ -205,6 +209,7 @@ public interface DiaryMapper {
         public void setStatus(String status) { this.status = status; }
         public void setOriginalProfile(String originalProfile) { this.originalProfile = originalProfile; }
         public void setThumbnailProfile(String thumbnailProfile) { this.thumbnailProfile = thumbnailProfile; }
+        public void setProtectedContent(boolean protectedContent){this.protectedContent=protectedContent;}
     }
 
     final class IdRow {

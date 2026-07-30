@@ -53,7 +53,7 @@ public class DiaryService {
         this.clock = clock;
     }
 
-    public CursorPage<DiaryEntry> list(UUID spaceId, long accountId, ListQuery query) {
+    public CursorPage<DiaryEntry> list(UUID spaceId, long accountId, ListQuery query, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         Cursor cursor = decodeCursor(query.cursor());
         int size = Math.max(1, Math.min(query.size(), 50));
@@ -62,24 +62,25 @@ public class DiaryService {
         }
         DiaryRepository.Query repositoryQuery = new DiaryRepository.Query(
                 space.internalId(), accountId, query.startDate(), query.endDate(), normalizeKeyword(query.keyword()),
-                blankToNull(query.mood()), query.tagId(), query.trash(), cursor == null ? null : cursor.date(),
+                blankToNull(query.mood()), query.tagId(), query.trash(), elevated, cursor == null ? null : cursor.date(),
                 cursor == null ? null : cursor.id(), size + 1);
         List<DiaryEntry> rows = new ArrayList<>(diaries.findPage(repositoryQuery));
         long totalElements = diaries.count(new DiaryRepository.Query(repositoryQuery.spaceId(), repositoryQuery.accountId(),
                 repositoryQuery.startDate(), repositoryQuery.endDate(), repositoryQuery.keyword(), repositoryQuery.mood(),
-                repositoryQuery.tagId(), repositoryQuery.trash(), null, null, 1));
+                repositoryQuery.tagId(), repositoryQuery.trash(), repositoryQuery.elevated(), null, null, 1));
         String nextCursor = null;
         if (rows.size() > size) {
             rows.remove(rows.size() - 1);
             DiaryEntry last = rows.get(rows.size() - 1);
             nextCursor = encodeCursor(last.diaryDate(), last.internalId());
         }
+        if (!elevated) rows.replaceAll(this::protectLocked);
         return new CursorPage<>(rows, nextCursor, totalElements);
     }
 
-    public DiaryEntry detail(UUID spaceId, UUID diaryId, long accountId, boolean includeDeleted) {
+    public DiaryEntry detail(UUID spaceId, UUID diaryId, long accountId, boolean includeDeleted, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        return requireDiary(space.internalId(), diaryId, accountId, includeDeleted);
+        return requireProtection(requireDiary(space.internalId(), diaryId, accountId, includeDeleted), elevated);
     }
 
     @Transactional
@@ -87,7 +88,7 @@ public class DiaryService {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         Validated validated = validate(command, space);
         List<Long> tagIds = resolveTags(space.internalId(), validated.tagIds());
-        List<Long> mediaIds = resolveMedia(space.internalId(), validated.mediaIds());
+        List<Long> mediaIds = resolveMedia(space.internalId(), accountId, validated.locked(), validated.mediaIds());
         UUID publicId = command.clientId() == null ? UUID.randomUUID() : command.clientId();
         if (command.clientId() != null) {
             DiaryEntry existing = diaries.findByPublicId(space.internalId(), publicId, accountId, false).orElse(null);
@@ -111,13 +112,15 @@ public class DiaryService {
     }
 
     @Transactional
-    public DiaryEntry update(UUID spaceId, UUID diaryId, long accountId, int expectedVersion, Command command) {
+    public DiaryEntry update(UUID spaceId, UUID diaryId, long accountId, int expectedVersion, Command command,
+                             boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         DiaryEntry current = requireDiary(space.internalId(), diaryId, accountId, false);
+        requireProtection(current, elevated);
         if (current.version() != expectedVersion) throw versionMismatch();
         Validated validated = validate(command, space);
         List<Long> tagIds = resolveTags(space.internalId(), validated.tagIds());
-        List<Long> mediaIds = resolveMedia(space.internalId(), validated.mediaIds());
+        List<Long> mediaIds = resolveMedia(space.internalId(), accountId, validated.locked(), validated.mediaIds());
         int updated = diaries.update(current.internalId(), expectedVersion,
                 new DiaryRepository.UpdatedDiary(validated.title(), validated.diaryDate(), validated.content().html(),
                         validated.content().text(), validated.mood(), validated.visibility(), validated.locked()));
@@ -132,9 +135,10 @@ public class DiaryService {
     }
 
     @Transactional
-    public void moveToTrash(UUID spaceId, UUID diaryId, long accountId, int expectedVersion) {
+    public void moveToTrash(UUID spaceId, UUID diaryId, long accountId, int expectedVersion, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         DiaryEntry current = requireDiary(space.internalId(), diaryId, accountId, false);
+        requireProtection(current, elevated);
         if (current.version() != expectedVersion
                 || diaries.setDeleted(current.internalId(), expectedVersion, now()) != 1) throw versionMismatch();
         changes.record(space.internalId(), accountId, "DIARY", diaryId,
@@ -142,9 +146,10 @@ public class DiaryService {
     }
 
     @Transactional
-    public DiaryEntry restore(UUID spaceId, UUID diaryId, long accountId, int expectedVersion) {
+    public DiaryEntry restore(UUID spaceId, UUID diaryId, long accountId, int expectedVersion, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         DiaryEntry current = requireDiary(space.internalId(), diaryId, accountId, true);
+        requireProtection(current, elevated);
         if (current.deletedAt() == null) return current;
         if (current.version() != expectedVersion
                 || diaries.setDeleted(current.internalId(), expectedVersion, null) != 1) throw versionMismatch();
@@ -154,17 +159,20 @@ public class DiaryService {
         return result;
     }
 
-    public List<DiaryRepository.RevisionSummary> revisions(UUID spaceId, UUID diaryId, long accountId) {
+    public List<DiaryRepository.RevisionSummary> revisions(UUID spaceId, UUID diaryId, long accountId,
+                                                            boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         DiaryEntry diary = requireDiary(space.internalId(), diaryId, accountId, true);
+        requireProtection(diary, elevated);
         return diaries.findRevisions(diary.internalId());
     }
 
     @Transactional
     public DiaryEntry restoreRevision(UUID spaceId, UUID diaryId, long revisionId, long accountId,
-                                      int expectedVersion) {
+                                      int expectedVersion, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         DiaryEntry current = requireDiary(space.internalId(), diaryId, accountId, false);
+        requireProtection(current, elevated);
         DiaryRepository.Revision revision = diaries.findRevision(current.internalId(), revisionId)
                 .orElseThrow(() -> V3Exception.notFound("REVISION_NOT_FOUND", "历史版本不存在"));
         try {
@@ -174,7 +182,7 @@ public class DiaryService {
                     textOrNull(snapshot, "mood"), snapshot.path("visibility").asText("PRIVATE"),
                     snapshot.path("locked").asBoolean(false), uuids(snapshot.path("tagIds")),
                     uuids(snapshot.path("mediaIds")));
-            return update(spaceId, diaryId, accountId, expectedVersion, command);
+            return update(spaceId, diaryId, accountId, expectedVersion, command, elevated);
         } catch (V3Exception exception) {
             throw exception;
         } catch (Exception exception) {
@@ -207,8 +215,8 @@ public class DiaryService {
         return result;
     }
 
-    private List<Long> resolveMedia(long spaceId, List<UUID> values) {
-        List<Long> result = diaries.resolveMediaIds(spaceId, values);
+    private List<Long> resolveMedia(long spaceId, long accountId, boolean locked, List<UUID> values) {
+        List<Long> result = diaries.resolveMediaIds(spaceId, accountId, locked, values);
         if (result.size() != values.size()) throw V3Exception.badRequest("MEDIA_NOT_FOUND", "部分媒体不存在或不属于当前空间");
         return result;
     }
@@ -216,6 +224,20 @@ public class DiaryService {
     private DiaryEntry requireDiary(long spaceId, UUID diaryId, long accountId, boolean includeDeleted) {
         return diaries.findByPublicId(spaceId, diaryId, accountId, includeDeleted)
                 .orElseThrow(() -> V3Exception.notFound("DIARY_NOT_FOUND", "日记不存在或无权访问"));
+    }
+
+    private DiaryEntry requireProtection(DiaryEntry diary, boolean elevated) {
+        if (diary.locked() && !elevated) {
+            throw new V3Exception(HttpStatus.LOCKED, "STEP_UP_REQUIRED", "请先完成二次验证");
+        }
+        return diary;
+    }
+
+    private DiaryEntry protectLocked(DiaryEntry diary) {
+        if (!diary.locked()) return diary;
+        return new DiaryEntry(diary.internalId(), diary.id(), diary.spaceId(), diary.authorId(), null,
+                diary.diaryDate(), null, null, null, diary.visibility(), true, diary.version(),
+                diary.createdAt(), diary.updatedAt(), diary.deletedAt(), List.of(), List.of());
     }
 
     private String snapshot(DiaryEntry diary) {

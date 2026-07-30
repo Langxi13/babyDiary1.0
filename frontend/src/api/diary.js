@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 import { activeSpaceId, diaryPayload, normalizeDiary, normalizeMedia } from '@/api/v3Adapters'
 import { cachedRequest, invalidateApiCache, stableStringify } from '@/utils/apiCache'
+import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
 
 const listCursors = new Map()
 const diaryVersions = new Map()
@@ -37,7 +38,8 @@ async function cursorForPage(spaceId, params, targetPage) {
   }
   for (let page = state.cursors.length - 1; page < targetPage; page += 1) {
     const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
-      params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined }
+      params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined },
+      headers: stepHeader(getStepUpToken())
     })
     if (!response.data.nextCursor) break
     state.cursors[page + 1] = response.data.nextCursor
@@ -96,7 +98,8 @@ const formDataCommand = async (spaceId, formData, editing) => {
 
 async function requiredVersion(spaceId, diaryId) {
   if (diaryVersions.has(diaryId)) return diaryVersions.get(diaryId)
-  const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`)
+  const response = await withStepUpRetry(token => request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`,
+    { headers: stepHeader(token) }))
   rememberVersion(response.data)
   return response.data.version
 }
@@ -110,7 +113,8 @@ export const diaryApi = {
         const page = Math.max(0, Number(params.page) || 0)
         const cursor = await cursorForPage(spaceId, params, page)
         const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
-          params: { ...normalizeListParams(params), cursor: cursor || undefined }
+          params: { ...normalizeListParams(params), cursor: cursor || undefined },
+          headers: stepHeader(getStepUpToken())
         })
         const content = (response.data.items || []).map(item => rememberVersion(normalizeDiary(item)))
         const totalElements = Number(response.data.totalElements) || 0
@@ -129,7 +133,8 @@ export const diaryApi = {
       `diaries:detail:${id}`,
       async () => {
         const spaceId = await activeSpaceId()
-        const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/${id}`)
+        const response = await withStepUpRetry(token => request.get(`/api/v3/spaces/${spaceId}/diaries/${id}`,
+          { headers: stepHeader(token) }))
         return { ...response, data: rememberVersion(normalizeDiary(response.data)) }
       },
       { ttl: options.ttl ?? 30000, force: options.force }
@@ -154,9 +159,8 @@ export const diaryApi = {
     const prepared = await formDataCommand(spaceId, formData, true)
     try {
       const version = await requiredVersion(spaceId, id)
-      const response = await request.put(`/api/v3/spaces/${spaceId}/diaries/${id}`, prepared.command, {
-        headers: { 'If-Match': `"${version}"` }
-      })
+      const response = await withStepUpRetry(token => request.put(`/api/v3/spaces/${spaceId}/diaries/${id}`,
+        prepared.command, { headers: { ...stepHeader(token), 'If-Match': `"${version}"` } }))
       invalidateDiaryReads()
       invalidateApiCache(`diaries:detail:${id}`)
       return { ...response, data: rememberVersion(normalizeDiary(response.data)) }
@@ -169,9 +173,9 @@ export const diaryApi = {
   async deleteDiary(id) {
     const spaceId = await activeSpaceId()
     const version = await requiredVersion(spaceId, id)
-    const response = await request.delete(`/api/v3/spaces/${spaceId}/diaries/${id}`, {
-      headers: { 'If-Match': `"${version}"` }
-    })
+    const response = await withStepUpRetry(token => request.delete(`/api/v3/spaces/${spaceId}/diaries/${id}`, {
+      headers: { ...stepHeader(token), 'If-Match': `"${version}"` }
+    }))
     diaryVersions.delete(id)
     invalidateDiaryReads()
     invalidateApiCache(`diaries:detail:${id}`)
@@ -186,7 +190,7 @@ export const diaryApi = {
     return cachedRequest(`diaries:timeline:${stableStringify(params)}`, async () => {
       const spaceId = await activeSpaceId()
       const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
-        params: { ...normalizeListParams(params), size: 50 }
+        params: { ...normalizeListParams(params), size: 50 }, headers: stepHeader(getStepUpToken())
       })
       const diaries = (response.data.items || []).map(item => rememberVersion(normalizeDiary(item)))
       const groups = new Map()
@@ -204,12 +208,18 @@ export const diaryApi = {
     return cachedRequest(`diaries:calendar:${stableStringify(params)}`, async () => {
       const spaceId = await activeSpaceId()
       const month = `${params.year}-${String(params.month).padStart(2, '0')}`
-      const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, { params: { month } })
+      const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, {
+        params: { month }, headers: stepHeader(getStepUpToken())
+      })
       return { ...response, data: (response.data.days || []).map(day => ({
         ...day, firstTitle: day.entries?.[0]?.title || '', firstDiaryId: day.entries?.[0]?.diaryId || null
       })) }
     }, { ttl: options.ttl ?? 120000, force: options.force })
   }
+}
+
+function stepHeader(token) {
+  return token ? { 'X-Step-Up-Token': token } : {}
 }
 
 export function invalidateDiaryReads() {

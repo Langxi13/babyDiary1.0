@@ -14,13 +14,13 @@ import java.util.List;
 @Mapper
 public interface DiaryInteractionMapper {
     @Select("""
-            SELECT d.diary_id FROM diary d JOIN space_member m ON m.space_id=d.space_id
+            SELECT d.diary_id,d.locked FROM diary d JOIN space_member m ON m.space_id=d.space_id
             WHERE d.space_id=#{spaceId} AND d.public_id=#{diaryPublicId} AND d.deleted_at IS NULL
               AND m.account_id=#{accountId} AND m.status='ACTIVE'
               AND (d.visibility='SHARED' OR d.author_id=#{accountId})
             """)
-    Long findVisibleDiary(@Param("spaceId") long spaceId, @Param("diaryPublicId") byte[] diaryPublicId,
-                          @Param("accountId") long accountId);
+    DiaryAccessRow findVisibleDiary(@Param("spaceId") long spaceId, @Param("diaryPublicId") byte[] diaryPublicId,
+                                    @Param("accountId") long accountId);
 
     @Select("""
             SELECT c.comment_id,c.public_id,a.public_id AS author_public_id,a.username,c.content,
@@ -74,6 +74,16 @@ public interface DiaryInteractionMapper {
     @Delete("DELETE FROM diary_reaction WHERE diary_id=#{diaryId} AND account_id=#{accountId} AND emoji=#{emoji}")
     void deleteReaction(@Param("diaryId") long diaryId, @Param("accountId") long accountId,
                         @Param("emoji") String emoji);
+
+    final class DiaryAccessRow {
+        private long diaryId;
+        private boolean locked;
+        public DiaryAccessRow() {}
+        public long getDiaryId() { return diaryId; }
+        public boolean isLocked() { return locked; }
+        public void setDiaryId(long diaryId) { this.diaryId = diaryId; }
+        public void setLocked(boolean locked) { this.locked = locked; }
+    }
 
     final class CommentInsert {
         private Long commentId;

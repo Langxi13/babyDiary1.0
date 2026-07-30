@@ -20,12 +20,12 @@ public class SyncService {
         this.executor = executor;
     }
 
-    public List<SyncOperationExecutor.Result> push(UUID spaceId, long accountId, List<PushOperation> operations) {
+    public List<SyncOperationExecutor.Result> push(UUID spaceId, long accountId, List<PushOperation> operations,boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         if (operations == null || operations.isEmpty() || operations.size() > 100) {
             throw V3Exception.badRequest("SYNC_BATCH_INVALID", "同步操作不能为空且单次最多100项");
         }
-        return operations.stream().map(item -> executor.execute(spaceId, space.internalId(), accountId,
+        return operations.stream().map(item -> executor.execute(spaceId, space.internalId(), accountId,elevated,
                 new SyncOperationExecutor.Operation(item.operationId(), item.entityType(), item.action(),
                         item.entityId(), item.baseVersion(), item.payload()))).toList();
     }

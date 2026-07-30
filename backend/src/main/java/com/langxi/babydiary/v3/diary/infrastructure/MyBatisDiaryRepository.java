@@ -68,9 +68,10 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     }
 
     @Override
-    public List<Long> resolveMediaIds(long spaceId, List<UUID> publicIds) {
+    public List<Long> resolveMediaIds(long spaceId, long accountId, boolean locked, List<UUID> publicIds) {
         return resolve(publicIds, publicIds.isEmpty() ? List.of()
-                : mapper.resolveMediaIds(spaceId, publicIds.stream().map(BinaryUuid::toBytes).toList()));
+                : mapper.resolveMediaIds(spaceId, accountId, locked,
+                publicIds.stream().map(BinaryUuid::toBytes).toList()));
     }
 
     @Override
@@ -115,7 +116,7 @@ public class MyBatisDiaryRepository implements DiaryRepository {
             media.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>()).add(
                     new DiaryEntry.MediaRef(BinaryUuid.fromBytes(row.publicId()), row.mediaType(), row.caption(),
                             row.takenAt(), row.position(), row.status(), row.originalProfile(),
-                            row.thumbnailProfile()));
+                            row.thumbnailProfile(),row.protectedContent()));
         }
         return rows.stream().map(row -> new DiaryEntry(row.diaryId(), BinaryUuid.fromBytes(row.publicId()),
                 BinaryUuid.fromBytes(row.spacePublicId()), row.authorId(), row.title(), row.diaryDate(),

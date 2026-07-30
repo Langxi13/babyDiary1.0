@@ -140,15 +140,17 @@
 | --- | --- | --- |
 | `POST` | `/api/v3/spaces/{spaceId}/media` | 上传图片、音频或视频 |
 | `GET` | `/api/v3/spaces/{spaceId}/media` | 分页查询空间媒体 |
-| `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 查看媒体资产元数据 |
+| `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 查看媒体资产元数据；锁定媒体需要 step-up |
 | `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}/variants/{variant}` | 获取受保护派生资源 |
 | `PUT` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 更新媒体元数据 |
 | `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
 | `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
-媒体变体由 `variant + profile` 共同确定。资产响应的 `variants[]` 会返回实际 `type`、`profile` 和与二者绑定的 `contentUrl`；日记媒体响应分别返回原图 `contentUrl` 和缩略图 `thumbnailUrl`。受保护变体接口可传可选查询参数 `profile`，省略时按 `default`、`source`、其他 profile 的顺序选择同类型可用变体。
+媒体变体由 `variant + profile` 共同确定。资产、相册、封面、头像等媒体响应使用命名的 `representations`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`。每个 representation 返回实际 `variantType`、`profile`、短时 `url`、`expiresAt`、MIME、大小和技术元数据；缺少的派生 representation 为 `null`。日记媒体为了保持列表响应紧凑，返回原图 `contentUrl` 和缩略图 `thumbnailUrl`，但 URL 同样绑定实际 profile。锁定媒体仍可在列表中显示不含 URL 的技术占位，直接详情和内容读取需要 `X-Step-Up-Token`。
 
-公开媒体 URL 的查询参数为 `profile`、`expires` 和 `signature`，其中 profile 已纳入 HMAC 签名，客户端不得修改。滚动部署前已签发且尚未过期的无 profile URL 仍可读取，并使用相同的确定性顺序选择变体；所有新 URL 都必须携带实际 profile。
+公开媒体 URL 的查询参数为 `profile`、`ticket`、`expires` 和 `signature`，其中 profile 与 HMAC 保护的访问上下文都纳入签名，客户端不得修改。旧的无上下文签名不再接受。内容读取支持 `GET`、`HEAD`、单段 `Range`、`ETag/If-None-Match`；无效 Range 返回 `416`。锁定或分享上下文使用 `Cache-Control: no-store`。
+
+上传先写入临时文件，再校验真实文件头和声明 MIME；图片上限 25 MB/8000 万像素，音视频上限 256 MB。原始文件进入 `ORIGINAL/source`，缩略图、海报、转码和波形由 `MEDIA_PROCESS` 后台任务生成。删除不会同步删除对象，而是标记 `DELETE_PENDING` 并排入幂等 `STORAGE_GC`；引用存在时返回 `MEDIA_IN_USE`。
 
 ### 相册与收藏
 
