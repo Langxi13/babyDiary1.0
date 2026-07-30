@@ -1,7 +1,49 @@
-<template><div class="invite-page" v-loading="loading"><div><el-icon><Connection /></el-icon><h1>{{ message }}</h1><el-button v-if="!loading" type="primary" @click="router.push('/spaces')">进入共同空间</el-button></div></div></template>
+<template>
+  <div class="invite-page" v-loading="loading">
+    <div>
+      <el-icon><Connection /></el-icon>
+      <h1>{{ message }}</h1>
+      <el-button v-if="!loading" type="primary" @click="router.push('/spaces')">
+        进入共同空间
+      </el-button>
+    </div>
+  </div>
+</template>
+
 <script setup>
-import { onMounted, ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import { ElButton } from 'element-plus/es/components/button/index.mjs'; import { ElIcon } from 'element-plus/es/components/icon/index.mjs'; import { Connection } from '@element-plus/icons-vue'; import { workspaceApi } from '@/api/workspace'; import { useWorkspaceStore } from '@/stores/workspace'; import 'element-plus/es/components/button/style/css.mjs'; import 'element-plus/es/components/icon/style/css.mjs'
-const route=useRoute(); const router=useRouter(); const store=useWorkspaceStore(); const loading=ref(true); const message=ref('正在接受邀请')
-onMounted(async()=>{try{const response=await workspaceApi.spaces.accept(route.params.token); await store.loadSpaces(true); store.selectSpace(response.data.spaceId); message.value=`已加入 ${response.data.name}`}finally{loading.value=false}})
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElButton } from 'element-plus/es/components/button/index.mjs'
+import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
+import { Connection } from '@element-plus/icons-vue'
+import { workspaceApi } from '@/api/workspace'
+import { useWorkspaceStore } from '@/stores/workspace'
+import 'element-plus/es/components/button/style/css.mjs'
+import 'element-plus/es/components/icon/style/css.mjs'
+
+const route = useRoute()
+const router = useRouter()
+const store = useWorkspaceStore()
+const loading = ref(true)
+const message = ref('正在接受邀请')
+
+onMounted(async () => {
+  try {
+    const previousIds = new Set(store.spaces.map(space => space.id))
+    await workspaceApi.spaces.accept(route.params.token)
+    await store.loadSpaces(true)
+    const joined = store.spaces.find(space => !previousIds.has(space.id))
+    if (joined) store.selectSpace(joined.id)
+    message.value = joined ? `已加入 ${joined.name}` : '已加入共同空间'
+  } finally {
+    loading.value = false
+  }
+})
 </script>
-<style scoped>.invite-page{min-height:100vh;background:#f6f3f0;display:grid;place-items:center;padding:20px}.invite-page>div{width:min(420px,100%);padding:34px;border:1px solid #e4dad5;border-radius:8px;background:#fff;text-align:center}.invite-page .el-icon{color:#347a70;font-size:38px}.invite-page h1{margin:16px 0 22px;font-size:24px}</style>
+
+<style scoped>
+.invite-page { min-height: 100vh; padding: 20px; background: #f6f3f0; display: grid; place-items: center; }
+.invite-page > div { width: min(420px, 100%); padding: 34px; border: 1px solid #e4dad5; border-radius: 8px; background: #fff; text-align: center; }
+.invite-page .el-icon { color: #347a70; font-size: 38px; }
+.invite-page h1 { margin: 16px 0 22px; font-size: 24px; }
+</style>

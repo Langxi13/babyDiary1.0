@@ -188,7 +188,7 @@ class ApiIntegrationTest {
         MvcResult refreshed =
                 mvc.perform(post("/api/v3/auth/refresh").cookie(firstRefresh))
                         .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                        .andExpect(jsonPath("$.token").isNotEmpty())
                         .andReturn();
         Cookie secondRefresh = refreshed.getResponse().getCookie("baby_diary_refresh");
         assertThat(secondRefresh).isNotNull();
@@ -793,7 +793,7 @@ class ApiIntegrationTest {
                                         .content("{\"password\":\"share-pass\"}"))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.title").value("Shared privately"))
-                        .andExpect(jsonPath("$.media[0].assetId").value(assetId.toString()))
+                        .andExpect(jsonPath("$.media[0].id").value(assetId.toString()))
                         .andExpect(
                                 jsonPath(
                                         "$.media[0].contentUrl",
@@ -1191,9 +1191,9 @@ class ApiIntegrationTest {
                                                 json.writeValueAsString(
                                                         Map.of("content", "A shared response"))))
                         .andExpect(status().isCreated())
-                        .andExpect(jsonPath("$.userId").value(OTHER_PUBLIC_ID.toString()))
+                        .andExpect(jsonPath("$.authorId").value(OTHER_PUBLIC_ID.toString()))
                         .andReturn();
-        UUID commentId = UUID.fromString(body(comment).path("publicId").asText());
+        UUID commentId = UUID.fromString(body(comment).path("id").asText());
 
         mvc.perform(
                         put(
@@ -1605,7 +1605,7 @@ class ApiIntegrationTest {
                                                 org.hamcrest.Matchers.containsString("script"))))
                         .andExpect(jsonPath("$.editable").value(true))
                         .andReturn();
-        UUID templateId = UUID.fromString(body(template).path("templateId").asText());
+        UUID templateId = UUID.fromString(body(template).path("id").asText());
         mvc.perform(
                         put(
                                         "/api/v3/spaces/{spaceId}/templates/{templateId}",
@@ -1968,7 +1968,7 @@ class ApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
                 .andExpect(status().isOk())
                 .andExpect(
-                        jsonPath("$[?(@.username == 'other')].userId")
+                        jsonPath("$[?(@.username == 'other')].id")
                                 .value(OTHER_PUBLIC_ID.toString()));
         mvc.perform(
                         put(
@@ -2475,7 +2475,7 @@ class ApiIntegrationTest {
                                                         PASSWORD))))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.token").isNotEmpty())
                 .andReturn();
     }
 
@@ -2577,7 +2577,7 @@ class ApiIntegrationTest {
     }
 
     private String accessToken(MvcResult result) throws Exception {
-        return body(result).path("accessToken").asText();
+        return body(result).path("token").asText();
     }
 
     private JsonNode body(MvcResult result) throws Exception {

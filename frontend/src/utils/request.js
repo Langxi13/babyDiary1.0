@@ -132,15 +132,7 @@ request.interceptors.response.use(
       }
       return response.data
     }
-    const { data } = response
-    if (response.config.url?.startsWith('/api/v3/')) {
-      return { code: 200, message: 'success', data }
-    }
-    if (data?.code === 200) {
-      return data
-    }
-    if (!response.config.__silentError) ElMessage.error(data.message || '请求失败')
-    return Promise.reject(new Error(data.message || '请求失败'))
+    return response.data
   },
   async error => {
     if (axios.isCancel(error) || isStaleSessionRequest(error.config)) {
@@ -169,14 +161,9 @@ request.interceptors.response.use(
             if (!isClientSessionGenerationCurrent(refreshRequest.generation)) {
               return Promise.reject(staleSessionError(originalRequest))
             }
-            const payload = refreshResponse.data
-            const refreshed = payload?.data || payload
+            const refreshed = refreshResponse.data
             if (refreshed?.token) {
-              const refreshedUser = refreshed.userInfo ? {
-                ...refreshed.userInfo,
-                userId: refreshed.userInfo.id || refreshed.userInfo.accountId,
-                systemRole: refreshed.userInfo.systemRole || refreshed.userInfo.role
-              } : null
+              const refreshedUser = refreshed.userInfo || null
               localStorage.setItem('userInfo', JSON.stringify(refreshedUser ? {
                 ...refreshedUser,
                 avatarMedia: refreshedUser.avatarMedia

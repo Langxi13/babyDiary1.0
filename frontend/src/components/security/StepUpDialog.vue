@@ -146,11 +146,11 @@ const submit = async () => {
   errorMessage.value = ''
   try {
     const { authApi } = await import('@/api/auth')
-    const response = await authApi.stepUp(password.value)
+    const result = await authApi.stepUp(password.value)
     const resolve = resolvePending
     clearPending()
     visible.value = false
-    resolve?.(response.data)
+    resolve?.(result)
   } catch (error) {
     errorMessage.value = error.response?.data?.detail
       || error.response?.data?.message

@@ -15,7 +15,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   let initialized = false
   let storeGeneration = 0
 
-  const activeSpace = computed(() => spaces.value.find(space => space.spaceId === activeSpaceId.value) || null)
+  const activeSpace = computed(() => spaces.value.find(space => space.id === activeSpaceId.value) || null)
   const isPersonalSpace = computed(() => activeSpace.value?.type === 'PERSONAL')
 
   async function loadSpaces(force = false) {
@@ -23,11 +23,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const generation = storeGeneration
     loading.value = true
     try {
-      const response = await workspaceApi.spaces.list()
+      const result = await workspaceApi.spaces.list()
       if (generation !== storeGeneration) return spaces.value
-      spaces.value = response.data || []
-      if (!spaces.value.some(space => space.spaceId === activeSpaceId.value)) {
-        activeSpaceId.value = spaces.value[0]?.spaceId || ''
+      spaces.value = result
+      if (!spaces.value.some(space => space.id === activeSpaceId.value)) {
+        activeSpaceId.value = spaces.value[0]?.id || ''
       }
       persistActiveSpace()
       return spaces.value
@@ -39,7 +39,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   function selectSpace(spaceId) {
-    if (!spaces.value.some(space => space.spaceId === spaceId)) return
+    if (!spaces.value.some(space => space.id === spaceId)) return
     activeSpaceId.value = spaceId
     persistActiveSpace()
     window.dispatchEvent(new CustomEvent('workspace:selected', { detail: { spaceId } }))
@@ -47,17 +47,17 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function createSpace(name) {
     const generation = storeGeneration
-    const response = await workspaceApi.spaces.create({ name })
+    const space = await workspaceApi.spaces.create({ name })
     if (generation !== storeGeneration) return null
     await loadSpaces(true)
     if (generation !== storeGeneration) return null
-    selectSpace(response.data.spaceId)
-    return response.data
+    selectSpace(space.id)
+    return space
   }
 
   async function refreshPendingCount() {
     const generation = storeGeneration
-    const spaceIds = spaces.value.map(space => space.spaceId)
+    const spaceIds = spaces.value.map(space => space.id)
     const count = await pendingOfflineCount(spaceIds)
     if (generation === storeGeneration) {
       pendingCount.value = count
@@ -67,9 +67,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   async function refreshUnread() {
     const generation = storeGeneration
     try {
-      const response = await workspaceApi.notifications.unread()
+      const count = await workspaceApi.notifications.unread()
       if (generation === storeGeneration) {
-        unreadNotifications.value = response.data || 0
+        unreadNotifications.value = count || 0
       }
     } catch {
       if (generation === storeGeneration) {

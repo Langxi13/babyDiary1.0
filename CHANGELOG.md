@@ -2,6 +2,8 @@
 
 ## 2026-07-30
 
+- Removed the frontend's fabricated V3 success envelopes and legacy model aliases; Web and Capacitor transports now expose the same raw response body, API methods require an explicit space, and UI state uses canonical `id`, `diaryDate`, `mood`, and `representations` fields.
+- Consolidated personal and shared diary API behavior, media presentation helpers, the Emoji mood picker, and the diary media gallery; corrected shared-space cursor pagination, invitation acceptance, notifications, templates, comments, shares, and account session consumers that still expected retired response fields.
 - Replaced the remaining application-to-MyBatis dependencies with explicit repository/gateway ports and infrastructure adapters across AI albums, schedules, discovery, templates, interactions, recovery, media authorization, notifications, shares, transfers and background jobs.
 - Added ArchUnit rules preventing application dependencies on infrastructure or MyBatis, and added a pinned Spotless/Google Java Format gate after normalizing the full backend source tree.
 - Removed the dormant legacy Java/API/Mapper/migration runtime and promoted the UUID architecture to the sole `BabyDiaryApplication`, canonical configuration, Mapper and Flyway locations while preserving the applied V1/V2 migration checksums.

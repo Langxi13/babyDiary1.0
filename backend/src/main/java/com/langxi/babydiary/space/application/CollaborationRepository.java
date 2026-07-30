@@ -30,12 +30,7 @@ public interface CollaborationRepository {
             String email,
             String role,
             String status,
-            LocalDateTime joinedAt) {
-        @com.fasterxml.jackson.annotation.JsonProperty("userId")
-        public UUID userId() {
-            return id;
-        }
-    }
+            LocalDateTime joinedAt) {}
 
     record Membership(long accountId, String role, String status) {}
 

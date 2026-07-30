@@ -14,10 +14,10 @@
 
       <section v-loading="loading" class="draft-list">
         <el-empty v-if="drafts.length === 0" description="暂无草稿" />
-        <article v-for="draft in drafts" :key="draft.draftId" class="draft-card">
+        <article v-for="draft in drafts" :key="draft.id" class="draft-card">
           <button class="draft-main" @click="openDraft(draft)">
             <span class="draft-type">{{ draftTypeLabel(draft) }}</span>
-            <strong>{{ draft.title || '未命名草稿' }}</strong>
+            <strong>{{ draft.payload?.title || '未命名草稿' }}</strong>
             <p>{{ previewText(draft) }}</p>
             <span class="draft-time">{{ formatChineseDateTime(draft.updatedAt) }}</span>
           </button>
@@ -28,7 +28,7 @@
             @confirm="deleteDraft(draft)"
           >
             <template #reference>
-              <el-button class="draft-delete-button" type="danger" text :loading="deletingId === draft.draftId" :disabled="!!deletingId" aria-label="删除草稿">
+              <el-button class="draft-delete-button" type="danger" text :loading="deletingId === draft.id" :disabled="!!deletingId" aria-label="删除草稿">
                 <el-icon><Delete /></el-icon>
                 <span class="action-label">删除</span>
               </el-button>
@@ -50,6 +50,7 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { draftApi } from '@/api/experience'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -62,10 +63,17 @@ const router = useRouter()
 const loading = ref(false)
 const drafts = ref([])
 const deletingId = ref(null)
+const workspaceStore = useWorkspaceStore()
+
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
 
 const draftTypeLabel = (draft) => String(draft.draftKey || '').startsWith('create') ? '新日记草稿' : '编辑草稿'
 const previewText = (draft) => {
-  const text = draft.contentFormat === 'html' ? stripHtml(draft.content) : draft.content
+  const text = stripHtml(draft.payload?.contentHtml || '')
   return text?.slice(0, 120) || '暂无正文'
 }
 const draftDiaryId = (draft) => {
@@ -77,8 +85,7 @@ const draftDiaryId = (draft) => {
 const loadDrafts = async () => {
   loading.value = true
   try {
-    const response = await draftApi.list()
-    drafts.value = response.data || []
+    drafts.value = await draftApi.list(await requireSpaceId())
   } finally {
     loading.value = false
   }
@@ -105,10 +112,10 @@ const openDraft = (draft) => {
 
 const deleteDraft = async (draft) => {
   if (deletingId.value) return
-  deletingId.value = draft.draftId
+  deletingId.value = draft.id
   try {
-    await draftApi.remove(draft.draftId)
-    drafts.value = drafts.value.filter(item => item.draftId !== draft.draftId)
+    await draftApi.remove(await requireSpaceId(), draft.draftKey)
+    drafts.value = drafts.value.filter(item => item.id !== draft.id)
     ElMessage.success('草稿已删除')
   } finally {
     deletingId.value = null

@@ -110,13 +110,13 @@ test('the same API cache key is isolated between authenticated accounts', async 
 
   clearApiCache()
   let calls = 0
-  storage.setItem('userInfo', JSON.stringify({ userId: 101, username: 'account-a' }))
+  storage.setItem('userInfo', JSON.stringify({ id: 101, username: 'account-a' }))
   const accountA = await cachedRequest('anniversaries:list', async () => ({ owner: 'A', calls: ++calls }))
 
-  storage.setItem('userInfo', JSON.stringify({ userId: 202, username: 'account-b' }))
+  storage.setItem('userInfo', JSON.stringify({ id: 202, username: 'account-b' }))
   const accountB = await cachedRequest('anniversaries:list', async () => ({ owner: 'B', calls: ++calls }))
 
-  storage.setItem('userInfo', JSON.stringify({ userId: 101, username: 'account-a' }))
+  storage.setItem('userInfo', JSON.stringify({ id: 101, username: 'account-a' }))
   const accountAAgain = await cachedRequest('anniversaries:list', async () => {
     throw new Error('account A should reuse only its own cached value')
   })

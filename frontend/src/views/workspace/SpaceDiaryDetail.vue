@@ -15,33 +15,23 @@
       <article v-if="diary" class="space-detail-article">
         <header class="article-head">
           <div class="article-meta">
-            <time>{{ formatChineseDate(diary.date) }}</time>
-            <span v-if="diary.moodKey">{{ moodEmoji(diary.moodKey) }}</span>
-            <span>{{ diary.authorName }}</span>
+            <time>{{ formatChineseDate(diary.diaryDate) }}</time>
+            <span v-if="diary.mood">{{ moodEmoji(diary.mood) }}</span>
             <span>{{ diary.visibility === 'PRIVATE' ? '仅自己' : '共同可见' }}</span>
             <el-icon v-if="diary.locked"><Lock /></el-icon>
           </div>
           <h1>{{ diary.title }}</h1>
           <div v-if="diary.tags?.length" class="article-tags">
-            <span v-for="tag in diary.tags" :key="tag.tagId"><i :style="{ background: tag.color }" />{{ tag.name }}</span>
+            <span v-for="tag in diary.tags" :key="tag.id"><i :style="{ background: tag.color }" />{{ tag.name }}</span>
           </div>
         </header>
 
         <section class="article-content">
-          <div v-if="diary.contentFormat === 'html'" v-html="diary.content" />
-          <p v-else>{{ diary.content }}</p>
+          <div v-if="diary.contentHtml" v-html="diary.contentHtml" />
+          <p v-else>{{ diary.contentText }}</p>
         </section>
 
-        <section v-if="diary.media?.length" class="rich-media">
-          <figure v-for="media in diary.media" :key="media.assetId">
-            <el-image v-if="media.mediaType === 'IMAGE'" :src="media.thumbnailUrl || media.contentUrl" :preview-src-list="[media.contentUrl]" preview-teleported fit="cover" />
-            <audio v-else-if="media.mediaType === 'AUDIO'" controls preload="metadata" :src="media.contentUrl" />
-            <video v-else controls preload="metadata" playsinline :poster="media.posterUrl" :src="media.transcodedUrl || media.contentUrl" />
-            <figcaption v-if="media.caption || media.locationName">
-              <span>{{ media.caption }}</span><small v-if="media.locationName">{{ media.locationName }}</small>
-            </figcaption>
-          </figure>
-        </section>
+        <diary-media-gallery :media="diary.media" />
 
         <footer class="article-footer">
           <span>更新于 {{ formatChineseDateTime(diary.updatedAt || diary.createdAt) }}</span>
@@ -66,7 +56,7 @@
           <el-button type="primary" :disabled="!commentText.trim()" :loading="commenting" @click="addComment">发送</el-button>
         </div>
         <div class="comment-list">
-          <article v-for="comment in comments" :key="comment.publicId">
+          <article v-for="comment in comments" :key="comment.id">
             <el-avatar :size="34" :src="comment.avatarMedia?.contentUrl">{{ comment.username?.slice(0, 1) }}</el-avatar>
             <div class="comment-body">
               <header>
@@ -76,7 +66,7 @@
                   <el-button :icon="Delete" circle text size="small" title="删除评论" @click="removeComment(comment)" />
                 </div>
               </header>
-              <div v-if="editingCommentId === comment.publicId" class="comment-editor">
+              <div v-if="editingCommentId === comment.id" class="comment-editor">
                 <el-input v-model="editingCommentText" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" maxlength="2000" />
                 <div><el-button size="small" @click="cancelCommentEdit">取消</el-button><el-button size="small" type="primary" :loading="savingComment" @click="saveComment(comment)">保存</el-button></div>
               </div>
@@ -100,7 +90,7 @@
 
     <el-drawer v-model="historyOpen" title="版本历史" size="min(480px, 100%)">
       <div v-loading="loadingHistory" class="revision-list">
-        <article v-for="revision in revisions" :key="revision.revisionId">
+        <article v-for="revision in revisions" :key="revision.id">
           <div><strong>版本 {{ revision.version }}</strong><span>{{ revision.editorName }} · {{ formatChineseDateTime(revision.createdAt) }}</span></div>
           <el-button size="small" @click="restoreRevision(revision)">恢复</el-button>
         </article>
@@ -126,7 +116,7 @@
       <section class="active-shares">
         <header><h3>活动中的分享</h3><span>{{ activeShares.length }} 个</span></header>
         <div v-loading="loadingShares" class="active-share-list">
-          <article v-for="share in activeShares" :key="share.shareId">
+          <article v-for="share in activeShares" :key="share.id">
             <div>
               <strong>{{ share.passwordProtected ? '已设置访问密码' : '无需访问密码' }}</strong>
               <span>{{ formatChineseDateTime(share.expiresAt) }} 到期 · {{ share.viewCount || 0 }}{{ share.maxViews ? ` / ${share.maxViews}` : '' }} 次浏览</span>
@@ -156,13 +146,15 @@ import { ElDrawer } from 'element-plus/es/components/drawer/index.mjs'
 import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
-import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElInputNumber } from 'element-plus/es/components/input-number/index.mjs'
 import { ElOption, ElSelect } from 'element-plus/es/components/select/index.mjs'
 import { ArrowLeft, Clock, CopyDocument, Delete, EditPen, Lock, Share } from '@element-plus/icons-vue'
 import SpaceDiaryEditor from '@/components/workspace/SpaceDiaryEditor.vue'
 import { workspaceApi } from '@/api/workspace'
+import { diaryApi } from '@/api/diary'
+import { tagApi } from '@/api/experience'
+import DiaryMediaGallery from '@/components/diary/DiaryMediaGallery.vue'
 import { useAuthStore } from '@/stores/auth'
 import { withStepUpRetry } from '@/utils/stepUp'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
@@ -174,7 +166,6 @@ import 'element-plus/es/components/drawer/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
-import 'element-plus/es/components/image/style/css.mjs'
 import 'element-plus/es/components/input/style/css.mjs'
 import 'element-plus/es/components/input-number/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
@@ -213,35 +204,32 @@ const reactionChoices = ['❤️', '👍', '🥰', '😂', '🎉', '🤗']
 const loadDiary = async () => {
   loading.value = true
   try {
-    const response = await withStepUpRetry(token => workspaceApi.diaries.get(spaceId, diaryId, token))
-    diary.value = response.data
+    diary.value = await diaryApi.getDiary(spaceId, diaryId, { force: true })
     await Promise.all([loadComments(), loadReactions()])
   } finally { loading.value = false }
 }
 
 const loadComments = async () => {
-  const response = await withStepUpRetry(token => workspaceApi.diaries.comments(spaceId, diaryId, token))
-  comments.value = response.data || []
+  comments.value = await withStepUpRetry(token => diaryApi.comments(spaceId, diaryId, token)) || []
 }
 
 const loadReactions = async () => {
-  const response = await withStepUpRetry(token => workspaceApi.diaries.reactions(spaceId, diaryId, token))
-  reactions.value = response.data || []
+  reactions.value = await withStepUpRetry(token => diaryApi.reactions(spaceId, diaryId, token)) || []
 }
 
 const addComment = async () => {
   if (!commentText.value.trim()) return
   commenting.value = true
   try {
-    await withStepUpRetry(token => workspaceApi.diaries.addComment(spaceId, diaryId, commentText.value.trim(), token))
+    await withStepUpRetry(token => diaryApi.addComment(spaceId, diaryId, commentText.value.trim(), token))
     commentText.value = ''
     await loadComments()
   } finally { commenting.value = false }
 }
 
-const isOwnComment = comment => String(comment.userId || '') === String(authStore.userInfo?.userId || '')
+const isOwnComment = comment => String(comment.authorId || '') === String(authStore.userInfo?.id || '')
 const beginCommentEdit = comment => {
-  editingCommentId.value = comment.publicId
+  editingCommentId.value = comment.id
   editingCommentText.value = comment.content
 }
 const cancelCommentEdit = () => {
@@ -253,35 +241,34 @@ const saveComment = async comment => {
   if (!content) return
   savingComment.value = true
   try {
-    await withStepUpRetry(token => workspaceApi.diaries.updateComment(spaceId, diaryId, comment.publicId, content, token))
+    await withStepUpRetry(token => diaryApi.updateComment(spaceId, diaryId, comment.id, content, token))
     cancelCommentEdit()
     await loadComments()
   } finally { savingComment.value = false }
 }
 const removeComment = async comment => {
   await ElMessageBox.confirm('删除后无法恢复。', '删除评论', { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' })
-  await withStepUpRetry(token => workspaceApi.diaries.removeComment(spaceId, diaryId, comment.publicId, token))
-  if (editingCommentId.value === comment.publicId) cancelCommentEdit()
+  await withStepUpRetry(token => diaryApi.removeComment(spaceId, diaryId, comment.id, token))
+  if (editingCommentId.value === comment.id) cancelCommentEdit()
   await loadComments()
 }
 
 const reactionFor = emoji => reactions.value.find(item => item.emoji === emoji)
 const toggleReaction = async emoji => {
   const current = reactionFor(emoji)
-  await withStepUpRetry(token => workspaceApi.diaries.setReaction(spaceId, diaryId, emoji, !current?.reactedByMe, token))
+  await withStepUpRetry(token => diaryApi.setReaction(spaceId, diaryId, emoji, !current?.reactedByMe, token))
   await loadReactions()
 }
 
 const loadRevisions = async () => {
   loadingHistory.value = true
   try {
-    const response = await withStepUpRetry(token => workspaceApi.diaries.revisions(spaceId, diaryId, token))
-    revisions.value = response.data || []
+    revisions.value = await withStepUpRetry(token => diaryApi.revisions(spaceId, diaryId, token)) || []
   } finally { loadingHistory.value = false }
 }
 
 const restoreRevision = async revision => {
-  await withStepUpRetry(token => workspaceApi.diaries.restoreRevision(spaceId, diaryId, revision.revisionId, diary.value.version, token))
+  await withStepUpRetry(token => diaryApi.restoreRevision(spaceId, diaryId, revision.id, diary.value.version, token))
   historyOpen.value = false
   await loadDiary()
 }
@@ -290,9 +277,9 @@ const createShare = async () => {
   sharing.value = true
   try {
     const payload = { ...shareForm, password: shareForm.password || null }
-    const response = await withStepUpRetry(token => workspaceApi.shares.create(spaceId, diaryId, payload, token))
-    shareUrl.value = `${window.location.origin}${response.data.sharePath}`
-    generatedShareId.value = response.data.shareId
+    const result = await withStepUpRetry(token => workspaceApi.shares.create(spaceId, diaryId, payload, token))
+    shareUrl.value = `${window.location.origin}${result.sharePath}`
+    generatedShareId.value = result.id
     await loadShares()
   } finally { sharing.value = false }
 }
@@ -300,15 +287,14 @@ const createShare = async () => {
 const loadShares = async () => {
   loadingShares.value = true
   try {
-    const response = await withStepUpRetry(token => workspaceApi.shares.list(spaceId, diaryId, token))
-    activeShares.value = response.data || []
+    activeShares.value = await withStepUpRetry(token => workspaceApi.shares.list(spaceId, diaryId, token)) || []
   } finally { loadingShares.value = false }
 }
 
 const revokeShare = async share => {
   await ElMessageBox.confirm('该链接撤销后将立即无法访问。', '撤销分享', { confirmButtonText: '撤销', cancelButtonText: '取消', type: 'warning' })
-  await workspaceApi.shares.revoke(share.shareId)
-  if (generatedShareId.value === share.shareId) {
+  await workspaceApi.shares.revoke(share.id)
+  if (generatedShareId.value === share.id) {
     shareUrl.value = ''
     generatedShareId.value = ''
   }
@@ -325,10 +311,10 @@ const moodEmoji = key => ({ happy: '😊', calm: '😌', loved: '🥰', excited:
 onMounted(async () => {
   await authStore.getUserInfo()
   const [tagResponse, templateResponse] = await Promise.all([
-    workspaceApi.spaces.tags(spaceId), workspaceApi.templates.list(spaceId)
+    tagApi.list(spaceId), workspaceApi.templates.list(spaceId)
   ])
-  tags.value = tagResponse.data || []
-  templates.value = templateResponse.data || []
+  tags.value = tagResponse || []
+  templates.value = templateResponse || []
   await loadDiary()
 })
 </script>

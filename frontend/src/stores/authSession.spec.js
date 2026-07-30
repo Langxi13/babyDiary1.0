@@ -15,7 +15,7 @@ vi.mock('@/router', () => ({
 
 import { useAuthStore } from './auth'
 
-const account = (userId, username) => ({ userId, username })
+const account = (id, username) => ({ id, username })
 
 describe('cross-tab authentication synchronization', () => {
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('cross-tab authentication synchronization', () => {
 
     window.dispatchEvent(new StorageEvent('storage', { key: 'userInfo' }))
 
-    expect(store.userInfo.userId).toBe(2)
+    expect(store.userInfo.id).toBe(2)
     expect(store.token).toBe('account-b-token')
     expect(store.sessionVersion).toBeGreaterThan(previousVersion)
   })

@@ -7,11 +7,11 @@ import {
 } from './timelineGroups.js'
 
 const diary = (id, date, imageCount = 0) => ({
-  diaryId: id,
-  date,
+  id,
+  diaryDate: date,
   title: `日记 ${id}`,
   media: Array.from({ length: imageCount }, (_, index) => ({
-    assetId: `asset-${id}-${index}`,
+    id: `asset-${id}-${index}`,
     mediaType: 'IMAGE',
     contentUrl: `/api/media/asset-${id}-${index}/content`
   }))

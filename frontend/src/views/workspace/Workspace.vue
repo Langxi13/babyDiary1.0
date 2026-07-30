@@ -39,7 +39,7 @@
             <el-empty v-if="!loadingDiaries && !diaries.length" :description="filters.trash ? '回收站为空' : '还没有共同日记'" />
             <article
               v-for="diary in diaries"
-              :key="diary.publicId"
+              :key="diary.id"
               class="space-diary-card"
               :class="{ pending: diary.pending, locked: diary.locked }"
               tabindex="0"
@@ -47,21 +47,20 @@
               @keyup.enter="openDetail(diary)"
             >
               <div class="diary-card-date">
-                <strong>{{ dayOf(diary.date) }}</strong>
-                <span>{{ monthOf(diary.date) }}</span>
+                <strong>{{ dayOf(diary.diaryDate) }}</strong>
+                <span>{{ monthOf(diary.diaryDate) }}</span>
               </div>
               <div class="diary-card-main">
                 <div class="diary-card-meta">
-                  <span v-if="diary.moodKey" class="mood-mark">{{ moodEmoji(diary.moodKey) }}</span>
-                  <span>{{ diary.authorName || '我' }}</span>
+                  <span v-if="diary.mood" class="mood-mark">{{ moodEmoji(diary.mood) }}</span>
                   <span>{{ diary.visibility === 'PRIVATE' ? '仅自己' : '共同可见' }}</span>
                   <span v-if="diary.pending">待同步</span>
                   <el-icon v-if="diary.locked"><Lock /></el-icon>
                 </div>
                 <h2>{{ diary.title }}</h2>
-                <p>{{ diary.locked ? '这篇日记已锁定' : excerpt(diary.content) }}</p>
+                <p>{{ diary.locked ? '这篇日记已锁定' : excerpt(diary.contentText) }}</p>
                 <div v-if="diary.tags?.length" class="diary-card-tags">
-                  <span v-for="tag in diary.tags.slice(0, 4)" :key="tag.tagId">
+                  <span v-for="tag in diary.tags.slice(0, 4)" :key="tag.id">
                     <i :style="{ background: tag.color }" />{{ tag.name }}
                   </span>
                 </div>
@@ -135,7 +134,7 @@
             </div>
             <div v-if="insights?.moods?.length" class="mood-summary">
               <h3>这一年的心情</h3>
-              <span v-for="mood in insights.moods" :key="mood.moodKey">{{ moodEmoji(mood.moodKey) }} {{ mood.count }}</span>
+              <span v-for="mood in insights.moods" :key="mood.mood">{{ moodEmoji(mood.mood) }} {{ mood.count }}</span>
             </div>
           </section>
         </el-tab-pane>
@@ -160,8 +159,8 @@
                 </template>
               </el-dropdown>
             </div>
-            <article v-for="report in reports" :key="report.reportId" class="report-entry">
-              <header><span>{{ report.type === 'WEEKLY' ? '周报' : report.type === 'MONTHLY' ? '月报' : '年报' }}</span><time>{{ formatChineseDate(report.createdAt) }}</time></header>
+            <article v-for="report in reports" :key="report.id" class="report-entry">
+              <header><span>{{ report.periodType === 'WEEKLY' ? '周报' : report.periodType === 'MONTHLY' ? '月报' : '年报' }}</span><time>{{ formatChineseDate(report.createdAt) }}</time></header>
               <h3>{{ report.title }}</h3>
               <div class="report-markdown" v-html="renderMarkdownReport(report.contentMarkdown)" />
             </article>
@@ -229,6 +228,9 @@ import { ArrowDown, EditPen, Lock, MagicStick, MoreFilled, Picture, Plus, Refres
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import SpaceDiaryEditor from '@/components/workspace/SpaceDiaryEditor.vue'
 import { workspaceApi } from '@/api/workspace'
+import { diaryApi } from '@/api/diary'
+import { tagApi } from '@/api/experience'
+import { aiApi } from '@/api/ai'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { getOfflineCache, listOfflineOperations, queueOfflineDiaryOperation, removeOfflineOperations, setOfflineCache } from '@/utils/offlineDb'
 import { applyPendingDiaryOperations } from '@/utils/offlineQueue'
@@ -301,13 +303,13 @@ const loadDiaries = async reset => {
   const params = { page: pagination.pageNumber, size: pagination.pageSize, keyword: filters.keyword || undefined, trash: filters.trash }
   const cacheKey = `workspace:${requestedSpaceId}:diaries:${JSON.stringify(params)}`
   try {
-    const response = await workspaceApi.diaries.list(requestedSpaceId, params)
+    const result = await diaryApi.getDiaryList(requestedSpaceId, params, { force: !!reset })
     const operations = await listOfflineOperations(requestedSpaceId)
     if (requestId !== diaryRequestId || activeSpaceId.value !== requestedSpaceId) return
-    diaries.value = applyPendingDiaryOperations(response.data.content || [], operations, filters.trash)
-    Object.assign(pagination, response.data)
+    diaries.value = applyPendingDiaryOperations(result.content || [], operations, filters.trash)
+    Object.assign(pagination, result)
     pagination.totalElements = Math.max(pagination.totalElements || 0, diaries.value.length)
-    await setOfflineCache(cacheKey, response.data)
+    await setOfflineCache(cacheKey, result)
   } catch (error) {
     if (!error.response) {
       const cached = await getOfflineCache(cacheKey)
@@ -328,12 +330,12 @@ const loadWorkspaceData = async () => {
   if (!requestedSpaceId) return
   const [, tagResponse, templateResponse] = await Promise.all([
     loadDiaries(true),
-    workspaceApi.spaces.tags(requestedSpaceId),
+    tagApi.list(requestedSpaceId),
     workspaceApi.templates.list(requestedSpaceId)
   ])
   if (activeSpaceId.value !== requestedSpaceId) return
-  tags.value = tagResponse.data || []
-  templates.value = templateResponse.data || []
+  tags.value = tagResponse || []
+  templates.value = templateResponse || []
 }
 
 const refreshWorkspace = async () => {
@@ -349,11 +351,11 @@ const openEditor = diary => {
 
 const openDetail = diary => {
   if (diary.pending) return openEditor(diary)
-  router.push(`/spaces/${activeSpaceId.value}/diaries/${diary.publicId}`)
+  router.push(`/spaces/${activeSpaceId.value}/diaries/${diary.id}`)
 }
 
 const handleSaved = saved => {
-  const index = diaries.value.findIndex(item => item.publicId === saved.publicId)
+  const index = diaries.value.findIndex(item => item.id === saved.id)
   if (index >= 0) diaries.value.splice(index, 1, saved)
   else diaries.value.unshift(saved)
   workspaceStore.refreshPendingCount()
@@ -382,8 +384,8 @@ const applyDiaryStateChange = async (action, diary) => {
   }
   try {
     await withStepUpRetry(token => action === 'DELETE'
-      ? workspaceApi.diaries.remove(activeSpaceId.value, diary.publicId, diary.version, token)
-      : workspaceApi.diaries.restore(activeSpaceId.value, diary.publicId, diary.version, token))
+      ? diaryApi.moveToTrash(activeSpaceId.value, diary.id, diary.version, token)
+      : diaryApi.restore(activeSpaceId.value, diary.id, diary.version, token))
   } catch (error) {
     if (error.response) throw error
     await queueDiaryStateChange(action, diary)
@@ -395,7 +397,7 @@ const queueDiaryStateChange = async (action, diary) => {
     id: crypto.randomUUID(),
     spaceId: activeSpaceId.value,
     action,
-    entityId: diary.publicId,
+    entityId: diary.id,
     baseVersion: diary.version,
     payload: null,
     localSnapshot: { ...diary }
@@ -419,8 +421,8 @@ const runSearch = async () => {
   if (!searchQuery.value.trim()) return
   searching.value = true
   try {
-    const response = await workspaceApi.search(activeSpaceId.value, searchQuery.value.trim())
-    searchResults.value = response.data.results || []
+    const result = await workspaceApi.search(activeSpaceId.value, searchQuery.value.trim())
+    searchResults.value = result.results || []
     searchPerformed.value = true
   } finally { searching.value = false }
 }
@@ -429,8 +431,7 @@ const loadInsights = async () => {
   if (!activeSpaceId.value) return
   loadingInsights.value = true
   try {
-    const response = await workspaceApi.insights(activeSpaceId.value, insightYear.value)
-    insights.value = response.data
+    insights.value = await workspaceApi.insights(activeSpaceId.value, insightYear.value)
   } finally { loadingInsights.value = false }
 }
 
@@ -438,8 +439,7 @@ const loadReports = async () => {
   if (!activeSpaceId.value) return
   loadingReports.value = true
   try {
-    const response = await workspaceApi.ai.reports(activeSpaceId.value, { page: 0, size: 20 })
-    reports.value = response.data.content || []
+    reports.value = (await aiApi.listReports(activeSpaceId.value, { page: 0, size: 20 })).content || []
   } finally { loadingReports.value = false }
 }
 
@@ -451,7 +451,7 @@ const generateReport = async type => {
     if (type === 'ANNUAL') period = String(now.getFullYear())
     else if (type === 'MONTHLY') period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     else period = isoWeek(now)
-    await workspaceApi.ai.generate(activeSpaceId.value, { type, period })
+    await aiApi.generateReport(activeSpaceId.value, { type, period })
     ElMessage.success('共同回顾已生成')
     await loadReports()
   } finally { generatingReport.value = false }
@@ -488,7 +488,7 @@ const openSyncIssue = async issue => {
   if (local?.action === 'CREATE') {
     await removeOfflineOperations([issue.operationId])
     syncIssues.value = syncIssues.value.filter(item => item.operationId !== issue.operationId)
-    openEditor({ ...local.localSnapshot, ...local.payload, publicId: issue.entityId, version: 0, pending: true, pendingAction: 'CREATE' })
+    openEditor({ ...local.localSnapshot, ...local.payload, id: issue.entityId, version: 0, pending: true, pendingAction: 'CREATE' })
   } else {
     router.push(`/spaces/${activeSpaceId.value}/diaries/${issue.entityId}`)
   }

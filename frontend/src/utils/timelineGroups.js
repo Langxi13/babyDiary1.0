@@ -18,7 +18,7 @@ const weekIndexOfMonth = (date = '') => {
 const buildWeeks = (month, diaries) => {
   const weeksByIndex = new Map()
   for (const diary of diaries) {
-    const weekIndex = weekIndexOfMonth(diary.date)
+    const weekIndex = weekIndexOfMonth(diary.diaryDate)
     const label = `第${weekIndex}周`
     if (!weeksByIndex.has(weekIndex)) {
       weeksByIndex.set(weekIndex, {
@@ -44,7 +44,7 @@ export const buildTimelineTree = (groups = [], options = {}) => {
   const years = new Map()
 
   for (const group of groups) {
-    const month = group.month || monthOf(group.diaries?.[0]?.date)
+    const month = group.month || monthOf(group.diaries?.[0]?.diaryDate)
     if (!month) continue
 
     const year = month.slice(0, 4)

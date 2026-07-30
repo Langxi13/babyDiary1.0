@@ -45,17 +45,18 @@ describe('authenticated store session boundaries', () => {
     setActivePinia(createPinia())
     Object.values(mocks).forEach(mock => mock.mockReset())
     mocks.pendingCount.mockResolvedValue(0)
-    mocks.unread.mockResolvedValue({ data: 0 })
+    mocks.unread.mockResolvedValue(0)
+    mocks.spaceList.mockResolvedValue([{ id: 'space-a', name: 'account A space' }])
     mocks.syncWorkspace.mockResolvedValue({ conflicts: [], failures: [] })
   })
 
   it('clears diary and workspace data immediately when the account session resets', () => {
     const diaryStore = useDiaryStore()
     const workspaceStore = useWorkspaceStore()
-    diaryStore.diaries = [{ diaryId: 1, title: 'account A diary' }]
-    diaryStore.currentDiary = { diaryId: 1 }
+    diaryStore.diaries = [{ id: 1, title: 'account A diary' }]
+    diaryStore.currentDiary = { id: 1 }
     diaryStore.pagination = { pageNumber: 2, pageSize: 5, totalElements: 12, totalPages: 3 }
-    workspaceStore.spaces = [{ spaceId: 'space-a' }]
+    workspaceStore.spaces = [{ id: 'space-a' }]
     workspaceStore.activeSpaceId = 'space-a'
     workspaceStore.pendingCount = 3
     workspaceStore.conflictCount = 2
@@ -95,14 +96,11 @@ describe('authenticated store session boundaries', () => {
 
     resetSession()
     resolveRequest({
-      code: 200,
-      data: {
-        content: [{ diaryId: 1, title: 'account A diary' }],
-        pageNumber: 0,
-        pageSize: 5,
-        totalElements: 1,
-        totalPages: 1
-      }
+      content: [{ id: 1, title: 'account A diary' }],
+      pageNumber: 0,
+      pageSize: 5,
+      totalElements: 1,
+      totalPages: 1
     })
     await pending
 
@@ -117,7 +115,7 @@ describe('authenticated store session boundaries', () => {
     const pending = workspaceStore.loadSpaces()
 
     resetSession()
-    resolveRequest({ data: [{ spaceId: 'space-a', name: 'account A space' }] })
+    resolveRequest([{ id: 'space-a', name: 'account A space' }])
     await pending
 
     expect(workspaceStore.spaces).toEqual([])

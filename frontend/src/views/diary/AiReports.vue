@@ -81,7 +81,7 @@
               <div class="preview-head">
                 <div>
                   <h2>{{ currentReport.title }}</h2>
-                  <span>{{ formatChineseDateRange(currentReport.periodStart, currentReport.periodEnd) }} · {{ currentReport.diaryCount }} 篇日记</span>
+                  <span>{{ formatChineseDateRange(currentReport.start, currentReport.end) }} · {{ currentReport.diaryCount }} 篇日记</span>
                 </div>
                 <el-button @click="copyReport(currentReport.contentMarkdown)">
                   <el-icon><DocumentCopy /></el-icon>
@@ -122,26 +122,26 @@
 
             <el-empty v-if="reports.length === 0" description="暂无报告" />
             <div v-else class="report-list">
-              <article v-for="report in reports" :key="report.reportId" class="report-item" @click="openReport(report.reportId)">
+              <article v-for="report in reports" :key="report.id" class="report-item" @click="openReport(report.id)">
                 <div>
                   <div class="report-item-title">
                     <strong>{{ report.title }}</strong>
-                    <em>{{ formatReportType(report.type) }}</em>
+                    <em>{{ formatReportType(report.periodType) }}</em>
                   </div>
-                  <span>{{ formatChineseDateRange(report.periodStart, report.periodEnd) }} · {{ report.diaryCount }} 篇</span>
+                  <span>{{ formatChineseDateRange(report.start, report.end) }} · {{ report.diaryCount }} 篇</span>
                   <small>{{ formatChineseDateTime(report.createdAt) }}</small>
                 </div>
                 <el-popconfirm
                   title="确定删除这份报告吗？"
                   confirm-button-text="确定"
                   cancel-button-text="取消"
-                  @confirm="deleteReport(report.reportId)"
+                  @confirm="deleteReport(report.id)"
                 >
                   <template #reference>
                     <el-button
                       type="danger"
                       text
-                      :loading="deletingReportId === report.reportId"
+                      :loading="deletingReportId === report.id"
                       :disabled="!!deletingReportId"
                       @click.stop
                     >
@@ -229,6 +229,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDatePicker } from 'element-plus/es/components/date-picker/index.mjs'
@@ -266,7 +267,8 @@ import 'element-plus/es/components/tabs/style/css.mjs'
 
 const activeTab = ref('generate')
 const authStore = useAuthStore()
-const isAdmin = computed(() => authStore.userInfo?.systemRole === 'ADMIN')
+const workspaceStore = useWorkspaceStore()
+const isAdmin = computed(() => authStore.userInfo?.role === 'ADMIN')
 const generating = ref(false)
 const savingConfig = ref(false)
 const testingConfig = ref(false)
@@ -283,6 +285,12 @@ const deletingReportId = ref(null)
 const generationElapsed = ref(0)
 let generationTimer = null
 let historyLoadVersion = 0
+
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
 
 const today = new Date()
 const generateForm = reactive({
@@ -334,14 +342,13 @@ const startGenerationTimer = () => {
 }
 
 const loadConfig = async () => {
-  const response = await aiApi.getConfig()
-  const data = response.data || {}
+  const data = await aiApi.getConfig() || {}
   Object.assign(configForm, {
     enabled: !!data.enabled,
     baseUrl: data.baseUrl || '',
     model: data.model || '',
     apiKey: '',
-    apiKeyMasked: data.apiKeyMasked || '',
+    apiKeyMasked: data.hasApiKey ? '********' : '',
     timeoutSeconds: data.timeoutSeconds || 30
   })
 }
@@ -356,11 +363,11 @@ const persistConfig = async (showMessage = true) => {
       apiKey: configForm.apiKey,
       timeoutSeconds: configForm.timeoutSeconds
     }
-    const response = await aiApi.saveConfig(payload)
+    const result = await aiApi.saveConfig(payload)
     Object.assign(configForm, {
       ...configForm,
       apiKey: '',
-      apiKeyMasked: response.data?.apiKeyMasked || ''
+      apiKeyMasked: result.hasApiKey ? '********' : ''
     })
     if (showMessage) {
       ElMessage.success('AI配置已保存')
@@ -376,8 +383,7 @@ const loadModels = async () => {
   loadingModels.value = true
   try {
     await persistConfig(false)
-    const response = await aiApi.listModels(configForm.timeoutSeconds)
-    modelOptions.value = response.data || []
+    modelOptions.value = await aiApi.listModels(configForm.timeoutSeconds) || []
     ElMessage.success(`已加载 ${modelOptions.value.length} 个模型`)
   } finally {
     loadingModels.value = false
@@ -399,11 +405,11 @@ const generateReport = async () => {
   generating.value = true
   startGenerationTimer()
   try {
-    const response = await aiApi.generateReport({
+    const spaceId = await requireSpaceId()
+    currentReport.value = await aiApi.generateReport(spaceId, {
       type: generateForm.type,
       period: reportPeriod.value
     }, configForm.timeoutSeconds)
-    currentReport.value = response.data
     ElMessage.success('报告已生成')
     await resetReports()
   } finally {
@@ -422,18 +428,23 @@ const loadReports = async ({ append = false } = {}) => {
     historyLoading.value = true
   }
   try {
-    const response = await aiApi.listReports({ type: historyType.value || undefined, page: nextPage, size: 10 })
+    const spaceId = await requireSpaceId()
+    const result = await aiApi.listReports(spaceId, {
+      type: historyType.value || undefined,
+      page: nextPage,
+      size: 10
+    })
     if (requestVersion !== historyLoadVersion) return
 
-    const content = response.data?.content || []
+    const content = result.content || []
     if (append) {
-      const existingIds = new Set(reports.value.map(report => report.reportId))
-      reports.value = reports.value.concat(content.filter(report => !existingIds.has(report.reportId)))
+      const existingIds = new Set(reports.value.map(report => report.id))
+      reports.value = reports.value.concat(content.filter(report => !existingIds.has(report.id)))
     } else {
       reports.value = content
     }
-    historyPage.value = response.data?.pageNumber ?? nextPage
-    totalReports.value = response.data?.totalElements || 0
+    historyPage.value = result.pageNumber ?? nextPage
+    totalReports.value = result.totalElements || 0
   } finally {
     if (requestVersion === historyLoadVersion) {
       historyLoading.value = false
@@ -446,8 +457,7 @@ const resetReports = () => loadReports()
 const loadMoreReports = () => loadReports({ append: true })
 
 const openReport = async (reportId) => {
-  const response = await aiApi.getReport(reportId)
-  currentReport.value = response.data
+  currentReport.value = await aiApi.getReport(await requireSpaceId(), reportId)
   activeTab.value = 'generate'
 }
 
@@ -455,8 +465,8 @@ const deleteReport = async (reportId) => {
   if (deletingReportId.value) return
   deletingReportId.value = reportId
   try {
-    await aiApi.deleteReport(reportId)
-    if (currentReport.value?.reportId === reportId) {
+    await aiApi.deleteReport(await requireSpaceId(), reportId)
+    if (currentReport.value?.id === reportId) {
       currentReport.value = null
     }
     await resetReports()

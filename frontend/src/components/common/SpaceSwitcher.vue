@@ -9,9 +9,9 @@
       <el-dropdown-menu class="space-menu">
         <el-dropdown-item
           v-for="space in workspaceStore.spaces"
-          :key="space.spaceId"
-          :command="`space:${space.spaceId}`"
-          :class="{ selected: space.spaceId === workspaceStore.activeSpaceId }"
+          :key="space.id"
+          :command="`space:${space.id}`"
+          :class="{ selected: space.id === workspaceStore.activeSpaceId }"
         >
           <el-icon><UserFilled v-if="space.type === 'PERSONAL'" /><Connection v-else /></el-icon>
           <span class="space-name">{{ space.name }}</span>

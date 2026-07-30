@@ -81,7 +81,7 @@
             </div>
             <div class="proposal-photos">
               <div v-for="photo in album.photos" :key="photo.assetId" class="proposal-photo">
-                <img :src="photo.media?.thumbnailUrl || photo.media?.contentUrl" alt="" loading="lazy" decoding="async" />
+                <img :src="mediaThumbnailUrl(photo.media)" alt="" loading="lazy" decoding="async" />
                 <button @click="removeProposalPhoto(album, photo.assetId)">移除</button>
               </div>
             </div>
@@ -141,7 +141,7 @@
               </div>
               <div class="album-info">
                 <strong>{{ formatSystemAlbumTitle(album) }}</strong>
-                <span>{{ album.photoCount || 0 }} 张照片</span>
+                <span>{{ album.mediaCount || 0 }} 张照片</span>
                 <small>{{ album.editable ? '可编辑' : '系统相册' }}</small>
               </div>
               <div v-if="album.editable" class="album-card-actions" @click.stop>
@@ -197,6 +197,8 @@ import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { FolderAdd, MagicStick, Picture, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { formatLocalDate } from '@/utils/aiReportPeriod'
 import { formatChineseDateRange, formatChineseMonth } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -210,6 +212,7 @@ import 'element-plus/es/components/message/style/css.mjs'
 import 'element-plus/es/components/tag/style/css.mjs'
 
 const router = useRouter()
+const workspaceStore = useWorkspaceStore()
 const loadingGroups = ref(false)
 const groupsError = ref('')
 const generatingProposal = ref(false)
@@ -234,9 +237,17 @@ const albumForm = reactive({ name: '', description: '' })
 
 const selectedAlbums = computed(() => selectedGroup.value?.albums || [])
 
-const groupKey = (group) => group ? `${group.type}:${group.groupId || 'system'}` : ''
-const albumKey = (album) => album ? `${album.systemKey || album.albumId}` : ''
-const coverStyle = (album) => album.coverMedia ? { backgroundImage: `url(${album.coverMedia.thumbnailUrl || album.coverMedia.contentUrl})` } : {}
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
+
+const groupKey = (group) => group ? `${group.type}:${group.id || 'system'}` : ''
+const albumKey = (album) => album ? `${album.systemKey || album.id}` : ''
+const coverStyle = (album) => album.coverMedia
+  ? { backgroundImage: `url(${mediaThumbnailUrl(album.coverMedia)})` }
+  : {}
 const formatSystemAlbumTitle = (album) => {
   if (!album?.systemKey?.startsWith('year:')) return album?.name || ''
   return formatChineseMonth(`${album.systemKey.replace('year:', '')}-01`).replace('1月', '')
@@ -246,8 +257,7 @@ const loadGroups = async () => {
   loadingGroups.value = true
   groupsError.value = ''
   try {
-    const response = await albumApi.getGroups({ force: true })
-    albumGroups.value = response.data || []
+    albumGroups.value = await albumApi.getGroups(await requireSpaceId(), { force: true })
     if (!selectedGroup.value) {
       selectGroup(albumGroups.value[0])
     } else {
@@ -279,7 +289,7 @@ const openAlbumDetail = (album) => {
     router.push(`/album/system/year-${album.systemKey.replace('year:', '')}`)
     return
   }
-  router.push(`/album/item/${album.albumId}`)
+  router.push(`/album/item/${album.id}`)
 }
 
 const generateProposal = async () => {
@@ -289,13 +299,13 @@ const generateProposal = async () => {
   }
   generatingProposal.value = true
   try {
-    const response = await albumApi.generateProposal({
+    const proposal = await albumApi.generateProposal(await requireSpaceId(), {
       startDate: aiForm.startDate,
       endDate: aiForm.endDate,
       prompt: aiForm.prompt
     })
-    currentProposal.value = response.data
-    proposalAlbums.value = response.data?.albums || []
+    currentProposal.value = proposal
+    proposalAlbums.value = proposal?.albums || []
     ElMessage.success('AI 推荐已生成，请确认')
   } finally {
     generatingProposal.value = false
@@ -315,11 +325,12 @@ const confirmProposal = async () => {
   if (!currentProposal.value) return
   confirmingProposal.value = true
   try {
-    await albumApi.updateProposal(currentProposal.value.proposalId, {
+    const spaceId = await requireSpaceId()
+    await albumApi.updateProposal(spaceId, currentProposal.value.proposalId, {
       ...currentProposal.value,
       albums: proposalAlbums.value
     })
-    await albumApi.confirmProposal(currentProposal.value.proposalId)
+    await albumApi.confirmProposal(spaceId, currentProposal.value.proposalId)
     currentProposal.value = null
     proposalAlbums.value = []
     await loadGroups()
@@ -331,7 +342,7 @@ const confirmProposal = async () => {
 
 const discardProposal = async () => {
   if (currentProposal.value?.proposalId) {
-    await albumApi.discardProposal(currentProposal.value.proposalId)
+    await albumApi.discardProposal(await requireSpaceId(), currentProposal.value.proposalId)
   }
   currentProposal.value = null
   proposalAlbums.value = []
@@ -343,14 +354,14 @@ const openGroupEditor = () => {
 }
 
 const saveGroup = async () => {
-  await albumApi.createGroup({ name: groupForm.name })
+  await albumApi.createGroup(await requireSpaceId(), { name: groupForm.name })
   groupDialogVisible.value = false
   await loadGroups()
 }
 
 const deleteGroup = async () => {
   if (!selectedGroup.value?.editable) return
-  await albumApi.deleteGroup(selectedGroup.value.groupId)
+  await albumApi.deleteGroup(await requireSpaceId(), selectedGroup.value.id)
   selectedGroup.value = null
   await loadGroups()
 }
@@ -364,14 +375,14 @@ const openAlbumEditor = (album = null) => {
 
 const saveAlbum = async () => {
   if (editingAlbum.value) {
-    await albumApi.updateAlbum(editingAlbum.value.albumId, {
-      groupId: selectedGroup.value.groupId,
+    await albumApi.updateAlbum(await requireSpaceId(), editingAlbum.value.id, {
+      groupId: selectedGroup.value.id,
       name: albumForm.name,
       description: albumForm.description
     })
   } else {
-    await albumApi.createAlbum({
-      groupId: selectedGroup.value.groupId,
+    await albumApi.createAlbum(await requireSpaceId(), {
+      groupId: selectedGroup.value.id,
       name: albumForm.name,
       description: albumForm.description
     })
@@ -381,7 +392,7 @@ const saveAlbum = async () => {
 }
 
 const deleteAlbum = async (album) => {
-  await albumApi.deleteAlbum(album.albumId)
+  await albumApi.deleteAlbum(await requireSpaceId(), album.id)
   await loadGroups()
 }
 

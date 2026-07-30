@@ -34,16 +34,16 @@
               <el-empty v-if="recentDiaries.length === 0" description="暂无日记" />
               <article
                 v-for="diary in recentDiaries"
-                :key="diary.diaryId"
+                :key="diary.id"
                 class="recent-item"
                 :class="{ 'has-image': firstDiaryImage(diary) }"
-                @click="router.push(`/diaries/${diary.diaryId}`)"
+                @click="router.push(`/diaries/${diary.id}`)"
               >
                 <div class="recent-copy">
                   <div class="meta-row">
-                    <span>{{ formatChineseDate(diary.date) }}</span>
-                    <el-tag v-if="diary.moodKey" size="small" :color="moodColor(diary.moodKey)" effect="dark">
-                      {{ moodLabel(diary.moodKey) }}
+                    <span>{{ formatChineseDate(diary.diaryDate) }}</span>
+                    <el-tag v-if="diary.mood" size="small" :color="moodColor(diary.mood)" effect="dark">
+                      {{ moodLabel(diary.mood) }}
                     </el-tag>
                   </div>
                   <h3>{{ diary.title }}</h3>
@@ -51,7 +51,7 @@
                 </div>
                 <img
                   v-if="firstDiaryImage(diary)"
-                  :src="firstDiaryImage(diary).thumbnailUrl || firstDiaryImage(diary).contentUrl"
+                  :src="mediaThumbnailUrl(firstDiaryImage(diary))"
                   alt=""
                   loading="lazy"
                   decoding="async"
@@ -72,12 +72,12 @@
               <el-empty v-if="favoritePhotos.length === 0" description="暂无收藏照片" />
               <button
                 v-for="photo in favoritePhotos"
-                :key="photo.assetId"
+                :key="photo.id"
                 class="photo-tile"
-                @click="router.push(`/diaries/${photo.diaryId}`)"
+                @click="router.push('/album/system/favorites')"
               >
-                <img :src="photo.media?.thumbnailUrl || photo.media?.contentUrl" alt="" loading="lazy" decoding="async" />
-                <span>{{ formatChineseDate(photo.diaryDate) }}</span>
+                <img :src="mediaThumbnailUrl(photo.media)" alt="" loading="lazy" decoding="async" />
+                <span>{{ formatChineseDate(photo.date) }}</span>
               </button>
             </div>
           </section>
@@ -99,8 +99,8 @@
             </div>
             <div v-loading="loading.drafts" class="mini-list">
               <el-empty v-if="drafts.length === 0" description="暂无草稿" />
-              <button v-for="draft in drafts" :key="draft.draftId" @click="openDraft(draft)">
-                <strong>{{ draft.title || draftTypeLabel(draft) }}</strong>
+              <button v-for="draft in drafts" :key="draft.id" @click="openDraft(draft)">
+                <strong>{{ draft.payload?.title || draftTypeLabel(draft) }}</strong>
                 <span>{{ formatChineseDateTime(draft.updatedAt) }}</span>
               </button>
             </div>
@@ -113,7 +113,7 @@
             </div>
             <div v-loading="loading.anniversaries" class="mini-list">
               <el-empty v-if="anniversaries.length === 0" description="暂无纪念日" />
-              <button v-for="item in anniversaries" :key="item.anniversaryId" @click="router.push('/anniversaries')">
+              <button v-for="item in anniversaries" :key="item.id" @click="router.push('/anniversaries')">
                 <strong>{{ item.title }}</strong>
                 <span>{{ anniversaryText(item) }}</span>
               </button>
@@ -135,7 +135,10 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { Edit, Notebook, Tickets } from '@element-plus/icons-vue'
 import { useDiaryStore } from '@/stores/diary'
-import { anniversaryApi, draftApi, photoApi } from '@/api/experience'
+import { useWorkspaceStore } from '@/stores/workspace'
+import { anniversaryApi, draftApi } from '@/api/experience'
+import { albumApi } from '@/api/album'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 import { moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -146,6 +149,7 @@ import 'element-plus/es/components/tag/style/css.mjs'
 
 const router = useRouter()
 const diaryStore = useDiaryStore()
+const workspaceStore = useWorkspaceStore()
 
 const recentDiaries = ref([])
 const drafts = ref([])
@@ -172,20 +176,26 @@ const heroLine = computed(() => {
 const diaryCountText = computed(() => totalDiaries.value ? `${totalDiaries.value} 篇` : '还没有日记')
 
 const previewText = (diary, limit = 100) => {
-  const text = diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
+  const text = diary.contentHtml ? stripHtml(diary.contentHtml) : diary.contentText
   return `${(text || '').slice(0, limit)}${text?.length > limit ? '...' : ''}`
 }
 const firstDiaryImage = diary => diary?.media?.find(item => item.mediaType === 'IMAGE')
 
-const draftTypeLabel = (draft) => draft.draftKey === 'create' ? '新日记草稿' : '编辑草稿'
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
+
+const draftTypeLabel = (draft) => String(draft.draftKey || '').startsWith('create') ? '新日记草稿' : '编辑草稿'
 const draftDiaryId = (draft) => {
   if (draft.diaryId) return draft.diaryId
   const match = String(draft.draftKey || '').match(/^edit-(.+)$/)
   return match ? match[1] : null
 }
 const openDraft = (draft) => {
-  if (draft.draftKey === 'create') {
-    router.push('/diaries/create')
+  if (String(draft.draftKey || '').startsWith('create')) {
+    router.push({ path: '/diaries/create', query: { draftKey: draft.draftKey } })
     return
   }
   const diaryId = draftDiaryId(draft)
@@ -205,11 +215,9 @@ const anniversaryText = (item) => {
 const loadDiaries = async () => {
   loading.diaries = true
   try {
-    const response = await diaryStore.fetchDiaries({ page: 0, size: 4 })
-    if (response?.code === 200) {
-      recentDiaries.value = diaryStore.diaries
-      totalDiaries.value = diaryStore.pagination.totalElements
-    }
+    await diaryStore.fetchDiaries({ page: 0, size: 4 })
+    recentDiaries.value = diaryStore.diaries
+    totalDiaries.value = diaryStore.pagination.totalElements
   } finally {
     loading.diaries = false
   }
@@ -218,8 +226,7 @@ const loadDiaries = async () => {
 const loadDrafts = async () => {
   loading.drafts = true
   try {
-    const response = await draftApi.list()
-    drafts.value = (response.data || []).slice(0, 3)
+    drafts.value = (await draftApi.list(await requireSpaceId())).slice(0, 3)
   } finally {
     loading.drafts = false
   }
@@ -228,8 +235,7 @@ const loadDrafts = async () => {
 const loadAnniversaries = async () => {
   loading.anniversaries = true
   try {
-    const response = await anniversaryApi.list()
-    anniversaries.value = (response.data || []).slice(0, 3)
+    anniversaries.value = (await anniversaryApi.list(await requireSpaceId())).slice(0, 3)
   } finally {
     loading.anniversaries = false
   }
@@ -238,8 +244,9 @@ const loadAnniversaries = async () => {
 const loadFavoritePhotos = async () => {
   loading.photos = true
   try {
-    const response = await photoApi.page({ favoriteOnly: true, page: 0, size: 6 })
-    favoritePhotos.value = response.data?.content || []
+    favoritePhotos.value = (await albumApi.getSystemPhotoPage(
+      await requireSpaceId(), 'favorites', { page: 0, size: 6 }
+    )).content || []
   } finally {
     loading.photos = false
   }

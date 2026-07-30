@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { activeSpaceId, diaryPayload, normalizeDiary, normalizeMedia } from '@/api/v3Adapters'
+import { diaryPayload, normalizeDiary, normalizeMedia } from '@/api/v3Adapters'
 import { cachedRequest, invalidateApiCache, stableStringify } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
 
@@ -11,7 +11,8 @@ const filterKey = params => stableStringify({
   endDate: params.endDate,
   keyword: params.keyword,
   tagId: params.tagId,
-  mood: params.moodKey || params.mood,
+  mood: params.mood,
+  trash: !!params.trash,
   size: params.size || 5
 })
 
@@ -20,7 +21,8 @@ const normalizeListParams = params => ({
   endDate: params.endDate || undefined,
   keyword: params.keyword || undefined,
   tagId: params.tagId || undefined,
-  mood: params.moodKey || params.mood || undefined,
+  mood: params.mood || undefined,
+  trash: params.trash || undefined,
   size: params.size || 5
 })
 
@@ -37,12 +39,12 @@ async function cursorForPage(spaceId, params, targetPage) {
     listCursors.set(key, state)
   }
   for (let page = state.cursors.length - 1; page < targetPage; page += 1) {
-    const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+    const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
       params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined },
       headers: stepHeader(getStepUpToken())
     })
-    if (!response.data.nextCursor) break
-    state.cursors[page + 1] = response.data.nextCursor
+    if (!result.nextCursor) break
+    state.cursors[page + 1] = result.nextCursor
   }
   return state.cursors[targetPage]
 }
@@ -53,8 +55,9 @@ const uploadFiles = async (spaceId, files) => {
     for (const file of files) {
       const body = new FormData()
       body.append('file', file)
-      const response = await request.post(`/api/v3/spaces/${spaceId}/media`, body, { timeout: 10 * 60 * 1000 })
-      uploaded.push(normalizeMedia(response.data))
+      uploaded.push(normalizeMedia(await request.post(`/api/v3/spaces/${spaceId}/media`, body, {
+        timeout: 10 * 60 * 1000
+      })))
     }
     return uploaded
   } catch (error) {
@@ -64,32 +67,34 @@ const uploadFiles = async (spaceId, files) => {
 }
 
 const cleanupUploads = (spaceId, uploaded) => Promise.allSettled(
-  uploaded.map(media => request.delete(`/api/v3/spaces/${spaceId}/media/${media.assetId}`, { __silentError: true }))
+  uploaded.map(media => request.delete(`/api/v3/spaces/${spaceId}/media/${media.id}`, { __silentError: true }))
 )
 
 const formDataCommand = async (spaceId, formData, editing) => {
   const files = formData.getAll('imageFiles').filter(value => value instanceof File)
   const uploaded = await uploadFiles(spaceId, files)
-  const retained = formData.getAll('retainedAssetIds').map(String)
+  const retained = formData.getAll('retainedMediaIds').map(String)
   const order = formData.getAll('mediaOrder').map(String)
   let mediaIds
   if (!editing) {
-    mediaIds = uploaded.map(item => item.assetId)
+    mediaIds = uploaded.map(item => item.id)
   } else if (order.length) {
     mediaIds = order.map(entry => {
       const [kind, rawIndex] = entry.split(':', 2)
-      return kind === 'new' ? uploaded[Number(rawIndex)]?.assetId : rawIndex
+      return kind === 'new' ? uploaded[Number(rawIndex)]?.id : rawIndex
     }).filter(Boolean)
   } else {
-    mediaIds = [...retained, ...uploaded.map(item => item.assetId)]
+    mediaIds = [...retained, ...uploaded.map(item => item.id)]
   }
   return {
     uploaded,
     command: diaryPayload({
       title: formData.get('title'),
-      date: formData.get('date'),
-      content: formData.get('content'),
-      moodKey: formData.get('moodKey'),
+      diaryDate: formData.get('diaryDate'),
+      contentHtml: formData.get('contentHtml'),
+      mood: formData.get('mood'),
+      visibility: formData.get('visibility') || undefined,
+      locked: formData.get('locked') === 'true',
       tagIds: String(formData.get('tagIds') || '').split(',').filter(Boolean),
       mediaIds
     })
@@ -98,122 +103,193 @@ const formDataCommand = async (spaceId, formData, editing) => {
 
 async function requiredVersion(spaceId, diaryId) {
   if (diaryVersions.has(diaryId)) return diaryVersions.get(diaryId)
-  const response = await withStepUpRetry(token => request.get(`/api/v3/spaces/${spaceId}/diaries/${diaryId}`,
-    { headers: stepHeader(token) }))
-  rememberVersion(response.data)
-  return response.data.version
+  const diary = normalizeDiary(await withStepUpRetry(token => request.get(
+    `/api/v3/spaces/${spaceId}/diaries/${diaryId}`,
+    { headers: stepHeader(token) }
+  )))
+  rememberVersion(diary)
+  return diary.version
 }
 
 export const diaryApi = {
-  getDiaryList(params = {}, options = {}) {
+  getDiaryList(spaceId, params = {}, options = {}) {
     return cachedRequest(
-      `diaries:list:${stableStringify(params)}`,
+      `spaces:${spaceId}:diaries:list:${stableStringify(params)}`,
       async () => {
-        const spaceId = await activeSpaceId()
         const page = Math.max(0, Number(params.page) || 0)
         const cursor = await cursorForPage(spaceId, params, page)
-        const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+        const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
           params: { ...normalizeListParams(params), cursor: cursor || undefined },
           headers: stepHeader(getStepUpToken())
         })
-        const content = (response.data.items || []).map(item => rememberVersion(normalizeDiary(item)))
-        const totalElements = Number(response.data.totalElements) || 0
+        const content = (result.items || []).map(item => rememberVersion(normalizeDiary(item)))
+        const totalElements = Number(result.totalElements) || 0
         const pageSize = Number(params.size) || 5
-        return { ...response, data: {
-          content, pageNumber: page, pageSize, totalElements,
-          totalPages: Math.ceil(totalElements / pageSize), nextCursor: response.data.nextCursor
-        } }
+        return {
+          content,
+          pageNumber: page,
+          pageSize,
+          totalElements,
+          totalPages: Math.ceil(totalElements / pageSize),
+          nextCursor: result.nextCursor
+        }
       },
       { ttl: options.ttl ?? 30000, force: options.force }
     )
   },
 
-  getDiary(id, options = {}) {
+  getDiary(spaceId, id, options = {}) {
     return cachedRequest(
-      `diaries:detail:${id}`,
-      async () => {
-        const spaceId = await activeSpaceId()
-        const response = await withStepUpRetry(token => request.get(`/api/v3/spaces/${spaceId}/diaries/${id}`,
-          { headers: stepHeader(token) }))
-        return { ...response, data: rememberVersion(normalizeDiary(response.data)) }
-      },
+      `spaces:${spaceId}:diaries:detail:${id}`,
+      async () => rememberVersion(normalizeDiary(await withStepUpRetry(token => request.get(
+        `/api/v3/spaces/${spaceId}/diaries/${id}`,
+        { headers: stepHeader(token) }
+      )))),
       { ttl: options.ttl ?? 30000, force: options.force }
     )
   },
 
-  async createDiary(formData) {
-    const spaceId = await activeSpaceId()
+  async createDiary(spaceId, formData) {
     const prepared = await formDataCommand(spaceId, formData, false)
     try {
-      const response = await request.post(`/api/v3/spaces/${spaceId}/diaries`, prepared.command)
-      invalidateDiaryReads()
-      return { ...response, data: rememberVersion(normalizeDiary(response.data)) }
+      return await this.create(spaceId, prepared.command)
     } catch (error) {
       await cleanupUploads(spaceId, prepared.uploaded)
       throw error
     }
   },
 
-  async updateDiary(id, formData) {
-    const spaceId = await activeSpaceId()
+  async updateDiary(spaceId, id, formData) {
     const prepared = await formDataCommand(spaceId, formData, true)
     try {
-      const version = await requiredVersion(spaceId, id)
-      const response = await withStepUpRetry(token => request.put(`/api/v3/spaces/${spaceId}/diaries/${id}`,
-        prepared.command, { headers: { ...stepHeader(token), 'If-Match': `"${version}"` } }))
-      invalidateDiaryReads()
-      invalidateApiCache(`diaries:detail:${id}`)
-      return { ...response, data: rememberVersion(normalizeDiary(response.data)) }
+      return await this.update(spaceId, id, prepared.command, await requiredVersion(spaceId, id))
     } catch (error) {
       await cleanupUploads(spaceId, prepared.uploaded)
       throw error
     }
   },
 
-  async deleteDiary(id) {
-    const spaceId = await activeSpaceId()
-    const version = await requiredVersion(spaceId, id)
-    const response = await withStepUpRetry(token => request.delete(`/api/v3/spaces/${spaceId}/diaries/${id}`, {
-      headers: { ...stepHeader(token), 'If-Match': `"${version}"` }
+  async deleteDiary(spaceId, id) {
+    await this.moveToTrash(spaceId, id, await requiredVersion(spaceId, id))
+  },
+
+  async create(spaceId, command) {
+    const diary = rememberVersion(normalizeDiary(await request.post(
+      `/api/v3/spaces/${spaceId}/diaries`, diaryPayload(command)
+    )))
+    invalidateDiaryReads(spaceId)
+    return diary
+  },
+
+  async update(spaceId, id, command, version, stepUpToken) {
+    const diary = rememberVersion(normalizeDiary(await withStepUpRetry(token => request.put(
+      `/api/v3/spaces/${spaceId}/diaries/${id}`,
+      diaryPayload(command),
+      { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
+    ))))
+    invalidateDiaryReads(spaceId)
+    invalidateApiCache(`spaces:${spaceId}:diaries:detail:${id}`)
+    return diary
+  },
+
+  async moveToTrash(spaceId, id, version, stepUpToken) {
+    await withStepUpRetry(token => request.delete(`/api/v3/spaces/${spaceId}/diaries/${id}`, {
+      headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` }
     }))
     diaryVersions.delete(id)
-    invalidateDiaryReads()
-    invalidateApiCache(`diaries:detail:${id}`)
-    return response
+    invalidateDiaryReads(spaceId)
+    invalidateApiCache(`spaces:${spaceId}:diaries:detail:${id}`)
   },
+
+  async restore(spaceId, id, version, stepUpToken) {
+    const diary = rememberVersion(normalizeDiary(await withStepUpRetry(token => request.post(
+      `/api/v3/spaces/${spaceId}/diaries/${id}/restore`,
+      null,
+      { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
+    ))))
+    invalidateDiaryReads(spaceId)
+    return diary
+  },
+
+  revisions: (spaceId, id, stepUpToken) => request.get(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/revisions`,
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  restoreRevision: async (spaceId, id, revisionId, version, stepUpToken) => normalizeDiary(
+    await request.post(
+      `/api/v3/spaces/${spaceId}/diaries/${id}/revisions/${revisionId}/restore`,
+      null,
+      { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }
+    )
+  ),
+
+  comments: (spaceId, id, stepUpToken) => request.get(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  addComment: (spaceId, id, content, stepUpToken) => request.post(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+    { content },
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  updateComment: (spaceId, id, commentId, content, stepUpToken) => request.put(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
+    { content },
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  removeComment: (spaceId, id, commentId, stepUpToken) => request.delete(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  reactions: (spaceId, id, stepUpToken) => request.get(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/reactions`,
+    { headers: stepHeader(stepUpToken) }
+  ),
+
+  setReaction: (spaceId, id, emoji, active, stepUpToken) => request.put(
+    `/api/v3/spaces/${spaceId}/diaries/${id}/reactions`,
+    { emoji, active },
+    { headers: stepHeader(stepUpToken) }
+  ),
 
   exportImages() {
-    return Promise.reject(new Error('V3 图片导出正在迁移，请从相册下载原图'))
+    return Promise.reject(new Error('图片导出请从相册下载原图'))
   },
 
-  async getTimeline(params = {}, options = {}) {
-    return cachedRequest(`diaries:timeline:${stableStringify(params)}`, async () => {
-      const spaceId = await activeSpaceId()
-      const response = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
-        params: { ...normalizeListParams(params), size: 50 }, headers: stepHeader(getStepUpToken())
+  getTimeline(spaceId, params = {}, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:diaries:timeline:${stableStringify(params)}`, async () => {
+      const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+        params: { ...normalizeListParams(params), size: 50 },
+        headers: stepHeader(getStepUpToken())
       })
-      const diaries = (response.data.items || []).map(item => rememberVersion(normalizeDiary(item)))
+      const diaries = (result.items || []).map(item => rememberVersion(normalizeDiary(item)))
       const groups = new Map()
       for (const diary of diaries) {
-        const month = diary.date?.slice(0, 7)
+        const month = diary.diaryDate?.slice(0, 7)
         if (!month) continue
         if (!groups.has(month)) groups.set(month, { month, diaries: [] })
         groups.get(month).diaries.push(diary)
       }
-      return { ...response, data: [...groups.values()] }
+      return [...groups.values()]
     }, { ttl: options.ttl ?? 120000, force: options.force })
   },
 
-  async getCalendar(params = {}, options = {}) {
-    return cachedRequest(`diaries:calendar:${stableStringify(params)}`, async () => {
-      const spaceId = await activeSpaceId()
+  getCalendar(spaceId, params = {}, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:diaries:calendar:${stableStringify(params)}`, async () => {
       const month = `${params.year}-${String(params.month).padStart(2, '0')}`
-      const response = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, {
+      const result = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, {
         params: { month }, headers: stepHeader(getStepUpToken())
       })
-      return { ...response, data: (response.data.days || []).map(day => ({
-        ...day, firstTitle: day.entries?.[0]?.title || '', firstDiaryId: day.entries?.[0]?.diaryId || null
-      })) }
+      return (result.days || []).map(day => ({
+        ...day,
+        firstTitle: day.entries?.[0]?.title || '',
+        firstDiaryId: day.entries?.[0]?.diaryId || null
+      }))
     }, { ttl: options.ttl ?? 120000, force: options.force })
   }
 }
@@ -222,11 +298,15 @@ function stepHeader(token) {
   return token ? { 'X-Step-Up-Token': token } : {}
 }
 
-export function invalidateDiaryReads() {
+export function invalidateDiaryReads(spaceId) {
+  if (spaceId) {
+    invalidateApiCache(`spaces:${spaceId}:diaries:`)
+    invalidateApiCache(`spaces:${spaceId}:photos:`)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+  } else {
+    invalidateApiCache()
+  }
   listCursors.clear()
-  invalidateApiCache('diaries:')
-  invalidateApiCache('photos:')
-  invalidateApiCache('albums:')
 }
 
 if (typeof window !== 'undefined') {

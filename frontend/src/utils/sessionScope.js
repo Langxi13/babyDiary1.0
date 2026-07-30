@@ -18,7 +18,7 @@ const readStoredUser = () => {
 
 export function getAccountCacheScope() {
   const user = readStoredUser()
-  const userId = user?.userId ?? user?.id
+  const userId = user?.id
   if (userId !== undefined && userId !== null && userId !== '') {
     return `user:${String(userId)}`
   }

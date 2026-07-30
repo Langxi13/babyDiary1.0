@@ -114,7 +114,7 @@ public class DiaryDiscoveryService {
 
     public record Day(LocalDate date, long count) {}
 
-    public record Mood(String moodKey, long count) {}
+    public record Mood(String mood, long count) {}
 
     public record Month(String month, long count) {}
 

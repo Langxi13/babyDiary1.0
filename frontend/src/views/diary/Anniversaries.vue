@@ -14,7 +14,7 @@
 
       <div v-loading="loading" class="anniversary-grid">
         <el-empty v-if="anniversaries.length === 0" description="暂无纪念日" />
-        <article v-for="item in anniversaries" :key="item.anniversaryId" class="anniversary-card">
+        <article v-for="item in anniversaries" :key="item.id" class="anniversary-card">
           <div class="cover" :style="coverStyle(item)">
             <span v-if="!item.coverMedia">{{ formatChineseDate(item.date) }}</span>
           </div>
@@ -26,9 +26,9 @@
                   <el-icon><Edit /></el-icon>
                   编辑
                 </el-button>
-                <el-popconfirm title="删除这个纪念日？" @confirm="removeItem(item.anniversaryId)">
+                <el-popconfirm title="删除这个纪念日？" @confirm="removeItem(item.id)">
                   <template #reference>
-                    <el-button text type="danger" size="small" :loading="deletingId === item.anniversaryId" :disabled="!!deletingId">
+                    <el-button text type="danger" size="small" :loading="deletingId === item.id" :disabled="!!deletingId">
                       <el-icon><Delete /></el-icon>
                       删除
                     </el-button>
@@ -154,6 +154,8 @@ import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
 import { Delete, Edit, Plus, UploadFilled } from '@element-plus/icons-vue'
 import { anniversaryApi } from '@/api/experience'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
+import { useWorkspaceStore } from '@/stores/workspace'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
 import { formatChineseDate } from '@/utils/dateDisplay'
@@ -170,6 +172,7 @@ import 'element-plus/es/components/popconfirm/style/css.mjs'
 import 'element-plus/es/components/upload/style/css.mjs'
 
 const loading = ref(false)
+const workspaceStore = useWorkspaceStore()
 const saving = ref(false)
 const dialogVisible = ref(false)
 const formRef = ref(null)
@@ -186,7 +189,7 @@ const form = reactive({
   date: '',
   description: '',
   coverAssetId: '',
-  sort: 0
+  sortOrder: 0
 })
 
 const rules = {
@@ -194,8 +197,16 @@ const rules = {
   date: [{ required: true, message: '请选择日期', trigger: 'change' }]
 }
 
-const coverStyle = (item) => item.coverMedia ? { backgroundImage: `url(${item.coverMedia.thumbnailUrl || item.coverMedia.contentUrl})` } : {}
+const coverStyle = (item) => item.coverMedia
+  ? { backgroundImage: `url(${mediaThumbnailUrl(item.coverMedia)})` }
+  : {}
 const coverPreviewStyle = computed(() => coverPreviewUrl.value ? { backgroundImage: `url(${coverPreviewUrl.value})` } : {})
+
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
 
 const setCoverPreviewUrl = (url, isObjectUrl = false) => {
   if (coverObjectUrl.value) {
@@ -211,8 +222,7 @@ const setCoverPreviewUrl = (url, isObjectUrl = false) => {
 const fetchAnniversaries = async () => {
   loading.value = true
   try {
-    const response = await anniversaryApi.list()
-    anniversaries.value = response.data || []
+    anniversaries.value = await anniversaryApi.list(await requireSpaceId())
   } finally {
     loading.value = false
   }
@@ -227,7 +237,7 @@ const resetForm = () => {
     date: formatLocalDate(),
     description: '',
     coverAssetId: '',
-    sort: 0
+    sortOrder: 0
   })
 }
 
@@ -237,16 +247,16 @@ const openCreate = () => {
 }
 
 const openEdit = (item) => {
-  editingId.value = item.anniversaryId
+  editingId.value = item.id
   coverFile.value = null
   Object.assign(form, {
     title: item.title,
     date: item.date,
     description: item.description || '',
     coverAssetId: item.coverAssetId || '',
-    sort: item.sort || 0
+    sortOrder: item.sortOrder || 0
   })
-  setCoverPreviewUrl(item.coverMedia?.thumbnailUrl || item.coverMedia?.contentUrl || '')
+  setCoverPreviewUrl(mediaThumbnailUrl(item.coverMedia))
   dialogVisible.value = true
 }
 
@@ -282,15 +292,16 @@ const submitForm = async () => {
 
   saving.value = true
   try {
+    const spaceId = await requireSpaceId()
     const payload = { ...form }
     if (coverFile.value) {
-      const coverResponse = await anniversaryApi.uploadCover(coverFile.value)
-      payload.coverAssetId = coverResponse.data?.coverAssetId || ''
+      const coverMedia = await anniversaryApi.uploadCover(spaceId, coverFile.value)
+      payload.coverAssetId = coverMedia.id
     }
     if (editingId.value) {
-      await anniversaryApi.update(editingId.value, payload)
+      await anniversaryApi.update(spaceId, editingId.value, payload)
     } else {
-      await anniversaryApi.create(payload)
+      await anniversaryApi.create(spaceId, payload)
     }
     ElMessage.success('保存成功')
     dialogVisible.value = false
@@ -304,7 +315,7 @@ const removeItem = async (id) => {
   if (deletingId.value) return
   deletingId.value = id
   try {
-    await anniversaryApi.remove(id)
+    await anniversaryApi.remove(await requireSpaceId(), id)
     ElMessage.success('删除成功')
     await fetchAnniversaries()
   } finally {

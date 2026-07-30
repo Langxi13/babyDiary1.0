@@ -35,7 +35,7 @@
                 />
               </el-form-item>
 
-              <el-form-item label="内容" prop="content" class="content-field">
+              <el-form-item label="内容" prop="contentHtml" class="content-field">
                 <div class="editor-wrap">
                   <div class="editor-toolbar">
                     <el-tooltip content="加粗">
@@ -89,9 +89,9 @@
 
             <aside class="meta-column">
               <div class="meta-card">
-                <el-form-item label="日期" prop="date">
+                <el-form-item label="日期" prop="diaryDate">
                   <el-date-picker
-                    v-model="form.date"
+                    v-model="form.diaryDate"
                     type="date"
                     placeholder="选择日期"
                     format="YYYY年MM月DD日"
@@ -101,29 +101,13 @@
                 </el-form-item>
 
                 <el-form-item label="心情">
-                  <div class="mood-group" role="radiogroup" aria-label="心情">
-                    <button
-                      v-for="mood in MOODS"
-                      :key="mood.key"
-                      type="button"
-                      class="mood-card"
-                      :class="{ active: form.moodKey === mood.key }"
-                      role="radio"
-                      :aria-checked="form.moodKey === mood.key"
-                      @click="form.moodKey = mood.key"
-                    >
-                      <span class="mood-option">
-                        <span class="mood-emoji">{{ mood.emoji }}</span>
-                        <span>{{ mood.label }}</span>
-                      </span>
-                    </button>
-                  </div>
+                  <diary-mood-picker v-model="form.mood" :moods="MOODS" />
                 </el-form-item>
 
                 <el-form-item label="标签">
                   <div class="tag-picker">
                     <el-select v-model="form.tagIds" multiple placeholder="选择标签" collapse-tags collapse-tags-tooltip>
-                      <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
+                      <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
                     </el-select>
                     <el-tooltip content="新建标签">
                       <el-button @click="tagDialogVisible = true">
@@ -298,9 +282,11 @@ import { ElTooltip } from 'element-plus/es/components/tooltip/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
 import { ArrowLeft, Check, Close, Plus } from '@element-plus/icons-vue'
 import { useDiaryStore } from '@/stores/diary'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { draftApi, tagApi } from '@/api/experience'
 import { useDiaryImages } from '@/composables/useDiaryImages'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
+import DiaryMoodPicker from '@/components/diary/DiaryMoodPicker.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
 import { MOODS, stripHtml } from '@/utils/diaryMeta'
 import {
@@ -326,6 +312,7 @@ import 'element-plus/es/components/upload/style/css.mjs'
 const router = useRouter()
 const route = useRoute()
 const diaryStore = useDiaryStore()
+const workspaceStore = useWorkspaceStore()
 
 const formRef = ref(null)
 const editor = shallowRef(null)
@@ -369,10 +356,9 @@ const shouldLoadDraft = computed(() => isDraftEntryRoute(route))
 
 const form = reactive({
   title: '',
-  date: '',
-  content: '',
-  contentFormat: 'html',
-  moodKey: '',
+  diaryDate: '',
+  contentHtml: '',
+  mood: '',
   tagIds: []
 })
 
@@ -386,10 +372,10 @@ const rules = {
     { required: true, message: '请输入标题', trigger: 'blur' },
     { max: 100, message: '标题不能超过100个字符', trigger: 'blur' }
   ],
-  date: [
+  diaryDate: [
     { required: true, message: '请选择日期', trigger: 'change' }
   ],
-  content: [
+  contentHtml: [
     {
       validator: (rule, value, callback) => {
         if (isBlankRichText(value)) {
@@ -425,8 +411,7 @@ const normalizeEditorContent = (content = '', format = 'html') => {
 
 const setEditorContent = (content = '', format = 'html') => {
   const normalizedContent = normalizeEditorContent(content, format)
-  form.content = normalizedContent
-  form.contentFormat = 'html'
+  form.contentHtml = normalizedContent
 
   if (editor.value && editor.value.getHTML() !== normalizedContent) {
     editor.value.commands.setContent(normalizedContent || '<p></p>', { emitUpdate: false })
@@ -435,8 +420,7 @@ const setEditorContent = (content = '', format = 'html') => {
 
 const syncContentFromEditor = () => {
   if (!editor.value) return
-  form.content = editor.value.getHTML()
-  form.contentFormat = 'html'
+  form.contentHtml = editor.value.getHTML()
 }
 
 const initEditor = () => {
@@ -444,15 +428,14 @@ const initEditor = () => {
     extensions: [
       StarterKit
     ],
-    content: form.content || '<p></p>',
+    content: form.contentHtml || '<p></p>',
     editorProps: {
       attributes: {
         'aria-label': '日记内容'
       }
     },
     onUpdate: ({ editor: currentEditor }) => {
-      form.content = currentEditor.getHTML()
-      form.contentFormat = 'html'
+      form.contentHtml = currentEditor.getHTML()
     }
   })
 }
@@ -482,17 +465,22 @@ const insertHorizontalRule = () => {
 const appendFormData = () => {
   const formData = new FormData()
   formData.append('title', form.title)
-  formData.append('date', form.date)
-  formData.append('content', form.content)
-  formData.append('contentFormat', 'html')
-  formData.append('moodKey', form.moodKey || '')
+  formData.append('diaryDate', form.diaryDate)
+  formData.append('contentHtml', form.contentHtml)
+  formData.append('mood', form.mood || '')
   formData.append('tagIds', form.tagIds.join(','))
   return formData
 }
 
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
+
 const removeDraftSilently = async () => {
   try {
-    await draftApi.removeByKey(draftKey.value)
+    await draftApi.remove(await requireSpaceId(), draftKey.value)
   } catch {
     draftStatus.value = '草稿清理失败'
   }
@@ -514,15 +502,15 @@ const handleSubmit = async () => {
     appendImagesToFormData(formData)
 
     if (isEdit.value) {
-      const response = await diaryStore.updateDiary(diaryId.value, formData)
+      const diary = await diaryStore.updateDiary(diaryId.value, formData)
       await removeDraftSilently()
       ElMessage.success('更新成功')
-      router.push(`/diaries/${response.data?.diaryId || diaryId.value}`)
+      router.push(`/diaries/${diary.id || diaryId.value}`)
     } else {
-      const response = await diaryStore.createDiary(formData)
+      const diary = await diaryStore.createDiary(formData)
       await removeDraftSilently()
       ElMessage.success('发布成功')
-      router.push(`/diaries/${response.data?.diaryId || ''}`)
+      router.push(`/diaries/${diary.id}`)
     }
   } catch (error) {
     if (!error?.message) {
@@ -534,8 +522,7 @@ const handleSubmit = async () => {
 }
 
 const fetchTags = async () => {
-  const response = await tagApi.list()
-  tags.value = response.data || []
+  tags.value = await tagApi.list(await requireSpaceId())
   if (!newTag.name.trim()) {
     newTag.color = nextTagColor(tags.value.length)
   }
@@ -550,10 +537,10 @@ const createTag = async () => {
   }
   tagSaving.value = true
   try {
-    const response = await tagApi.create({ name: tagName, color: newTag.color })
+    const tag = await tagApi.create(await requireSpaceId(), { name: tagName, color: newTag.color })
     await fetchTags()
-    if (!form.tagIds.includes(response.data.tagId)) {
-      form.tagIds.push(response.data.tagId)
+    if (!form.tagIds.includes(tag.id)) {
+      form.tagIds.push(tag.id)
     }
     Object.assign(newTag, { name: '', color: nextTagColor(tags.value.length) })
     tagDialogVisible.value = false
@@ -563,19 +550,20 @@ const createTag = async () => {
 }
 
 const applyDraft = (draft) => {
-  if (!draft) return
-  form.title = draft.title || form.title
-  form.date = draft.date || form.date
-  setEditorContent(draft.content || form.content, draft.contentFormat || 'html')
-  form.moodKey = draft.moodKey || form.moodKey
-  form.tagIds = draft.tagIds || form.tagIds
+  const payload = draft?.payload
+  if (!payload) return
+  form.title = payload.title || form.title
+  form.diaryDate = payload.diaryDate || form.diaryDate
+  setEditorContent(payload.contentHtml || form.contentHtml)
+  form.mood = payload.mood || form.mood
+  form.tagIds = payload.tagIds || form.tagIds
 }
 
 const loadDraft = async () => {
   if (!shouldLoadDraft.value) return
-  const response = await draftApi.get(draftKey.value)
-  if (response.data) {
-    applyDraft(response.data)
+  const draft = await draftApi.get(await requireSpaceId(), draftKey.value)
+  if (draft) {
+    applyDraft(draft)
     draftStatus.value = '已载入草稿'
   }
 }
@@ -583,17 +571,16 @@ const loadDraft = async () => {
 const saveDraft = async () => {
   if (loadingInitialData.value) return
   syncContentFromEditor()
-  const hasContent = form.title || !isBlankRichText(form.content) || form.moodKey || form.tagIds.length
+  const hasContent = form.title || !isBlankRichText(form.contentHtml) || form.mood || form.tagIds.length
   if (!hasContent) return
 
-  await draftApi.save({
+  await draftApi.save(await requireSpaceId(), {
     draftKey: draftKey.value,
     diaryId: isEdit.value ? diaryId.value : null,
     title: form.title,
-    date: form.date,
-    content: form.content,
-    contentFormat: form.contentFormat,
-    moodKey: form.moodKey,
+    diaryDate: form.diaryDate,
+    contentHtml: form.contentHtml,
+    mood: form.mood,
     tagIds: form.tagIds
   })
   draftStatus.value = `草稿已保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
@@ -611,20 +598,16 @@ const scheduleAutosave = () => {
 
 const loadDiary = async () => {
   if (!isEdit.value) {
-    form.date = formatLocalDate()
+    form.diaryDate = formatLocalDate()
     return
   }
-  const response = await diaryStore.fetchDiary(diaryId.value)
-  if (response.code === 200) {
-    const diary = diaryStore.currentDiary
-    form.title = diary.title
-    form.date = diary.date
-    setEditorContent(diary.content, diary.contentFormat || 'html')
-    form.moodKey = diary.moodKey || ''
-    form.tagIds = diary.tags?.map(tag => tag.tagId) || []
-
-    setExistingImages(diary.media || [])
-  }
+  const diary = await diaryStore.fetchDiary(diaryId.value)
+  form.title = diary.title
+  form.diaryDate = diary.diaryDate
+  setEditorContent(diary.contentHtml || diary.contentText, diary.contentHtml ? 'html' : 'plain')
+  form.mood = diary.mood || ''
+  form.tagIds = diary.tags?.map(tag => tag.id) || []
+  setExistingImages(diary.media || [])
 }
 
 watch(form, scheduleAutosave, { deep: true })

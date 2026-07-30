@@ -133,13 +133,14 @@ public class AuthController {
     private ResponseEntity<SessionResponse> response(AuthenticationService.Session session) {
         SessionResponse body =
                 new SessionResponse(
-                        session.accountId(),
-                        session.username(),
-                        session.email(),
-                        session.role(),
-                        session.timezone(),
                         session.accessToken(),
-                        session.accessExpiresAt());
+                        session.accessExpiresAt(),
+                        new UserInfo(
+                                session.accountId(),
+                                session.username(),
+                                session.email(),
+                                session.role(),
+                                session.timezone()));
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken()).toString())
                 .cacheControl(CacheControl.noStore())
@@ -176,24 +177,7 @@ public class AuthController {
             @NotBlank @Size(max = 200) String confirmPassword,
             @NotBlank @Size(max = 100) String invitationCode) {}
 
-    public record SessionResponse(
-            UUID accountId,
-            String username,
-            String email,
-            String role,
-            String timezone,
-            String accessToken,
-            long accessExpiresAt) {
-        @com.fasterxml.jackson.annotation.JsonProperty("token")
-        public String token() {
-            return accessToken;
-        }
-
-        @com.fasterxml.jackson.annotation.JsonProperty("userInfo")
-        public UserInfo userInfo() {
-            return new UserInfo(accountId, username, email, role, timezone);
-        }
-    }
+    public record SessionResponse(String token, long expiresAt, UserInfo userInfo) {}
 
     public record UserInfo(UUID id, String username, String email, String role, String timezone) {}
 

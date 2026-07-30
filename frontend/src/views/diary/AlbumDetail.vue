@@ -18,9 +18,9 @@
 
       <div v-loading="loadingPhotos" class="album-photo-grid">
         <el-empty v-if="!loadingPhotos && photos.length === 0" description="暂无照片" />
-        <article v-for="(photo, index) in photos" :key="photo.assetId" class="photo-card">
+        <article v-for="(photo, index) in photos" :key="photo.id" class="photo-card">
           <el-image
-            :src="photo.media?.thumbnailUrl || photo.media?.contentUrl"
+            :src="mediaThumbnailUrl(photo.media)"
             :preview-src-list="previewImages"
             :initial-index="index"
             fit="cover"
@@ -46,12 +46,12 @@
           >
             <el-icon><StarFilled /></el-icon>
           </button>
-          <button v-if="editableAlbum" class="remove-photo-btn" @click.stop="removePhoto(photo.assetId)">
+          <button v-if="editableAlbum" class="remove-photo-btn" @click.stop="removePhoto(photo.id)">
             移除
           </button>
-          <div class="photo-meta" @click.stop="router.push(`/diaries/${photo.diaryId}`)">
-            <strong>{{ photo.diaryTitle }}</strong>
-            <span>{{ formatChineseDate(photo.diaryDate) }}</span>
+          <div class="photo-meta">
+            <strong>{{ photo.title }}</strong>
+            <span>{{ formatChineseDate(photo.date) }}</span>
           </div>
         </article>
       </div>
@@ -77,7 +77,8 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ArrowLeft, Picture, StarFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
-import { photoApi } from '@/api/experience'
+import { mediaOriginalUrl, mediaThumbnailUrl } from '@/api/v3Adapters'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
@@ -87,6 +88,7 @@ import 'element-plus/es/components/message/style/css.mjs'
 
 const route = useRoute()
 const router = useRouter()
+const workspaceStore = useWorkspaceStore()
 const PHOTO_PAGE_SIZE = 24
 const loadingPhotos = ref(false)
 const loadingMore = ref(false)
@@ -97,7 +99,7 @@ const photoPage = ref(0)
 const totalPhotos = ref(0)
 let loadVersion = 0
 
-const previewImages = computed(() => photos.value.map(item => item.media?.contentUrl).filter(Boolean))
+const previewImages = computed(() => photos.value.map(item => mediaOriginalUrl(item.media)).filter(Boolean))
 const editableAlbum = computed(() => !!albumMeta.value?.editable)
 const hasMorePhotos = computed(() => photos.value.length < totalPhotos.value)
 const albumTitle = computed(() => albumMeta.value?.name || fallbackSystemTitle())
@@ -105,6 +107,12 @@ const albumDescription = computed(() => {
   if (route.params.systemKey) return '默认相册按日记图片动态生成，不会复制图片。'
   return albumMeta.value?.description || '照片只从当前相册索引中移除，不会删除原图。'
 })
+
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
 
 const fallbackSystemTitle = () => {
   const systemKey = route.params.systemKey
@@ -121,8 +129,7 @@ const systemAlbumKey = () => {
 }
 
 const findAlbumMeta = async () => {
-  const response = await albumApi.getGroups()
-  const groups = response.data || []
+  const groups = await albumApi.getGroups(await requireSpaceId())
   if (route.params.systemKey) {
     const expectedKey = route.params.systemKey === 'all'
       ? 'all'
@@ -137,17 +144,18 @@ const findAlbumMeta = async () => {
   }
   const albumId = route.params.albumId
   for (const group of groups) {
-    const album = group.albums?.find(item => item.albumId === albumId)
+    const album = group.albums?.find(item => item.id === albumId)
     if (album) return album
   }
   return null
 }
 
-const requestPhotoPage = (page, options = {}) => {
+const requestPhotoPage = async (page, options = {}) => {
   const params = { page, size: PHOTO_PAGE_SIZE }
+  const spaceId = await requireSpaceId()
   return route.params.systemKey
-    ? albumApi.getSystemPhotoPage(systemAlbumKey(), params, options)
-    : albumApi.getAlbumPhotoPage(route.params.albumId, params, options)
+    ? albumApi.getSystemPhotoPage(spaceId, systemAlbumKey(), params, options)
+    : albumApi.getAlbumPhotoPage(spaceId, route.params.albumId, params, options)
 }
 
 const loadAlbumPhotos = async ({ append = false, force = false } = {}) => {
@@ -177,15 +185,15 @@ const loadAlbumPhotos = async ({ append = false, force = false } = {}) => {
     }
     if (requestVersion !== loadVersion) return
 
-    const content = response.data?.content || []
+    const content = response.content || []
     if (append) {
-      const existingIds = new Set(photos.value.map(photo => photo.assetId))
-      photos.value = photos.value.concat(content.filter(photo => !existingIds.has(photo.assetId)))
+      const existingIds = new Set(photos.value.map(photo => photo.id))
+      photos.value = photos.value.concat(content.filter(photo => !existingIds.has(photo.id)))
     } else {
       photos.value = content
     }
-    totalPhotos.value = response.data?.totalElements || 0
-    photoPage.value = response.data?.pageNumber ?? nextPage
+    totalPhotos.value = response.totalElements || 0
+    photoPage.value = response.pageNumber ?? nextPage
   } finally {
     if (requestVersion === loadVersion) {
       loadingPhotos.value = false
@@ -198,18 +206,17 @@ const loadMorePhotos = () => loadAlbumPhotos({ append: true })
 
 const toggleFavorite = async (photo) => {
   if (favoriteBusyId.value) return
-  favoriteBusyId.value = photo.assetId
+  favoriteBusyId.value = photo.id
   try {
     if (photo.favorite) {
-      await photoApi.unfavorite(photo.assetId)
+      await albumApi.unfavoriteMedia(await requireSpaceId(), photo.id)
       photo.favorite = false
       if (route.params.systemKey === 'favorites') {
         await loadAlbumPhotos({ force: true })
       }
       ElMessage.success('已取消收藏')
     } else {
-      const response = await photoApi.favorite(photo.assetId)
-      Object.assign(photo, response.data)
+      Object.assign(photo, await albumApi.favoriteMedia(await requireSpaceId(), photo.id))
       ElMessage.success('已收藏')
     }
   } finally {
@@ -217,9 +224,9 @@ const toggleFavorite = async (photo) => {
   }
 }
 
-const removePhoto = async (assetId) => {
+const removePhoto = async (mediaId) => {
   if (!editableAlbum.value || !route.params.albumId) return
-  await albumApi.removeAlbumPhoto(route.params.albumId, assetId)
+  await albumApi.removeAlbumPhoto(await requireSpaceId(), route.params.albumId, mediaId)
   await loadAlbumPhotos({ force: true })
   ElMessage.success('已移出相册')
 }

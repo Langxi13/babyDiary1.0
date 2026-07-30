@@ -153,12 +153,7 @@ public class PrivateShareService {
                                 })
                         .toList();
         return new SharedDiary(
-                row.title(),
-                row.diaryDate(),
-                row.contentHtml(),
-                "html",
-                row.moodKey(),
-                sharedMedia);
+                row.title(), row.diaryDate(), row.contentHtml(), row.moodKey(), sharedMedia);
     }
 
     private PrivateShareRepository.DiaryData manageable(
@@ -196,11 +191,10 @@ public class PrivateShareService {
         }
     }
 
-    public record Created(
-            UUID shareId, String sharePath, LocalDateTime expiresAt, Integer maxViews) {}
+    public record Created(UUID id, String sharePath, LocalDateTime expiresAt, Integer maxViews) {}
 
     public record Summary(
-            UUID shareId,
+            UUID id,
             LocalDateTime expiresAt,
             Integer maxViews,
             int viewCount,
@@ -209,14 +203,13 @@ public class PrivateShareService {
 
     public record SharedDiary(
             String title,
-            LocalDate date,
-            String content,
-            String contentFormat,
-            String moodKey,
+            LocalDate diaryDate,
+            String contentHtml,
+            String mood,
             List<SharedMedia> media) {}
 
     public record SharedMedia(
-            UUID assetId,
+            UUID id,
             String mediaType,
             String caption,
             LocalDateTime takenAt,

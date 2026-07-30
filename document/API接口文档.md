@@ -6,12 +6,13 @@
 
 - 生产 API 通过 HTTPS 暴露，后端服务只绑定回环地址。
 - JSON 请求使用 `Content-Type: application/json`；上传使用 `multipart/form-data`。
-- 访问令牌放在 `Authorization: Bearer <accessToken>`，默认有效期 15 分钟。
+- 访问令牌放在 `Authorization: Bearer <token>`，默认有效期 15 分钟。
 - 登录和刷新同时使用 HttpOnly、Secure、SameSite=Lax Cookie `baby_diary_refresh`，默认会话有效期 30 天。
 - 修改密码、退出和刷新令牌轮换会使相应旧会话失效。
 - 涉及锁定日记、导出、私密分享和管理员邀请码的接口，可要求 `X-Step-Up-Token`。
 - 所有时间戳使用 ISO-8601；日期字段使用 `YYYY-MM-DD`，由客户端按用户时区展示。
 - `204 No Content` 接口没有响应体。分页接口使用 `items`、`nextCursor` 和 `totalElements`。
+- 资源主标识统一为 `id`；日记使用 `diaryDate`、`contentHtml`、`mood`，媒体使用 `id` 和命名的 `representations`。关系请求中的 `diaryId`、`tagId`、`mediaIds` 等字段仅表示外键关系，不是资源响应别名。
 
 ## 响应与错误
 
@@ -59,6 +60,8 @@
 | `GET` | `/api/v3/auth/sessions` | 查看当前账户有效设备会话 |
 | `DELETE` | `/api/v3/auth/sessions/{sessionId}` | 撤销指定会话 |
 | `DELETE` | `/api/v3/auth/sessions` | 撤销当前账户全部会话 |
+
+登录和刷新成功体固定为 `{ token, expiresAt, userInfo }`，`userInfo` 使用账户 `id` 和 `role`，不重复返回 `accessToken`、顶层账户字段或旧角色别名。
 
 密码与邮箱恢复：
 

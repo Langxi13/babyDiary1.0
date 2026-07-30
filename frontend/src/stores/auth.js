@@ -5,6 +5,7 @@ import { resetClientSession } from '@/utils/sessionBoundary'
 import { getClientSessionGeneration } from '@/utils/sessionScope'
 import { getAccountCacheScope } from '@/utils/sessionScope'
 import { clearOfflineSessionCache } from '@/utils/offlineDb'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 const persistedUserInfo = user => user ? {
   ...user,
@@ -22,7 +23,7 @@ const readUserInfo = () => {
   }
 }
 
-const userIdentity = (user) => user?.userId ?? user?.id ?? user?.username ?? null
+const userIdentity = (user) => user?.id ?? user?.username ?? null
 
 export const useAuthStore = defineStore('auth', () => {
   const USER_INFO_TTL = 30000
@@ -40,17 +41,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       if (logoutRequest) await logoutRequest
       const { authApi } = await import('@/api/auth')
-      const response = await authApi.login(loginData)
-      if (response.code === 200) {
-        sessionVersion.value = resetClientSession('login')
-        token.value = response.data.token
-        userInfo.value = response.data.userInfo
-        persistUserInfo(response.data.userInfo)
-        localStorage.setItem('token', response.data.token)
-        lastUserInfoFetchAt = Date.now()
-        return { success: true }
-      }
-      return { success: false, message: response.message }
+      const session = await authApi.login(loginData)
+      sessionVersion.value = resetClientSession('login')
+      token.value = session.token
+      userInfo.value = session.userInfo
+      persistUserInfo(session.userInfo)
+      localStorage.setItem('token', session.token)
+      lastUserInfoFetchAt = Date.now()
+      return { success: true }
     } catch (error) {
       return { success: false, message: error.message || '登录失败' }
     }
@@ -59,11 +57,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(registerData) {
     try {
       const { authApi } = await import('@/api/auth')
-      const response = await authApi.register(registerData)
-      if (response.code === 200) {
-        return { success: true, message: '注册成功' }
-      }
-      return { success: false, message: response.message }
+      await authApi.register(registerData)
+      return { success: true, message: '注册成功' }
     } catch (error) {
       return { success: false, message: error.message || '注册失败' }
     }
@@ -114,12 +109,12 @@ export const useAuthStore = defineStore('auth', () => {
     const request = (async () => {
       try {
         const { authApi } = await import('@/api/auth')
-        const response = await authApi.getUserInfo()
-        if (response.code === 200 && token.value === requestedToken) {
-          userInfo.value = response.data
-          persistUserInfo(response.data)
+        const profile = await authApi.getUserInfo()
+        if (token.value === requestedToken) {
+          userInfo.value = profile
+          persistUserInfo(profile)
           lastUserInfoFetchAt = Date.now()
-          return response.data
+          return profile
         }
         return null
       } catch {
@@ -139,15 +134,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function uploadAvatar(file) {
     const { authApi } = await import('@/api/auth')
-    const formData = new FormData()
-    formData.append('avatarFile', file)
-    const response = await authApi.uploadAvatar(formData)
-    if (response.code === 200) {
-      userInfo.value = response.data
-      persistUserInfo(response.data)
-      lastUserInfoFetchAt = Date.now()
-    }
-    return response
+    const workspaceStore = useWorkspaceStore()
+    await workspaceStore.loadSpaces()
+    if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+    const profile = await authApi.uploadAvatar(workspaceStore.activeSpaceId, file)
+    userInfo.value = profile
+    persistUserInfo(profile)
+    lastUserInfoFetchAt = Date.now()
+    return profile
   }
 
   async function changePassword(payload) {

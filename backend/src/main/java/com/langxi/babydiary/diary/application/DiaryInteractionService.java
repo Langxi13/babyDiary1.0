@@ -134,7 +134,6 @@ public class DiaryInteractionService {
         return new Comment(
                 BinaryUuid.fromBytes(row.publicId()),
                 authorId,
-                authorId,
                 row.username(),
                 row.content(),
                 avatar,
@@ -151,9 +150,8 @@ public class DiaryInteractionService {
     }
 
     public record Comment(
-            UUID publicId,
             UUID id,
-            UUID userId,
+            UUID authorId,
             String username,
             String content,
             AvatarMedia avatarMedia,

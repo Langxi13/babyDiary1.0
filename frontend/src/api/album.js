@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { activeSpaceId, normalizeAlbum, normalizeAlbumGroup, normalizeMedia } from '@/api/v3Adapters'
+import { normalizeAlbum, normalizeAlbumGroup, normalizeMedia } from '@/api/v3Adapters'
 import { invalidateApiCache, cachedRequest, stableStringify } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
 
@@ -8,120 +8,167 @@ const stepHeader = token => token ? { 'X-Step-Up-Token': token } : {}
 const photo = (media, favorite = false) => {
   const value = normalizeMedia(media)
   return {
-    assetId: value.assetId,
+    id: value.id,
     media: value,
     favorite,
-    diaryId: null,
-    diaryTitle: value.caption || value.filename || '照片',
-    diaryDate: value.takenAt?.slice(0, 10) || value.createdAt?.slice(0, 10)
+    title: value.caption || value.originalFilename || '照片',
+    date: value.takenAt?.slice(0, 10) || value.createdAt?.slice(0, 10)
   }
 }
 
-const pageResult = (response, items, page, size, total, nextCursor = null) => ({
-  ...response,
-  data: { content: items, pageNumber: page, pageSize: size, totalElements: total,
-    totalPages: Math.ceil(total / size), nextCursor }
+const pageResult = (content, page, size, total, nextCursor = null) => ({
+  content,
+  pageNumber: page,
+  pageSize: size,
+  totalElements: total,
+  totalPages: Math.ceil(total / size),
+  nextCursor
 })
 
 const albumDetailPage = async (path, params, favorite = false) => {
   const page = Math.max(0, Number(params.page) || 0)
   const size = Math.max(1, Math.min(60, Number(params.size) || 24))
-  const response = await request.get(path, { params: { page, size }, headers: stepHeader(getStepUpToken()) })
-  const all = (response.data.media || []).map(item => photo(item, favorite))
-  const total = Number(response.data.totalMedia ?? response.data.album?.mediaCount ?? all.length)
-  return pageResult(response, all, Number(response.data.pageNumber ?? page),
-    Number(response.data.pageSize ?? size), total)
+  const result = await request.get(path, {
+    params: { page, size }, headers: stepHeader(getStepUpToken())
+  })
+  const content = (result.media || []).map(item => photo(item, favorite))
+  const total = Number(result.totalMedia ?? result.album?.mediaCount ?? content.length)
+  return pageResult(
+    content,
+    Number(result.pageNumber ?? page),
+    Number(result.pageSize ?? size),
+    total
+  )
 }
 
+const normalizeProposal = proposal => proposal ? {
+  ...proposal,
+  albums: (proposal.albums || []).map(album => ({
+    ...album,
+    photos: (album.photos || []).map(item => ({
+      ...item,
+      media: normalizeMedia(item.media)
+    }))
+  }))
+} : proposal
+
 export const albumApi = {
-  getGroups(options = {}) {
-    return cachedRequest('albums:groups', async () => {
-      const spaceId = await activeSpaceId()
-      const response = await request.get(`/api/v3/spaces/${spaceId}/album-groups`, { headers: stepHeader(getStepUpToken()) })
-      return { ...response, data: (response.data.groups || []).map(normalizeAlbumGroup) }
+  getGroups(spaceId, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:albums:groups`, async () => {
+      const result = await request.get(`/api/v3/spaces/${spaceId}/album-groups`, {
+        headers: stepHeader(getStepUpToken())
+      })
+      return (result.groups || []).map(normalizeAlbumGroup)
     }, { ttl: options.ttl ?? 30000, force: options.force })
   },
-  getSystemPhotoPage(systemKey, params = {}, options = {}) {
-    return cachedRequest(`albums:system:${systemKey}:page:${stableStringify(params)}`, async () => {
-      const spaceId = await activeSpaceId()
-      if (systemKey !== 'all' && systemKey !== 'favorites') {
-        return pageResult({ code: 200 }, [], 0, Number(params.size) || 24, 0)
+
+  getSystemPhotoPage(spaceId, systemKey, params = {}, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:albums:system:${systemKey}:page:${stableStringify(params)}`, async () => {
+      if (!['all', 'favorites'].includes(systemKey)) {
+        return pageResult([], 0, Number(params.size) || 24, 0)
       }
-      return albumDetailPage(`/api/v3/spaces/${spaceId}/albums/system/${systemKey}`, params, systemKey === 'favorites')
+      return albumDetailPage(
+        `/api/v3/spaces/${spaceId}/albums/system/${systemKey}`,
+        params,
+        systemKey === 'favorites'
+      )
     }, { ttl: options.ttl ?? 30000, force: options.force })
   },
-  getAlbumPhotoPage(albumId, params = {}, options = {}) {
-    return cachedRequest(`albums:${albumId}:photos:page:${stableStringify(params)}`, async () => {
-      const spaceId = await activeSpaceId()
-      return albumDetailPage(`/api/v3/spaces/${spaceId}/albums/${albumId}`, params, false)
-    }, { ttl: options.ttl ?? 30000, force: options.force })
+
+  getAlbumPhotoPage(spaceId, albumId, params = {}, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:albums:${albumId}:photos:page:${stableStringify(params)}`, () => (
+      albumDetailPage(`/api/v3/spaces/${spaceId}/albums/${albumId}`, params)
+    ), { ttl: options.ttl ?? 30000, force: options.force })
   },
-  async createGroup(payload) {
-    const spaceId = await activeSpaceId()
-    const response = await request.post(`/api/v3/spaces/${spaceId}/album-groups`, payload)
-    invalidateApiCache('albums:')
-    return response
+
+  async createGroup(spaceId, payload) {
+    const group = await request.post(`/api/v3/spaces/${spaceId}/album-groups`, payload)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return group
   },
-  async updateGroup(groupId, payload) {
-    const spaceId = await activeSpaceId()
-    const response = await request.put(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`, payload)
-    invalidateApiCache('albums:')
-    return response
+
+  async updateGroup(spaceId, groupId, payload) {
+    const group = await request.put(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`, payload)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return group
   },
-  async deleteGroup(groupId) {
-    const spaceId = await activeSpaceId()
-    const response = await request.delete(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`)
-    invalidateApiCache('albums:')
-    return response
+
+  async deleteGroup(spaceId, groupId) {
+    await request.delete(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
-  async createAlbum(payload) {
-    const spaceId = await activeSpaceId()
-    const response = await withStepUpRetry(token => request.post(`/api/v3/spaces/${spaceId}/albums`,
-      { ...payload, mediaIds: payload.mediaIds || [] }, { headers: stepHeader(token) }))
-    invalidateApiCache('albums:')
-    return { ...response, data: normalizeAlbum(response.data) }
+
+  async createAlbum(spaceId, payload) {
+    const album = await withStepUpRetry(token => request.post(`/api/v3/spaces/${spaceId}/albums`, {
+      ...payload,
+      mediaIds: payload.mediaIds || []
+    }, { headers: stepHeader(token) }))
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return normalizeAlbum(album)
   },
-  async updateAlbum(albumId, payload) {
-    const spaceId = await activeSpaceId()
-    const response = await request.put(`/api/v3/spaces/${spaceId}/albums/${albumId}`, payload)
-    invalidateApiCache('albums:')
-    return { ...response, data: normalizeAlbum(response.data) }
+
+  async updateAlbum(spaceId, albumId, payload) {
+    const album = await request.put(`/api/v3/spaces/${spaceId}/albums/${albumId}`, payload)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return normalizeAlbum(album)
   },
-  async deleteAlbum(albumId) {
-    const spaceId = await activeSpaceId()
-    const response = await request.delete(`/api/v3/spaces/${spaceId}/albums/${albumId}`)
-    invalidateApiCache('albums:')
-    return response
+
+  async deleteAlbum(spaceId, albumId) {
+    await request.delete(`/api/v3/spaces/${spaceId}/albums/${albumId}`)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
-  async removeAlbumPhoto(albumId, assetId) {
-    const spaceId = await activeSpaceId()
-    const response = await withStepUpRetry(token => request.delete(
-      `/api/v3/spaces/${spaceId}/albums/${albumId}/media/${assetId}`, { headers: stepHeader(token) }))
-    invalidateApiCache('albums:')
-    return response
+
+  async removeAlbumPhoto(spaceId, albumId, mediaId) {
+    await withStepUpRetry(token => request.delete(
+      `/api/v3/spaces/${spaceId}/albums/${albumId}/media/${mediaId}`,
+      { headers: stepHeader(token) }
+    ))
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
-  async generateProposal(payload) {
-    const spaceId = await activeSpaceId()
-    return request.post(`/api/v3/spaces/${spaceId}/ai-album-proposals`, payload, { timeout: 120000 })
+
+  async favoriteMedia(spaceId, mediaId) {
+    await withStepUpRetry(token => request.put(
+      `/api/v3/spaces/${spaceId}/media/${mediaId}/favorite`,
+      null,
+      { headers: stepHeader(token) }
+    ))
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return { id: mediaId, favorite: true }
   },
-  async updateProposal(proposalId, payload) {
-    const spaceId = await activeSpaceId()
-    return request.put(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`, payload)
+
+  async unfavoriteMedia(spaceId, mediaId) {
+    await withStepUpRetry(token => request.delete(
+      `/api/v3/spaces/${spaceId}/media/${mediaId}/favorite`,
+      { headers: stepHeader(token) }
+    ))
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
-  async confirmProposal(proposalId) {
-    const spaceId = await activeSpaceId()
-    const response = await request.post(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}/confirm`)
-    invalidateApiCache('albums:')
-    return response
+
+  async generateProposal(spaceId, payload) {
+    return normalizeProposal(await request.post(
+      `/api/v3/spaces/${spaceId}/ai-album-proposals`, payload, { timeout: 120000 }
+    ))
   },
-  async discardProposal(proposalId) {
-    const spaceId = await activeSpaceId()
+
+  async updateProposal(spaceId, proposalId, payload) {
+    return normalizeProposal(await request.put(
+      `/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`, payload
+    ))
+  },
+
+  async confirmProposal(spaceId, proposalId) {
+    const result = await request.post(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}/confirm`)
+    invalidateApiCache(`spaces:${spaceId}:albums:`)
+    return result
+  },
+
+  discardProposal(spaceId, proposalId) {
     return request.delete(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
   },
-  getProposal(proposalId, options = {}) {
-    return cachedRequest(`albums:proposal:${proposalId}`, async () => {
-      const spaceId = await activeSpaceId()
-      return request.get(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
-    }, { ttl: options.ttl ?? 30000, force: options.force })
+
+  getProposal(spaceId, proposalId, options = {}) {
+    return cachedRequest(`spaces:${spaceId}:albums:proposal:${proposalId}`, async () => normalizeProposal(
+      await request.get(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
+    ), { ttl: options.ttl ?? 30000, force: options.force })
   }
 }

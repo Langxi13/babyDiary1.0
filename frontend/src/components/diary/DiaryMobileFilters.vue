@@ -39,7 +39,7 @@
       <button
         type="button"
         class="mobile-filter-trigger"
-        :class="{ active: activePanel === 'mood' || !!moodKey }"
+        :class="{ active: activePanel === 'mood' || !!mood }"
         :aria-expanded="activePanel === 'mood'"
         aria-controls="mobile-diary-filter-panel"
         @click="togglePanel('mood')"
@@ -119,10 +119,10 @@
             </button>
             <button
               v-for="tag in tags"
-              :key="tag.tagId"
+              :key="tag.id"
               type="button"
-              :class="{ selected: tagId === tag.tagId }"
-              @click="selectTag(tag.tagId)"
+              :class="{ selected: tagId === tag.id }"
+              @click="selectTag(tag.id)"
             >
               <i :style="{ backgroundColor: tag.color }" />
               <span>{{ tag.name }}</span>
@@ -136,14 +136,14 @@
             <span>选择后立即更新列表</span>
           </div>
           <div class="mobile-filter-choices mood-choices">
-            <button type="button" :class="{ selected: !moodKey }" @click="selectMood('')">
+            <button type="button" :class="{ selected: !mood }" @click="selectMood('')">
               全部心情
             </button>
             <button
               v-for="mood in moods"
               :key="mood.key"
               type="button"
-              :class="{ selected: moodKey === mood.key }"
+              :class="{ selected: mood === mood.key }"
               @click="selectMood(mood.key)"
             >
               <span class="choice-emoji">{{ mood.emoji }}</span>
@@ -180,12 +180,12 @@ const keyword = defineModel('keyword', { type: String, default: '' })
 const startDate = defineModel('startDate', { type: String, default: '' })
 const endDate = defineModel('endDate', { type: String, default: '' })
 const tagId = defineModel('tagId', { default: null })
-const moodKey = defineModel('moodKey', { type: String, default: '' })
+const mood = defineModel('mood', { type: String, default: '' })
 const activePanel = ref('')
 
 const hasDateFilter = computed(() => !!startDate.value || !!endDate.value)
-const selectedTag = computed(() => props.tags.find(tag => tag.tagId === tagId.value) || null)
-const selectedMood = computed(() => props.moods.find(mood => mood.key === moodKey.value) || null)
+const selectedTag = computed(() => props.tags.find(tag => tag.id === tagId.value) || null)
+const selectedMood = computed(() => props.moods.find(item => item.key === mood.value) || null)
 const dateFilterLabel = computed(() => hasDateFilter.value ? '日期 · 已选' : '日期')
 const tagFilterLabel = computed(() => selectedTag.value?.name || '标签')
 const moodFilterLabel = computed(() => selectedMood.value
@@ -194,7 +194,7 @@ const moodFilterLabel = computed(() => selectedMood.value
 const hasActiveFilters = computed(() => hasDateFilter.value
   || !!keyword.value.trim()
   || !!tagId.value
-  || !!moodKey.value)
+  || !!mood.value)
 
 const togglePanel = (panel) => {
   activePanel.value = activePanel.value === panel ? '' : panel
@@ -223,7 +223,7 @@ const selectTag = (value) => {
 }
 
 const selectMood = (value) => {
-  moodKey.value = value
+  mood.value = value
   activePanel.value = ''
   emit('filter')
 }

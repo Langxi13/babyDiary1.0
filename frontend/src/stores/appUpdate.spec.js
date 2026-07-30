@@ -31,7 +31,7 @@ describe('app update store', () => {
 
   it('loads current client and server release metadata once', async () => {
     mocks.getCurrentClientInfo.mockResolvedValue({ platform: 'android', build: 1, version: 'beta.1' })
-    mocks.bootstrap.mockResolvedValue({ data: { androidUpdate: { enabled: true, latestVersionCode: 2 } } })
+    mocks.bootstrap.mockResolvedValue({ androidUpdate: { enabled: true, latestVersionCode: 2 } })
     const store = useAppUpdateStore()
 
     await store.check()
@@ -49,7 +49,7 @@ describe('app update store', () => {
 
     const pending = store.check()
     store.reset()
-    resolveBootstrap({ data: { serverVersion: 'old', androidUpdate: { enabled: true, latestVersionCode: 2 } } })
+    resolveBootstrap({ serverVersion: 'old', androidUpdate: { enabled: true, latestVersionCode: 2 } })
     await pending
 
     expect(store.checked).toBe(false)

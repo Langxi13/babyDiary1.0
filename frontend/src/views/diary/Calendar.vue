@@ -39,12 +39,13 @@ import { useRouter } from 'vue-router'
 import { ElCalendar } from 'element-plus/es/components/calendar/index.mjs'
 import { ElCard } from 'element-plus/es/components/card/index.mjs'
 import { ElDatePicker } from 'element-plus/es/components/date-picker/index.mjs'
-import { diaryApi } from '@/api/diary'
+import { useDiaryStore } from '@/stores/diary'
 import 'element-plus/es/components/calendar/style/css.mjs'
 import 'element-plus/es/components/card/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
 
 const router = useRouter()
+const diaryStore = useDiaryStore()
 const loading = ref(false)
 const selectedDate = ref(new Date())
 const monthValue = ref(new Date().toISOString().slice(0, 7))
@@ -69,9 +70,9 @@ const fetchCalendar = async () => {
     const [year, month] = monthValue.value.split('-')
     syncingFromPicker = true
     selectedDate.value = new Date(Number(year), Number(month) - 1, 1)
-    const response = await diaryApi.getCalendar({ year: Number(year), month: Number(month) })
+    const result = await diaryStore.fetchCalendar({ year: Number(year), month: Number(month) })
     if (seq === fetchSeq.value) {
-      days.value = response.data || []
+      days.value = result || []
     }
   } finally {
     if (seq === fetchSeq.value) {

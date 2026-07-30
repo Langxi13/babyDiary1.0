@@ -1,27 +1,27 @@
 import request from '@/utils/request'
 import { nativeAuthResultRequest } from '@/platform/nativeAuth'
-import { isNativeApp } from '@/platform/runtimeConfig'
-import { resolveServerUrl } from '@/platform/runtimeConfig'
+import { isNativeApp, resolveServerUrl } from '@/platform/runtimeConfig'
+import { normalizeMedia } from '@/api/v3Adapters'
 
 const normalizeUser = user => user ? {
   ...user,
-  userId: user.id || user.accountId,
-  systemRole: user.systemRole || user.role,
   avatarMedia: user.avatarMedia ? {
     ...user.avatarMedia,
     contentUrl: resolveServerUrl(user.avatarMedia.contentUrl)
   } : null
 } : user
 
-const normalizeSession = response => ({
-  ...response,
-  data: { ...response.data, userInfo: normalizeUser(response.data?.userInfo || response.data) }
+const normalizeSession = session => ({
+  ...session,
+  userInfo: normalizeUser(session?.userInfo)
 })
 
 export const authApi = {
-  login(data) {
-    if (isNativeApp()) return nativeAuthResultRequest('POST', '/api/v3/auth/login', data).then(normalizeSession)
-    return request.post('/api/v3/auth/login', data).then(normalizeSession)
+  async login(data) {
+    const session = isNativeApp()
+      ? await nativeAuthResultRequest('POST', '/api/v3/auth/login', data)
+      : await request.post('/api/v3/auth/login', data)
+    return normalizeSession(session)
   },
 
   register(data) {
@@ -40,23 +40,20 @@ export const authApi = {
     })
   },
 
-  getUserInfo() {
-    return request.get('/api/v3/account/profile').then(response => ({ ...response, data: normalizeUser(response.data) }))
+  async getUserInfo() {
+    return normalizeUser(await request.get('/api/v3/account/profile'))
   },
 
-  async uploadAvatar(formData) {
-    const { activeSpaceId, normalizeMedia } = await import('@/api/v3Adapters')
-    const spaceId = await activeSpaceId()
-    const file = formData.get('avatarFile')
+  async uploadAvatar(spaceId, file) {
     const mediaBody = new FormData()
     mediaBody.append('file', file)
-    const upload = await request.post(`/api/v3/spaces/${spaceId}/media`, mediaBody, { timeout: 10 * 60 * 1000 })
-    const media = normalizeMedia(upload.data)
+    const media = normalizeMedia(await request.post(`/api/v3/spaces/${spaceId}/media`, mediaBody, {
+      timeout: 10 * 60 * 1000
+    }))
     try {
-      const response = await request.put('/api/v3/account/avatar', { spaceId, assetId: media.assetId })
-      return { ...response, data: normalizeUser(response.data) }
+      return normalizeUser(await request.put('/api/v3/account/avatar', { spaceId, assetId: media.id }))
     } catch (error) {
-      await request.delete(`/api/v3/spaces/${spaceId}/media/${media.assetId}`, { __silentError: true }).catch(() => {})
+      await request.delete(`/api/v3/spaces/${spaceId}/media/${media.id}`, { __silentError: true }).catch(() => {})
       throw error
     }
   },
@@ -76,16 +73,12 @@ export const authApi = {
     return request.delete(`/api/v3/auth/sessions/${sessionId}`)
   },
 
-  updateEmail(data) {
-    return request.put('/api/v3/account/email', { email: data.email })
-      .then(response => ({
-        ...response,
-        message: response.data.mailSent
-          ? '邮箱已更新，验证邮件已发送'
-          : '邮箱已更新；当前未启用邮件服务，请联系管理员完成验证',
-        data: normalizeUser(response.data.profile),
-        mailSent: response.data.mailSent
-      }))
+  async updateEmail(data) {
+    const result = await request.put('/api/v3/account/email', { email: data.email })
+    return {
+      ...result,
+      profile: normalizeUser(result.profile)
+    }
   },
 
   confirmEmail(token) {

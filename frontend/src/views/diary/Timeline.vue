@@ -24,9 +24,9 @@
           @change="fetchTimeline"
         />
         <el-select class="timeline-tag-filter" v-model="filters.tagId" placeholder="标签" clearable @change="fetchTimeline">
-          <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
+          <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
         </el-select>
-        <el-select class="timeline-mood-filter" v-model="filters.moodKey" placeholder="心情" clearable @change="fetchTimeline">
+        <el-select class="timeline-mood-filter" v-model="filters.mood" placeholder="心情" clearable @change="fetchTimeline">
           <el-option v-for="mood in MOODS" :key="mood.key" :label="mood.label" :value="mood.key" />
         </el-select>
       </section>
@@ -73,18 +73,18 @@
                       </span>
                     </button>
                     <div v-if="isExpanded(week.key)" class="week-items">
-                      <article v-for="diary in week.diaries" :key="diary.diaryId" class="timeline-item" @click="router.push(`/diaries/${diary.diaryId}`)">
-                        <div class="date-chip">{{ formatChineseMonthDay(diary.date) }}</div>
+                      <article v-for="diary in week.diaries" :key="diary.id" class="timeline-item" @click="router.push(`/diaries/${diary.id}`)">
+                        <div class="date-chip">{{ formatChineseMonthDay(diary.diaryDate) }}</div>
                         <div class="item-body">
-                          <div class="mobile-date-pill">{{ formatChineseMonthDay(diary.date) }}</div>
+                          <div class="mobile-date-pill">{{ formatChineseMonthDay(diary.diaryDate) }}</div>
                           <div class="item-head">
                             <h2>{{ diary.title }}</h2>
-                            <el-tag v-if="diary.moodKey" size="small" :color="moodColor(diary.moodKey)" effect="dark">
-                              {{ moodLabel(diary.moodKey) }}
+                            <el-tag v-if="diary.mood" size="small" :color="moodColor(diary.mood)" effect="dark">
+                              {{ moodLabel(diary.mood) }}
                             </el-tag>
                           </div>
                           <div class="tag-row" v-if="diary.tags?.length">
-                            <el-tag v-for="tag in diary.tags" :key="tag.tagId" size="small" effect="plain" :color="tag.color">
+                            <el-tag v-for="tag in diary.tags" :key="tag.id" size="small" effect="plain" :color="tag.color">
                               {{ tag.name }}
                             </el-tag>
                           </div>
@@ -92,8 +92,8 @@
                           <div class="thumbs" v-if="diaryImages(diary).length">
                             <img
                               v-for="img in diaryImages(diary).slice(0, 3)"
-                              :key="img.assetId"
-                              :src="img.thumbnailUrl || img.contentUrl"
+                              :key="img.id"
+                              :src="mediaThumbnailUrl(img)"
                               alt=""
                               loading="lazy"
                               decoding="async"
@@ -106,18 +106,18 @@
                 </template>
 
                 <template v-else>
-                  <article v-for="diary in month.diaries" :key="diary.diaryId" class="timeline-item" @click="router.push(`/diaries/${diary.diaryId}`)">
-                    <div class="date-chip">{{ formatChineseMonthDay(diary.date) }}</div>
+                  <article v-for="diary in month.diaries" :key="diary.id" class="timeline-item" @click="router.push(`/diaries/${diary.id}`)">
+                    <div class="date-chip">{{ formatChineseMonthDay(diary.diaryDate) }}</div>
                     <div class="item-body">
-                      <div class="mobile-date-pill">{{ formatChineseMonthDay(diary.date) }}</div>
+                      <div class="mobile-date-pill">{{ formatChineseMonthDay(diary.diaryDate) }}</div>
                       <div class="item-head">
                         <h2>{{ diary.title }}</h2>
-                        <el-tag v-if="diary.moodKey" size="small" :color="moodColor(diary.moodKey)" effect="dark">
-                          {{ moodLabel(diary.moodKey) }}
+                        <el-tag v-if="diary.mood" size="small" :color="moodColor(diary.mood)" effect="dark">
+                          {{ moodLabel(diary.mood) }}
                         </el-tag>
                       </div>
                       <div class="tag-row" v-if="diary.tags?.length">
-                        <el-tag v-for="tag in diary.tags" :key="tag.tagId" size="small" effect="plain" :color="tag.color">
+                        <el-tag v-for="tag in diary.tags" :key="tag.id" size="small" effect="plain" :color="tag.color">
                           {{ tag.name }}
                         </el-tag>
                       </div>
@@ -125,8 +125,8 @@
                       <div class="thumbs" v-if="diaryImages(diary).length">
                         <img
                           v-for="img in diaryImages(diary).slice(0, 3)"
-                          :key="img.assetId"
-                          :src="img.thumbnailUrl || img.contentUrl"
+                          :key="img.id"
+                          :src="mediaThumbnailUrl(img)"
                           alt=""
                           loading="lazy"
                           decoding="async"
@@ -156,6 +156,8 @@ import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ArrowRight, Edit } from '@element-plus/icons-vue'
 import { diaryApi } from '@/api/diary'
 import { tagApi } from '@/api/experience'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseMonth, formatChineseMonthDay } from '@/utils/dateDisplay'
 import { buildTimelineTree, initialExpandedTimelineKeys } from '@/utils/timelineGroups'
@@ -167,6 +169,7 @@ import 'element-plus/es/components/select/style/css.mjs'
 import 'element-plus/es/components/tag/style/css.mjs'
 
 const router = useRouter()
+const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const groups = ref([])
 const tags = ref([])
@@ -175,8 +178,14 @@ const fetchSeq = ref(0)
 const expandedKeys = ref(new Set())
 const filters = reactive({
   tagId: null,
-  moodKey: ''
+  mood: ''
 })
+
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
 
 const timelineTree = computed(() => buildTimelineTree(groups.value))
 
@@ -201,14 +210,13 @@ const toggleExpanded = (key) => {
 }
 
 const previewText = (diary) => {
-  const text = diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
+  const text = diary.contentHtml ? stripHtml(diary.contentHtml) : diary.contentText
   return text?.slice(0, 160) || ''
 }
 const diaryImages = diary => diary?.media?.filter(item => item.mediaType === 'IMAGE') || []
 
 const fetchTags = async () => {
-  const response = await tagApi.list()
-  tags.value = response.data || []
+  tags.value = await tagApi.list(await requireSpaceId())
 }
 
 const fetchTimeline = async () => {
@@ -218,16 +226,16 @@ const fetchTimeline = async () => {
   try {
     const params = {
       tagId: filters.tagId,
-      moodKey: filters.moodKey || undefined
+      mood: filters.mood || undefined
     }
     if (monthValue.value) {
       const [year, month] = monthValue.value.split('-')
       params.year = Number(year)
       params.month = Number(month)
     }
-    const response = await diaryApi.getTimeline(params)
+    const result = await diaryApi.getTimeline(await requireSpaceId(), params)
     if (seq === fetchSeq.value) {
-      groups.value = response.data || []
+      groups.value = result || []
     }
   } finally {
     if (seq === fetchSeq.value) {

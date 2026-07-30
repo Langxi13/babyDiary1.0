@@ -33,37 +33,25 @@
       <article v-if="diary" class="detail-panel">
         <header class="detail-head">
           <div class="meta-row">
-            <span>{{ formatChineseDate(diary.date) }}</span>
-            <el-tag v-if="diary.moodKey" size="small" :color="moodColor(diary.moodKey)" effect="dark">
-              {{ moodLabel(diary.moodKey) }}
+            <span>{{ formatChineseDate(diary.diaryDate) }}</span>
+            <el-tag v-if="diary.mood" size="small" :color="moodColor(diary.mood)" effect="dark">
+              {{ moodLabel(diary.mood) }}
             </el-tag>
           </div>
           <h1>{{ diary.title }}</h1>
           <div class="tag-row" v-if="diary.tags?.length">
-            <el-tag v-for="tag in diary.tags" :key="tag.tagId" size="small" effect="plain" :color="tag.color">
+            <el-tag v-for="tag in diary.tags" :key="tag.id" size="small" effect="plain" :color="tag.color">
               {{ tag.name }}
             </el-tag>
           </div>
         </header>
 
         <section class="content-section">
-          <div v-if="diary.contentFormat === 'html'" class="rich-content" v-html="diary.content"></div>
-          <p v-else class="plain-content">{{ diary.content }}</p>
+          <div v-if="diary.contentHtml" class="rich-content" v-html="diary.contentHtml"></div>
+          <p v-else class="plain-content">{{ diary.contentText }}</p>
         </section>
 
-        <section v-if="images.length" class="image-grid">
-          <el-image
-            v-for="(img, index) in images"
-            :key="img.assetId"
-            :src="img.thumbnailUrl || img.contentUrl"
-            :preview-src-list="images.map(item => item.contentUrl).filter(Boolean)"
-            :initial-index="index"
-            :preview-teleported="true"
-            fit="cover"
-            class="detail-image"
-            lazy
-          />
-        </section>
+        <diary-media-gallery :media="images" />
 
         <footer class="detail-foot">
           <span>创建于 {{ formatChineseDateTime(diary.createdAt) }}</span>
@@ -80,23 +68,23 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
-import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ArrowLeft, Delete, Edit } from '@element-plus/icons-vue'
-import { diaryApi } from '@/api/diary'
+import { useDiaryStore } from '@/stores/diary'
+import DiaryMediaGallery from '@/components/diary/DiaryMediaGallery.vue'
 import { moodColor, moodLabel } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
-import 'element-plus/es/components/image/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
 import 'element-plus/es/components/popconfirm/style/css.mjs'
 import 'element-plus/es/components/tag/style/css.mjs'
 
 const route = useRoute()
 const router = useRouter()
+const diaryStore = useDiaryStore()
 const diaryId = computed(() => route.params.id)
 const loading = ref(false)
 const deleting = ref(false)
@@ -106,8 +94,7 @@ const images = computed(() => diary.value?.media?.filter(item => item.mediaType 
 const loadDiary = async () => {
   loading.value = true
   try {
-    const response = await diaryApi.getDiary(diaryId.value)
-    diary.value = response.data || null
+    diary.value = await diaryStore.fetchDiary(diaryId.value)
   } catch (error) {
     diary.value = null
     if (!error?.message) {
@@ -122,7 +109,7 @@ const handleDelete = async () => {
   if (deleting.value) return
   deleting.value = true
   try {
-    await diaryApi.deleteDiary(diaryId.value)
+    await diaryStore.deleteDiary(diaryId.value)
     ElMessage.success('删除成功')
     await router.replace('/diaries')
   } catch (error) {

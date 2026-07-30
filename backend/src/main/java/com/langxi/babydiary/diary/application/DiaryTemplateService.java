@@ -98,7 +98,6 @@ public class DiaryTemplateService {
     private Template response(DiaryTemplateRepository.TemplateData row, long accountId) {
         return new Template(
                 BinaryUuid.fromBytes(row.publicId()),
-                BinaryUuid.fromBytes(row.publicId()),
                 row.name(),
                 row.description(),
                 row.icon(),
@@ -119,7 +118,6 @@ public class DiaryTemplateService {
 
     public record Template(
             UUID id,
-            UUID templateId,
             String name,
             String description,
             String icon,

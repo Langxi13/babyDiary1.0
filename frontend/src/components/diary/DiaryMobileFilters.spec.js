@@ -8,8 +8,8 @@ const mountFilters = (props = {}) => shallowMount(DiaryMobileFilters, {
     startDate: '',
     endDate: '',
     tagId: null,
-    moodKey: '',
-    tags: [{ tagId: 7, name: '旅行', color: '#2f8f83' }],
+    mood: '',
+    tags: [{ id: 7, name: '旅行', color: '#2f8f83' }],
     moods: [{ key: 'happy', emoji: '😊', label: '开心' }],
     ...props
   },

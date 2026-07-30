@@ -37,7 +37,7 @@ export function mergeQueuedDiaryOperation(previous, next) {
 }
 
 export function applyPendingDiaryOperations(diaries, operations, trash = false) {
-  const result = new Map((diaries || []).map(diary => [diary.publicId, { ...diary }]))
+  const result = new Map((diaries || []).map(diary => [diary.id, { ...diary }]))
   for (const operation of (operations || []).filter(item => item.kind === 'diary')) {
     const existing = result.get(operation.entityId)
     if (operation.action === 'CREATE' || operation.action === 'UPDATE') {
@@ -48,7 +48,7 @@ export function applyPendingDiaryOperations(diaries, operations, trash = false) 
       result.set(operation.entityId, {
         ...existing,
         ...operation.payload,
-        publicId: operation.entityId,
+        id: operation.entityId,
         version: existing?.version ?? operation.baseVersion ?? 0,
         pending: true,
         pendingAction: operation.action
@@ -58,7 +58,7 @@ export function applyPendingDiaryOperations(diaries, operations, trash = false) 
         result.set(operation.entityId, {
           ...existing,
           ...operation.localSnapshot,
-          publicId: operation.entityId,
+          id: operation.entityId,
           pending: true,
           pendingAction: 'DELETE'
         })

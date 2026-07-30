@@ -37,11 +37,10 @@ export const nativeAuthRawRequest = async (method, path, data, headers = {}) => 
     readTimeout: 30000
   })
   const payload = parsePayload(response.data)
-  const isV3 = path.startsWith('/api/v3/')
-  if (response.status < 200 || response.status >= 300 || (!isV3 && payload?.code !== 200)) {
+  if (response.status < 200 || response.status >= 300) {
     throw requestError(response, payload)
   }
-  return { ...response, data: isV3 ? { code: 200, message: 'success', data: payload } : payload }
+  return { ...response, data: payload }
 }
 
 export const nativeAuthResultRequest = async (method, path, data, headers = {}) => {

@@ -38,7 +38,7 @@ test('profile layout prevents text and controls from overlapping at narrow web w
 
 test('administrator invitation code stays local, step-up protected and automatically masked', () => {
   assert.match(source, /v-if="isAdmin"/)
-  assert.match(source, /authStore\.userInfo\?\.systemRole === 'ADMIN'/)
+  assert.match(source, /authStore\.userInfo\?\.role === 'ADMIN'/)
   assert.match(source, /withAdminStepUp/)
   assert.match(source, /adminApi\.getInvitationCode/)
   assert.match(source, /adminApi\.rotateInvitationCode/)

@@ -3,7 +3,7 @@
     <main class="notifications-container">
       <header><div><h1>通知</h1><p>{{ unread }} 条未读</p></div><div><el-button @click="togglePush"><el-icon><Bell /></el-icon>{{ pushEnabled ? '关闭推送' : '开启推送' }}</el-button><el-button type="primary" plain @click="markAll">全部已读</el-button></div></header>
       <section v-loading="loading" class="notification-list">
-        <button v-for="item in notifications" :key="item.publicId" type="button" :class="{ unread: !item.readAt }" @click="openNotification(item)">
+        <button v-for="item in notifications" :key="item.id" type="button" :class="{ unread: !item.readAt }" @click="openNotification(item)">
           <span class="notification-icon"><el-icon><component :is="iconFor(item.type)" /></el-icon></span>
           <span class="notification-copy"><strong>{{ item.title }}</strong><span>{{ item.body }}</span></span>
           <time>{{ formatChineseDateTime(item.createdAt) }}</time>
@@ -40,18 +40,18 @@ const pushEnabled = ref(false)
 const load = async () => {
   loading.value = true
   try {
-    const [listResponse, unreadResponse] = await Promise.all([
+    const [page, unreadCount] = await Promise.all([
       workspaceApi.notifications.list({ page: 0, size: 50 }), workspaceApi.notifications.unread()
     ])
-    notifications.value = listResponse.data.content || []
-    unread.value = unreadResponse.data || 0
+    notifications.value = page.items || []
+    unread.value = unreadCount || 0
     workspaceStore.unreadNotifications = unread.value
   } finally { loading.value = false }
 }
 
 const openNotification = async item => {
-  if (!item.readAt) await workspaceApi.notifications.read(item.publicId)
-  if (item.targetPath) router.push(item.targetPath)
+  if (!item.readAt) await workspaceApi.notifications.read(item.id)
+  if (item.target?.path) router.push(item.target.path)
   else load()
 }
 const markAll = async () => { await workspaceApi.notifications.readAll(); await load() }
@@ -71,12 +71,12 @@ const togglePush = async () => {
   }
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') return
-  const keyResponse = await workspaceApi.notifications.publicKey()
-  if (!keyResponse.data) {
+  const publicKey = await workspaceApi.notifications.publicKey()
+  if (!publicKey) {
     ElMessage.warning('服务器尚未配置推送密钥')
     return
   }
-  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyResponse.data) })
+  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) })
   const json = subscription.toJSON()
   await workspaceApi.notifications.subscribe({ endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth })
   pushEnabled.value = true

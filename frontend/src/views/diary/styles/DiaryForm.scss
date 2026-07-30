@@ -245,54 +245,6 @@
   }
 }
 
-.mood-group {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
-.mood-card {
-  width: 100%;
-  min-height: 50px;
-  border: 1px solid #eadeda;
-  border-radius: 8px;
-  padding: 9px 8px;
-  color: #4a4541;
-  background: #fffdfc;
-  cursor: pointer;
-  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
-
-  &:hover {
-    border-color: #c8ddd7;
-    background: #f7fbfa;
-  }
-
-  &.active {
-    border-color: #2f8f83;
-    color: #195d55;
-    background: #e8f6f3;
-  }
-
-  &:focus-visible {
-    outline: 2px solid rgba(47, 143, 131, 0.28);
-    outline-offset: 2px;
-  }
-}
-
-.mood-option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-}
-
-.mood-emoji {
-  font-size: 18px;
-  line-height: 1;
-}
-
 .tag-color-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -529,28 +481,6 @@
     padding: 16px;
     font-size: 16px;
     line-height: 1.72;
-  }
-
-  .mood-group {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .mood-card {
-    min-height: 66px;
-    border-radius: 8px;
-    padding: 10px 6px;
-    box-shadow: none;
-  }
-
-  .mood-option {
-    flex-direction: column;
-    gap: 7px;
-    font-size: 12px;
-  }
-
-  .mood-emoji {
-    font-size: 26px;
   }
 
   .tag-picker {

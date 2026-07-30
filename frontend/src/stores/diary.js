@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { diaryApi } from '@/api/diary'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 const emptyPagination = () => ({
   pageNumber: 0,
@@ -17,30 +18,45 @@ export const useDiaryStore = defineStore('diary', () => {
   let diaryListRequestId = 0
   let diaryDetailRequestId = 0
 
+  async function resolveSpaceId() {
+    const workspaceStore = useWorkspaceStore()
+    await workspaceStore.loadSpaces()
+    return workspaceStore.activeSpaceId
+  }
+
+  async function requireSpaceId() {
+    const spaceId = await resolveSpaceId()
+    if (!spaceId) throw new Error('当前账户没有可用日记空间')
+    return spaceId
+  }
+
   async function fetchDiaries(params = {}) {
     const requestId = ++diaryListRequestId
     loading.value = true
     try {
-      const response = await diaryApi.getDiaryList({
+      const spaceId = await resolveSpaceId()
+      if (requestId !== diaryListRequestId) return null
+      if (!spaceId) throw new Error('当前账户没有可用日记空间')
+      const result = await diaryApi.getDiaryList(spaceId, {
         page: params.page ?? 0,
         size: params.size ?? 5,
         startDate: params.startDate,
         endDate: params.endDate,
         keyword: params.keyword,
         tagId: params.tagId,
-        moodKey: params.moodKey
+        mood: params.mood
       })
       
-      if (response.code === 200 && requestId === diaryListRequestId) {
-        diaries.value = response.data.content
+      if (requestId === diaryListRequestId) {
+        diaries.value = result.content
         pagination.value = {
-          pageNumber: response.data.pageNumber,
-          pageSize: response.data.pageSize,
-          totalElements: response.data.totalElements,
-          totalPages: response.data.totalPages
+          pageNumber: result.pageNumber,
+          pageSize: result.pageSize,
+          totalElements: result.totalElements,
+          totalPages: result.totalPages
         }
       }
-      return response
+      return result
     } finally {
       if (requestId === diaryListRequestId) {
         loading.value = false
@@ -52,11 +68,14 @@ export const useDiaryStore = defineStore('diary', () => {
     const requestId = ++diaryDetailRequestId
     loading.value = true
     try {
-      const response = await diaryApi.getDiary(id)
-      if (response.code === 200 && requestId === diaryDetailRequestId) {
-        currentDiary.value = response.data
+      const spaceId = await resolveSpaceId()
+      if (requestId !== diaryDetailRequestId) return null
+      if (!spaceId) throw new Error('当前账户没有可用日记空间')
+      const diary = await diaryApi.getDiary(spaceId, id)
+      if (requestId === diaryDetailRequestId) {
+        currentDiary.value = diary
       }
-      return response
+      return diary
     } finally {
       if (requestId === diaryDetailRequestId) {
         loading.value = false
@@ -65,15 +84,15 @@ export const useDiaryStore = defineStore('diary', () => {
   }
 
   async function createDiary(formData) {
-    return diaryApi.createDiary(formData)
+    return diaryApi.createDiary(await requireSpaceId(), formData)
   }
 
   async function updateDiary(id, formData) {
-    return diaryApi.updateDiary(id, formData)
+    return diaryApi.updateDiary(await requireSpaceId(), id, formData)
   }
 
   async function deleteDiary(id) {
-    return diaryApi.deleteDiary(id)
+    return diaryApi.deleteDiary(await requireSpaceId(), id)
   }
 
   async function exportImages(startDate, endDate) {
@@ -81,11 +100,11 @@ export const useDiaryStore = defineStore('diary', () => {
   }
 
   async function fetchTimeline(params = {}) {
-    return diaryApi.getTimeline(params)
+    return diaryApi.getTimeline(await requireSpaceId(), params)
   }
 
   async function fetchCalendar(params = {}) {
-    return diaryApi.getCalendar(params)
+    return diaryApi.getCalendar(await requireSpaceId(), params)
   }
 
   function clearCurrentDiary() {

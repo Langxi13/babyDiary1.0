@@ -1,4 +1,6 @@
 import { workspaceApi } from '@/api/workspace'
+import { diaryApi } from '@/api/diary'
+import { mediaApi } from '@/api/media'
 import {
   getOfflineMeta,
   listOfflineOperations,
@@ -20,10 +22,10 @@ export async function syncWorkspace(spaceId) {
     const queued = await listOfflineOperations(spaceId)
     const diaryOperations = queued.filter(item => item.kind === 'diary')
     for (const batch of chunkOperations(diaryOperations)) {
-      const response = await workspaceApi.sync.push(spaceId, batch.map(toSyncOperation), getStepUpToken())
+      const results = await workspaceApi.sync.push(spaceId, batch.map(toSyncOperation), getStepUpToken())
       const appliedIds = []
       let retryable = false
-      response.data.forEach(result => {
+      results.forEach(result => {
         const local = batch.find(item => item.id === result.operationId)
         if (result.status === 'APPLIED') {
           appliedIds.push(result.operationId)
@@ -53,20 +55,20 @@ export async function syncWorkspace(spaceId) {
           const formData = new FormData()
           formData.append('file', media.file, media.filename || 'media')
           if (media.caption) formData.append('caption', media.caption)
-          const response = await workspaceApi.media.upload(spaceId, formData)
-          uploaded.push(response.data.assetId)
+          const media = await mediaApi.upload(spaceId, formData)
+          uploaded.push(media.id)
         }
         const stepUpToken = getStepUpToken()
-        const current = (await workspaceApi.diaries.get(spaceId, diaryId, stepUpToken)).data
+        const current = await diaryApi.getDiary(spaceId, diaryId, { force: true })
         const mediaIds = [
-          ...(current.media || []).map(item => item.assetId).filter(Boolean),
+          ...(current.media || []).map(item => item.id).filter(Boolean),
           ...uploaded
         ]
-        await workspaceApi.diaries.update(spaceId, diaryId, { ...current, mediaIds }, stepUpToken)
+        await diaryApi.update(spaceId, diaryId, { ...current, mediaIds }, current.version, stepUpToken)
         await removeOfflineOperations(items.map(item => item.id))
         synced += items.length
       } catch {
-        await Promise.allSettled(uploaded.map(assetId => workspaceApi.media.remove(spaceId, assetId)))
+        await Promise.allSettled(uploaded.map(mediaId => mediaApi.remove(spaceId, mediaId)))
         break
       }
     }
@@ -74,10 +76,10 @@ export async function syncWorkspace(spaceId) {
     let cursor = await getOfflineMeta(`cursor:${spaceId}`, 0)
     let hasMore = true
     while (hasMore) {
-      const response = await workspaceApi.sync.pull(spaceId, cursor, 200)
-      cursor = response.data.nextCursor
-      hasMore = response.data.hasMore
-      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('workspace:changes', { detail: { spaceId, changes: response.data.changes } }))
+      const result = await workspaceApi.sync.pull(spaceId, cursor, 200)
+      cursor = result.nextCursor
+      hasMore = result.hasMore
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('workspace:changes', { detail: { spaceId, changes: result.changes } }))
     }
     await setOfflineMeta(`cursor:${spaceId}`, cursor)
     if ((conflicts.length || failures.length) && typeof window !== 'undefined') {

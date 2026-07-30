@@ -1,33 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeMedia } from './v3Adapters'
+import { mediaOriginalUrl, mediaThumbnailUrl, normalizeMedia } from './v3Adapters'
 
 describe('V3 media normalization', () => {
-  it('keeps migrated source originals and default thumbnails readable', () => {
+  it('resolves canonical representation URLs without creating legacy aliases', () => {
     const media = normalizeMedia({
       id: 'asset-1',
       mediaType: 'IMAGE',
-      variants: [
-        { type: 'ORIGINAL', profile: 'source', status: 'READY', contentUrl: '/media/original?profile=source' },
-        { type: 'THUMBNAIL', profile: 'default', status: 'READY', contentUrl: '/media/thumb?profile=default' }
-      ]
+      representations: {
+        original: { variantType: 'ORIGINAL', profile: 'source', url: '/media/original?profile=source' },
+        thumbnail: { variantType: 'THUMBNAIL', profile: 'default', url: '/media/thumb?profile=default' }
+      }
     })
 
-    expect(media.assetId).toBe('asset-1')
-    expect(media.contentUrl).toContain('profile=source')
-    expect(media.thumbnailUrl).toContain('profile=default')
+    expect(media.id).toBe('asset-1')
+    expect(media).not.toHaveProperty('assetId')
+    expect(mediaOriginalUrl(media)).toContain('profile=source')
+    expect(mediaThumbnailUrl(media)).toContain('profile=default')
   })
 
-  it('prefers the source original deterministically when profiles share a type', () => {
+  it('falls back to the original when a thumbnail representation is absent', () => {
     const media = normalizeMedia({
       id: 'asset-2',
-      variants: [
-        { type: 'ORIGINAL', profile: 'source', status: 'READY', contentUrl: '/media/source' },
-        { type: 'ORIGINAL', profile: 'archive', status: 'READY', contentUrl: '/media/archive' },
-        { type: 'ORIGINAL', profile: 'default', status: 'READY', contentUrl: '/media/default' }
-      ]
+      representations: {
+        original: { variantType: 'ORIGINAL', profile: 'source', url: '/media/source' }
+      }
     })
 
-    expect(media.contentUrl).toBe('/media/source')
-    expect(media.thumbnailUrl).toBe('/media/source')
+    expect(mediaOriginalUrl(media)).toBe('/media/source')
+    expect(mediaThumbnailUrl(media)).toBe('/media/source')
   })
 })

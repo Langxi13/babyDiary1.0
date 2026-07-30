@@ -15,10 +15,10 @@
       <section v-if="activeSection === 'members'" class="settings-section">
         <header><div><h2>成员</h2><p>共同空间的访问成员</p></div><el-button v-if="isOwner && !isPersonal" type="primary" @click="inviteOpen = true"><el-icon><Plus /></el-icon>邀请</el-button></header>
         <div class="member-list">
-          <article v-for="member in members" :key="member.userId">
+          <article v-for="member in members" :key="member.id">
             <el-avatar :size="42" :src="member.avatarMedia?.contentUrl">{{ member.username?.slice(0, 1) }}</el-avatar>
             <div><strong>{{ member.username }}</strong><span>{{ member.role === 'OWNER' ? '所有者' : '成员' }}</span></div>
-            <el-dropdown v-if="isOwner && !isPersonal && member.userId !== authStore.userInfo?.userId" @command="command => memberCommand(command, member)">
+            <el-dropdown v-if="isOwner && !isPersonal && member.id !== authStore.userInfo?.id" @command="command => memberCommand(command, member)">
               <el-button :icon="MoreFilled" circle text aria-label="成员操作" />
               <template #dropdown><el-dropdown-menu><el-dropdown-item :command="member.role === 'OWNER' ? 'member' : 'owner'">{{ member.role === 'OWNER' ? '设为成员' : '设为所有者' }}</el-dropdown-item><el-dropdown-item command="remove" divided>移除成员</el-dropdown-item></el-dropdown-menu></template>
             </el-dropdown>
@@ -30,12 +30,12 @@
         <header><div><h2>标签与模板</h2><p>空间成员共同使用</p></div></header>
         <div class="subsection">
           <div class="subsection-heading"><h3>标签</h3><el-button @click="tagOpen = true"><el-icon><Plus /></el-icon>新标签</el-button></div>
-          <div class="tag-list"><span v-for="tag in tags" :key="tag.tagId"><i :style="{ background: tag.color }" />{{ tag.name }}</span><em v-if="!tags.length">暂无标签</em></div>
+          <div class="tag-list"><span v-for="tag in tags" :key="tag.id"><i :style="{ background: tag.color }" />{{ tag.name }}</span><em v-if="!tags.length">暂无标签</em></div>
         </div>
         <div class="subsection">
           <div class="subsection-heading"><h3>日记模板</h3><el-button @click="openTemplate()"><el-icon><Plus /></el-icon>新模板</el-button></div>
           <div class="template-list">
-            <article v-for="template in templates" :key="template.templateId">
+            <article v-for="template in templates" :key="template.id">
               <el-icon><Notebook /></el-icon><div><strong>{{ template.name }}</strong><span>{{ template.description || template.promptText }}</span></div>
               <el-button v-if="template.editable" :icon="Edit" circle text title="编辑模板" @click="openTemplate(template)" />
             </article>
@@ -86,8 +86,8 @@
 
     <el-dialog v-model="inviteOpen" title="邀请成员" width="min(460px, 92vw)">
       <el-form label-position="top" class="dialog-form">
-        <el-form-item label="指定邮箱"><el-input v-model="inviteForm.email" placeholder="可留空生成通用邀请" /></el-form-item>
-        <el-form-item label="角色"><el-segmented v-model="inviteForm.role" :options="[{ label: '成员', value: 'MEMBER' }, { label: '所有者', value: 'OWNER' }]" /></el-form-item>
+        <el-form-item label="指定邮箱"><el-input v-model="inviteForm.email" placeholder="受邀成员邮箱" /></el-form-item>
+        <el-form-item label="角色"><el-segmented v-model="inviteForm.role" :options="[{ label: '成员', value: 'MEMBER' }, { label: '只读', value: 'VIEWER' }]" /></el-form-item>
       </el-form>
       <div v-if="inviteLink" class="invite-link"><el-input :model-value="inviteLink" readonly /><el-button :icon="CopyDocument" circle @click="copyInvite" /></div>
       <template #footer><el-button @click="inviteOpen = false">关闭</el-button><el-button type="primary" :loading="inviting" @click="createInvite">生成邀请</el-button></template>
@@ -122,6 +122,8 @@ import { ElSwitch } from 'element-plus/es/components/switch/index.mjs'
 import { ArrowDown, Connection, CopyDocument, Document, Download, Edit, MagicStick, MoreFilled, Notebook, Plus, PriceTag, Upload } from '@element-plus/icons-vue'
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import { workspaceApi } from '@/api/workspace'
+import { tagApi } from '@/api/experience'
+import { aiApi } from '@/api/ai'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { withStepUpRetry } from '@/utils/stepUp'
@@ -170,15 +172,15 @@ const isPersonal = computed(() => workspaceStore.activeSpace?.type === 'PERSONAL
 const load = async () => {
   if (!activeSpaceId.value) return
   const [memberResponse, tagResponse, templateResponse, scheduleResponse, reminderResponse] = await Promise.all([
-    workspaceApi.spaces.members(activeSpaceId.value), workspaceApi.spaces.tags(activeSpaceId.value),
-    workspaceApi.templates.list(activeSpaceId.value), workspaceApi.ai.schedule(activeSpaceId.value),
+    workspaceApi.spaces.members(activeSpaceId.value), tagApi.list(activeSpaceId.value),
+    workspaceApi.templates.list(activeSpaceId.value), aiApi.getSchedule(activeSpaceId.value),
     workspaceApi.reminders.list(activeSpaceId.value)
   ])
-  members.value = memberResponse.data || []
-  tags.value = tagResponse.data || []
-  templates.value = templateResponse.data || []
-  Object.assign(schedule, scheduleResponse.data || {})
-  for (const reminder of reminderResponse.data || []) {
+  members.value = memberResponse || []
+  tags.value = tagResponse || []
+  templates.value = templateResponse || []
+  Object.assign(schedule, scheduleResponse || {})
+  for (const reminder of reminderResponse || []) {
     if (reminder.type === 'DAILY') Object.assign(reminders.daily, reminder)
     if (reminder.type === 'WEEKLY') Object.assign(reminders.weekly, reminder)
   }
@@ -187,16 +189,20 @@ const load = async () => {
 const memberCommand = async (command, member) => {
   if (command === 'remove') {
     await ElMessageBox.confirm(`确认移除 ${member.username}？`, '移除成员', { type: 'warning' })
-    await workspaceApi.spaces.removeMember(activeSpaceId.value, member.userId)
-  } else await workspaceApi.spaces.updateRole(activeSpaceId.value, member.userId, command === 'owner' ? 'OWNER' : 'MEMBER')
+    await workspaceApi.spaces.removeMember(activeSpaceId.value, member.id)
+  } else await workspaceApi.spaces.updateRole(activeSpaceId.value, member.id, command === 'owner' ? 'OWNER' : 'MEMBER')
   await load()
 }
 
 const createInvite = async () => {
+  if (!inviteForm.email.trim()) {
+    ElMessage.warning('请输入受邀成员邮箱')
+    return
+  }
   inviting.value = true
   try {
-    const response = await workspaceApi.spaces.invite(activeSpaceId.value, { email: inviteForm.email || null, role: inviteForm.role })
-    inviteLink.value = `${window.location.origin}/spaces/invitations/${response.data.token}`
+    const result = await workspaceApi.spaces.invite(activeSpaceId.value, { email: inviteForm.email.trim(), role: inviteForm.role })
+    inviteLink.value = `${window.location.origin}/spaces/invitations/${result.token}`
   } finally { inviting.value = false }
 }
 const copyInvite = async () => {
@@ -206,7 +212,7 @@ const copyInvite = async () => {
 
 const createTag = async () => {
   if (!tagForm.name.trim()) return
-  await workspaceApi.spaces.createTag(activeSpaceId.value, { ...tagForm, name: tagForm.name.trim() })
+  await tagApi.create(activeSpaceId.value, { ...tagForm, name: tagForm.name.trim() })
   tagForm.name = ''
   tagOpen.value = false
   await load()
@@ -219,16 +225,16 @@ const openTemplate = template => {
 }
 const saveTemplate = async () => {
   if (!templateForm.name.trim() || !templateForm.contentHtml.trim()) return
-  if (editingTemplate.value) await workspaceApi.templates.update(activeSpaceId.value, editingTemplate.value.templateId, templateForm)
+  if (editingTemplate.value) await workspaceApi.templates.update(activeSpaceId.value, editingTemplate.value.id, templateForm)
   else await workspaceApi.templates.create(activeSpaceId.value, templateForm)
   templateOpen.value = false
   await load()
 }
-const removeTemplate = async () => { await workspaceApi.templates.remove(activeSpaceId.value, editingTemplate.value.templateId); templateOpen.value = false; await load() }
+const removeTemplate = async () => { await workspaceApi.templates.remove(activeSpaceId.value, editingTemplate.value.id); templateOpen.value = false; await load() }
 
 const saveSchedule = async () => {
   savingSchedule.value = true
-  try { await workspaceApi.ai.updateSchedule(activeSpaceId.value, { ...schedule }); ElMessage.success('自动回顾计划已保存') }
+  try { await aiApi.updateSchedule(activeSpaceId.value, { ...schedule }); ElMessage.success('自动回顾计划已保存') }
   finally { savingSchedule.value = false }
 }
 
@@ -254,7 +260,7 @@ const importArchive = async event => {
   const file = event.target.files?.[0]
   if (!file) return
   importing.value = true
-  try { const data = new FormData(); data.append('archive', file); const response = await withStepUpRetry(token => workspaceApi.transfer.importSpace(activeSpaceId.value, data, token)); ElMessage.success(`已导入 ${response.data.importedDiaries} 篇日记`) }
+  try { const data = new FormData(); data.append('archive', file); const result = await withStepUpRetry(token => workspaceApi.transfer.importSpace(activeSpaceId.value, data, token)); ElMessage.success(`已导入 ${result.importedDiaries} 篇日记`) }
   finally { importing.value = false; event.target.value = '' }
 }
 const download = (blob, filename) => { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }

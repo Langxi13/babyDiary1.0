@@ -22,13 +22,13 @@ export const useAppUpdateStore = defineStore('appUpdate', () => {
     checking.value = true
     error.value = ''
     try {
-      const [info, response] = await Promise.all([
+      const [info, result] = await Promise.all([
         getCurrentClientInfo(),
         clientApi.bootstrap()
       ])
       if (requestGeneration !== generation) return
       clientInfo.value = info
-      bootstrap.value = response.data || null
+      bootstrap.value = result || null
       checked.value = true
     } catch (cause) {
       if (requestGeneration !== generation) return

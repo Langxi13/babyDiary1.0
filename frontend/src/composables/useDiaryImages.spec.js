@@ -18,8 +18,8 @@ describe('useDiaryImages', () => {
       isEdit: ref(true)
     })
     images.setExistingImages([
-      { assetId: 'old-a', mediaType: 'IMAGE', contentUrl: '/media/old-a' },
-      { assetId: 'old-b', mediaType: 'IMAGE', contentUrl: '/media/old-b' }
+      { id: 'old-a', mediaType: 'IMAGE', contentUrl: '/media/old-a' },
+      { id: 'old-b', mediaType: 'IMAGE', contentUrl: '/media/old-b' }
     ])
 
     const replacement = new File(['replacement'], 'replacement.jpg', { type: 'image/jpeg' })
@@ -33,7 +33,7 @@ describe('useDiaryImages', () => {
     images.appendImagesToFormData(formData)
 
     expect(formData.get('clearImages')).toBe('true')
-    expect(formData.getAll('retainedAssetIds')).toEqual([])
+    expect(formData.getAll('retainedMediaIds')).toEqual([])
     expect(formData.getAll('imageFiles')).toHaveLength(1)
     expect(formData.getAll('mediaOrder')).toEqual(['new:0'])
   })

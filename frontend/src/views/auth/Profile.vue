@@ -74,7 +74,7 @@
             <el-button @click="generateRecoveryCodes">生成恢复码</el-button>
           </div>
           <div class="session-list">
-            <article v-for="session in sessions" :key="session.publicId">
+            <article v-for="session in sessions" :key="session.id">
               <el-icon><Monitor /></el-icon>
               <div><strong>{{ session.deviceName }}</strong><span>{{ session.ipAddress }} · 最近使用 {{ formatChineseDateTime(session.lastSeenAt) }}</span></div>
               <el-tag v-if="session.current" class="current-session-tag" size="small">当前设备</el-tag>
@@ -256,7 +256,7 @@ const passwordRules = {
 const avatarUrl = computed(() => authStore.userInfo?.avatarMedia?.contentUrl || '')
 const usernameInitial = computed(() => authStore.username?.charAt(0)?.toUpperCase() || '')
 const joinedAt = computed(() => formatChineseDate(authStore.userInfo?.createdAt))
-const isAdmin = computed(() => authStore.userInfo?.systemRole === 'ADMIN')
+const isAdmin = computed(() => authStore.userInfo?.role === 'ADMIN')
 const invitationCodeDisplay = computed(() => {
   if (!invitationCode.value) return ''
   return invitationVisible.value ? invitationCode.value : '********************************'
@@ -288,9 +288,9 @@ const withAdminStepUp = async action => {
   return withStepUpRetry(action)
 }
 
-const applyInvitationResponse = response => {
-  invitationCode.value = response.data.code
-  invitationUpdatedAt.value = response.data.updatedAt
+const applyInvitationResponse = result => {
+  invitationCode.value = result.code
+  invitationUpdatedAt.value = new Date().toISOString()
   invitationVisible.value = true
   scheduleInvitationMask()
 }
@@ -384,12 +384,10 @@ const submitPassword = async () => {
   }
   passwordSaving.value = true
   try {
-    const response = await authStore.changePassword({ ...passwordForm })
+    await authStore.changePassword({ ...passwordForm })
     ElMessage.success('密码已修改，请重新登录')
-    if (response.code === 200) {
-      authStore.clearAuth()
-      router.push('/login')
-    }
+    authStore.clearAuth()
+    router.push('/login')
   } finally {
     passwordSaving.value = false
   }
@@ -397,8 +395,7 @@ const submitPassword = async () => {
 
 const loadSessions = async () => {
   const { authApi } = await import('@/api/auth')
-  const response = await authApi.getSessions()
-  sessions.value = response.data || []
+  sessions.value = await authApi.getSessions() || []
 }
 
 const saveEmail = async () => {
@@ -406,8 +403,10 @@ const saveEmail = async () => {
   emailSaving.value = true
   try {
     const { authApi } = await import('@/api/auth')
-    const response = await authApi.updateEmail({ email: email.value.trim() })
-    ElMessage.success(response.message)
+    const result = await authApi.updateEmail({ email: email.value.trim() })
+    ElMessage.success(result.mailSent
+      ? '邮箱已更新，验证邮件已发送'
+      : '邮箱已更新；当前未启用邮件服务，请联系管理员完成验证')
     await authStore.getUserInfo({ force: true })
   } finally { emailSaving.value = false }
 }
@@ -417,15 +416,15 @@ const generateRecoveryCodes = async () => {
     '恢复码只显示一次，请妥善保存。', '生成恢复码', { inputType: 'password', inputPlaceholder: '当前密码', confirmButtonText: '生成', cancelButtonText: '取消' }
   ))
   const { authApi } = await import('@/api/auth')
-  const response = await authApi.recoveryCodes(value)
+  const recoveryCodes = await authApi.recoveryCodes(value)
   await import('element-plus/es/components/message-box/index.mjs').then(({ ElMessageBox }) => ElMessageBox.alert(
-    response.data.join('\n'), '账户恢复码', { confirmButtonText: '我已保存', customClass: 'recovery-code-dialog' }
+    recoveryCodes.join('\n'), '账户恢复码', { confirmButtonText: '我已保存', customClass: 'recovery-code-dialog' }
   ))
 }
 
 const revokeSession = async session => {
   const { authApi } = await import('@/api/auth')
-  await authApi.revokeSession(session.publicId)
+  await authApi.revokeSession(session.id)
   await loadSessions()
 }
 

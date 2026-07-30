@@ -19,7 +19,7 @@
           v-model:start-date="filterForm.startDate"
           v-model:end-date="filterForm.endDate"
           v-model:tag-id="filterForm.tagId"
-          v-model:mood-key="filterForm.moodKey"
+          v-model:mood="filterForm.mood"
           :tags="tags"
           :moods="MOODS"
           :exporting="exporting"
@@ -45,12 +45,12 @@
 
           <el-form-item label="标签" class="tag-filter">
             <el-select v-model="filterForm.tagId" placeholder="全部标签" clearable @change="handleFilter">
-              <el-option v-for="tag in tags" :key="tag.tagId" :label="tag.name" :value="tag.tagId" />
+              <el-option v-for="tag in tags" :key="tag.id" :label="tag.name" :value="tag.id" />
             </el-select>
           </el-form-item>
 
           <el-form-item label="心情" class="mood-filter">
-            <el-select v-model="filterForm.moodKey" placeholder="全部心情" clearable @change="handleFilter">
+            <el-select v-model="filterForm.mood" placeholder="全部心情" clearable @change="handleFilter">
               <el-option v-for="mood in MOODS" :key="mood.key" :label="mood.label" :value="mood.key" />
             </el-select>
           </el-form-item>
@@ -83,20 +83,20 @@
       <div class="diary-list" v-loading="loading">
         <el-empty v-if="diaries.length === 0" description="暂无日记" />
 
-        <article v-for="diary in diaries" :key="diary.diaryId" class="diary-card" @click="openDiary(diary.diaryId)">
+        <article v-for="diary in diaries" :key="diary.id" class="diary-card" @click="openDiary(diary.id)">
           <div class="diary-content">
             <div class="diary-header">
               <div class="diary-heading">
                 <h2 class="diary-title">{{ diary.title }}</h2>
                 <div class="meta-row">
-                  <span class="diary-date">{{ formatChineseDate(diary.date) }}</span>
-                  <el-tag v-if="diary.moodKey" size="small" :color="moodColor(diary.moodKey)" effect="dark">
-                    {{ moodLabel(diary.moodKey) }}
+                  <span class="diary-date">{{ formatChineseDate(diary.diaryDate) }}</span>
+                  <el-tag v-if="diary.mood" size="small" :color="moodColor(diary.mood)" effect="dark">
+                    {{ moodLabel(diary.mood) }}
                   </el-tag>
                 </div>
               </div>
               <div class="diary-actions" role="group" aria-label="日记操作" @click.stop>
-                <el-button class="view-action" type="primary" size="small" text @click.stop="openDiary(diary.diaryId)">
+                <el-button class="view-action" type="primary" size="small" text @click.stop="openDiary(diary.id)">
                   <el-icon><View /></el-icon>
                   <span class="action-label">查看详情</span>
                 </el-button>
@@ -107,7 +107,7 @@
                   text
                   aria-label="编辑日记"
                   title="编辑日记"
-                  @click.stop="handleEdit(diary.diaryId)"
+                  @click.stop="handleEdit(diary.id)"
                 >
                   <el-icon><Edit /></el-icon>
                   <span class="action-label">编辑</span>
@@ -116,7 +116,7 @@
                   title="确定要删除这篇日记吗？"
                   confirm-button-text="确定"
                   cancel-button-text="取消"
-                  @confirm="handleDelete(diary.diaryId)"
+                  @confirm="handleDelete(diary.id)"
                 >
                   <template #reference>
                     <el-button
@@ -124,7 +124,7 @@
                       size="small"
                       text
                       class="delete-action"
-                      :loading="deletingId === diary.diaryId"
+                      :loading="deletingId === diary.id"
                       :disabled="!!deletingId"
                       aria-label="删除日记"
                       title="删除日记"
@@ -139,7 +139,7 @@
             </div>
 
             <div class="tag-row" v-if="diary.tags?.length">
-              <el-tag v-for="tag in diary.tags" :key="tag.tagId" size="small" effect="plain" :color="tag.color">
+              <el-tag v-for="tag in diary.tags" :key="tag.id" size="small" effect="plain" :color="tag.color">
                 {{ tag.name }}
               </el-tag>
             </div>
@@ -149,9 +149,9 @@
             <div class="diary-images" v-if="diaryImages(diary).length > 0" @click.stop>
               <el-image
                 v-for="(img, index) in diaryImages(diary).slice(0, 4)"
-                :key="img.assetId"
-                :src="img.thumbnailUrl || img.contentUrl"
-                :preview-src-list="diaryImages(diary).map(item => item.contentUrl).filter(Boolean)"
+                :key="img.id"
+                :src="mediaThumbnailUrl(img)"
+                :preview-src-list="diaryImages(diary).map(mediaOriginalUrl).filter(Boolean)"
                 :initial-index="index"
                 fit="cover"
                 class="diary-image"
@@ -202,7 +202,9 @@ import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { Search, Plus, Download, Edit, Delete, View } from '@element-plus/icons-vue'
 import DiaryMobileFilters from '@/components/diary/DiaryMobileFilters.vue'
 import { useDiaryStore } from '@/stores/diary'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { tagApi } from '@/api/experience'
+import { mediaOriginalUrl, mediaThumbnailUrl } from '@/api/v3Adapters'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -221,6 +223,7 @@ import 'element-plus/es/components/tag/style/css.mjs'
 const router = useRouter()
 const route = useRoute()
 const diaryStore = useDiaryStore()
+const workspaceStore = useWorkspaceStore()
 
 const loading = computed(() => diaryStore.loading)
 const diaries = computed(() => diaryStore.diaries)
@@ -239,7 +242,7 @@ const filterForm = reactive({
   endDate: '',
   keyword: '',
   tagId: null,
-  moodKey: ''
+  mood: ''
 })
 const desktopDateRange = computed({
   get: () => filterForm.startDate && filterForm.endDate
@@ -257,14 +260,19 @@ const updateViewportMode = () => {
 }
 
 const previewContent = (diary) => {
-  if (!diary?.content) return ''
-  return diary.contentFormat === 'html' ? stripHtml(diary.content) : diary.content
+  if (!diary) return ''
+  return diary.contentHtml ? stripHtml(diary.contentHtml) : diary.contentText || ''
 }
 const diaryImages = diary => diary?.media?.filter(item => item.mediaType === 'IMAGE') || []
 
+const requireSpaceId = async () => {
+  await workspaceStore.loadSpaces()
+  if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
+  return workspaceStore.activeSpaceId
+}
+
 const fetchTags = async () => {
-  const response = await tagApi.list()
-  tags.value = response.data || []
+  tags.value = await tagApi.list(await requireSpaceId())
 }
 
 const fetchDiaries = async () => {
@@ -272,7 +280,7 @@ const fetchDiaries = async () => {
     page: currentPage.value - 1,
     size: 5,
     tagId: filterForm.tagId,
-    moodKey: filterForm.moodKey || undefined
+    mood: filterForm.mood || undefined
   }
 
   if (filterForm.startDate) params.startDate = filterForm.startDate
@@ -320,7 +328,7 @@ const resetFilters = () => {
     endDate: '',
     keyword: '',
     tagId: null,
-    moodKey: ''
+    mood: ''
   })
   handleFilter()
 }

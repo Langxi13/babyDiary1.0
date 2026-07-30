@@ -10,7 +10,7 @@
     <el-form class="space-diary-form" label-position="top" @submit.prevent="save">
       <div class="editor-grid">
         <el-form-item label="日期">
-          <el-date-picker v-model="form.date" type="date" value-format="YYYY-MM-DD" format="YYYY年MM月DD日" :clearable="false" />
+        <el-date-picker v-model="form.diaryDate" type="date" value-format="YYYY-MM-DD" format="YYYY年MM月DD日" :clearable="false" />
         </el-form-item>
         <el-form-item label="可见范围">
           <el-segmented v-model="form.visibility" :options="visibilityOptions" />
@@ -22,35 +22,22 @@
       </el-form-item>
 
       <el-form-item label="心情">
-        <div class="mood-options" role="radiogroup" aria-label="心情">
-          <button
-            v-for="mood in moods"
-            :key="mood.key"
-            type="button"
-            :class="{ active: form.moodKey === mood.key }"
-            :aria-pressed="form.moodKey === mood.key"
-            :title="mood.label"
-            @click="form.moodKey = form.moodKey === mood.key ? '' : mood.key"
-          >
-            <span>{{ mood.emoji }}</span>
-            <small>{{ mood.label }}</small>
-          </button>
-        </div>
+        <diary-mood-picker v-model="form.mood" :moods="moods" clearable />
       </el-form-item>
 
       <el-form-item v-if="templates.length" label="模板">
         <el-select v-model="selectedTemplate" clearable placeholder="选择模板" @change="applyTemplate">
-          <el-option v-for="template in templates" :key="template.templateId" :label="template.name" :value="template.templateId" />
+          <el-option v-for="template in templates" :key="template.id" :label="template.name" :value="template.id" />
         </el-select>
       </el-form-item>
 
       <el-form-item label="正文">
-        <el-input v-model="form.content" type="textarea" :autosize="{ minRows: 10, maxRows: 24 }" maxlength="1000000" />
+        <el-input v-model="form.contentHtml" type="textarea" :autosize="{ minRows: 10, maxRows: 24 }" maxlength="1000000" />
       </el-form-item>
 
       <el-form-item v-if="tags.length" label="标签">
         <el-checkbox-group v-model="form.tagIds" class="tag-options">
-          <el-checkbox-button v-for="tag in tags" :key="tag.tagId" :value="tag.tagId">
+          <el-checkbox-button v-for="tag in tags" :key="tag.id" :value="tag.id">
             <span class="tag-swatch" :style="{ background: tag.color }" />{{ tag.name }}
           </el-checkbox-button>
         </el-checkbox-group>
@@ -131,10 +118,12 @@ import { ElOption, ElSelect } from 'element-plus/es/components/select/index.mjs'
 import { ElSegmented } from 'element-plus/es/components/segmented/index.mjs'
 import { ElSwitch } from 'element-plus/es/components/switch/index.mjs'
 import { Check, Close, Plus, Rank } from '@element-plus/icons-vue'
-import { workspaceApi } from '@/api/workspace'
+import { diaryApi } from '@/api/diary'
+import { mediaApi } from '@/api/media'
 import { queueOfflineDiaryOperation, queueOfflineOperation } from '@/utils/offlineDb'
 import { withStepUpRetry } from '@/utils/stepUp'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
+import DiaryMoodPicker from '@/components/diary/DiaryMoodPicker.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/checkbox/style/css.mjs'
@@ -185,12 +174,12 @@ watch(() => props.modelValue, visible => {
   if (!visible) return
   Object.assign(form, emptyForm(), props.diary ? {
     title: props.diary.title,
-    date: props.diary.date,
-    content: props.diary.content,
-    moodKey: props.diary.moodKey || '',
+    diaryDate: props.diary.diaryDate,
+    contentHtml: props.diary.contentHtml || props.diary.contentText || '',
+    mood: props.diary.mood || '',
     visibility: props.diary.visibility || 'SHARED',
     locked: !!props.diary.locked,
-    tagIds: props.diary.tags?.map(tag => tag.tagId) || []
+    tagIds: props.diary.tags?.map(tag => tag.id) || []
   } : {})
   files.value = []
   selectedTemplate.value = ''
@@ -198,7 +187,7 @@ watch(() => props.modelValue, visible => {
 
 const save = async () => {
   if (saving.value) return
-  if (!form.title.trim() || !form.content.trim()) {
+  if (!form.title.trim() || !form.contentHtml.trim()) {
     ElMessage.warning('请填写标题和正文')
     return
   }
@@ -207,46 +196,46 @@ const save = async () => {
     return
   }
   saving.value = true
-  const entityId = props.diary?.publicId || crypto.randomUUID()
+  const entityId = props.diary?.id || crypto.randomUUID()
   const creating = !props.diary || (props.diary.pending && props.diary.pendingAction === 'CREATE')
   const payload = {
     clientId: creating ? entityId : undefined,
     title: form.title.trim(),
-    date: form.date,
-    content: form.content,
-    contentFormat: 'plain',
-    moodKey: form.moodKey || null,
+    diaryDate: form.diaryDate,
+    contentHtml: form.contentHtml,
+    mood: form.mood || null,
     visibility: form.visibility,
     locked: form.locked,
     baseVersion: props.diary?.version,
     tagIds: form.tagIds,
-    mediaIds: props.diary?.media?.map(item => item.assetId || item.id).filter(Boolean) || []
+    mediaIds: props.diary?.media?.map(item => item.id).filter(Boolean) || []
   }
   const uploadedAssetIds = []
   try {
     let saved
     if (offline.value) {
       await queueDiary(entityId, payload)
-      saved = { ...props.diary, ...payload, publicId: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
+      saved = { ...props.diary, ...payload, id: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
     } else {
       try {
         for (const item of files.value) {
           const formData = new FormData()
           formData.append('file', item.raw, item.raw.name)
-          const upload = await workspaceApi.media.upload(props.spaceId, formData)
-          uploadedAssetIds.push(upload.data.assetId)
+          const upload = await mediaApi.upload(props.spaceId, formData)
+          uploadedAssetIds.push(upload.id)
         }
         payload.mediaIds = [...payload.mediaIds, ...uploadedAssetIds]
-        const response = await withStepUpRetry(token => creating
-          ? workspaceApi.diaries.create(props.spaceId, payload, token || props.stepUpToken)
-          : workspaceApi.diaries.update(props.spaceId, entityId, payload, token || props.stepUpToken))
-        saved = response.data
+        saved = creating
+          ? await diaryApi.create(props.spaceId, payload)
+          : await withStepUpRetry(token => diaryApi.update(
+            props.spaceId, entityId, payload, props.diary.version, token || props.stepUpToken
+          ))
       } catch (error) {
         if (!error.response) {
           await queueDiary(entityId, payload)
-          saved = { ...props.diary, ...payload, publicId: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
+          saved = { ...props.diary, ...payload, id: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
         } else {
-          await Promise.allSettled(uploadedAssetIds.map(assetId => workspaceApi.media.remove(props.spaceId, assetId)))
+          await Promise.allSettled(uploadedAssetIds.map(mediaId => mediaApi.remove(props.spaceId, mediaId)))
           throw error
         }
       }
@@ -268,7 +257,7 @@ const queueDiary = (entityId, payload) => queueOfflineDiaryOperation({
   entityId,
   baseVersion: props.diary?.version,
   payload,
-  localSnapshot: { ...props.diary, ...payload, publicId: entityId }
+  localSnapshot: { ...props.diary, ...payload, id: entityId }
 })
 
 const queueMedia = async diaryId => {
@@ -311,17 +300,17 @@ const moveFile = targetIndex => {
 }
 
 const applyTemplate = templateId => {
-  const template = props.templates.find(item => item.templateId === templateId)
+  const template = props.templates.find(item => item.id === templateId)
   if (!template) return
   if (!form.title) form.title = template.name
   const text = new DOMParser().parseFromString(template.contentHtml || '', 'text/html').body.innerText
-  form.content = form.content ? `${form.content}\n\n${text}` : text
+  form.contentHtml = form.contentHtml ? `${form.contentHtml}\n\n${text}` : text
 }
 
 function emptyForm() {
   const now = new Date()
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return { title: '', date, content: '', moodKey: '', visibility: 'SHARED', locked: false, tagIds: [] }
+  return { title: '', diaryDate: date, contentHtml: '', mood: '', visibility: 'SHARED', locked: false, tagIds: [] }
 }
 
 function formatBytes(bytes) {
@@ -341,11 +330,6 @@ function formatBytes(bytes) {
 }
 
 .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.mood-options { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.mood-options button { min-width: 0; min-height: 64px; padding: 7px 3px; border: 1px solid #e5d9d3; border-radius: 8px; background: #fff; color: #756963; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; }
-.mood-options button span { font-size: 25px; line-height: 1; }
-.mood-options button small { font-size: 11px; }
-.mood-options button.active { border-color: #bd756b; background: #fff3ef; color: #7c413d; box-shadow: inset 0 0 0 1px #bd756b; }
 .tag-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .tag-swatch { width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; display: inline-block; }
 .media-picker { border: 1px solid #e8ddd7; border-radius: 8px; padding: 14px; background: #fbfaf8; }
@@ -370,8 +354,6 @@ function formatBytes(bytes) {
 @media (max-width: 768px) {
   .space-diary-form { gap: 18px; }
   .editor-grid { grid-template-columns: 1fr; gap: 18px; }
-  .mood-options { grid-template-columns: repeat(3, 1fr); }
-  .mood-options button { min-height: 58px; }
   .editor-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .editor-actions :deep(.el-button) { width: 100%; margin: 0; }
 }

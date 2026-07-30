@@ -140,7 +140,7 @@ export function useDiaryImages({ route, isEdit }) {
         formData.append('imageFiles', file.raw)
         newImageIndex += 1
       } else if (file.isExisting && file.name) {
-        formData.append('retainedAssetIds', file.name)
+        formData.append('retainedMediaIds', file.name)
       }
       if (orderEntry) {
         formData.append('mediaOrder', orderEntry)
@@ -157,7 +157,7 @@ export function useDiaryImages({ route, isEdit }) {
     const images = media.filter(item => item?.mediaType === 'IMAGE')
     initialImageCount.value = images.length
     fileList.value = images.map((item, index) => ({
-      name: item.assetId,
+      name: item.id,
       url: item.thumbnailUrl || item.contentUrl,
       uid: `existing-${index}`,
       isExisting: true,

@@ -27,6 +27,13 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.push })
 }))
 
+vi.mock('@/stores/workspace', () => ({
+  useWorkspaceStore: () => ({
+    activeSpaceId: 'space-1',
+    loadSpaces: vi.fn().mockResolvedValue([{ id: 'space-1' }])
+  })
+}))
+
 const ButtonStub = {
   emits: ['click'],
   template: '<button type="button" @click="$emit(\'click\')"><slot /></button>'
@@ -63,7 +70,7 @@ describe('Album loading states', () => {
     expect(wrapper.find('.album-load-error').exists()).toBe(true)
     expect(wrapper.text()).toContain('相册暂时无法加载')
 
-    mocks.getGroups.mockResolvedValueOnce({ data: [] })
+    mocks.getGroups.mockResolvedValueOnce([])
     await wrapper.find('.album-load-error button').trigger('click')
     await flushPromises()
 
@@ -72,9 +79,9 @@ describe('Album loading states', () => {
   })
 
   it('selects the first group returned by the API', async () => {
-    mocks.getGroups.mockResolvedValueOnce({
-      data: [{ groupId: 1, type: 'SYSTEM', name: '默认相册', editable: false, albums: [] }]
-    })
+    mocks.getGroups.mockResolvedValueOnce([
+      { id: 1, type: 'SYSTEM', name: '默认相册', editable: false, albums: [] }
+    ])
     const wrapper = mountAlbum()
     await flushPromises()
 
