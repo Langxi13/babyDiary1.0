@@ -77,13 +77,13 @@ class V3CleanSchemaMigrationTest {
     private void migrate() {
         Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/v3/migration")
+                .locations("classpath:db/migration")
                 .cleanDisabled(false)
                 .load()
                 .clean();
         Flyway.configure()
                 .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
-                .locations("classpath:db/v3/migration")
+                .locations("classpath:db/migration")
                 .load()
                 .migrate();
     }

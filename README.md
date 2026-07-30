@@ -10,13 +10,13 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - 富文本、心情、标签、草稿、模板、全文搜索、时间轴、日历和年度洞察
 - 纪念日、系统相册、自建相册、收藏相册和 AI 智能相册
 - OpenAI 兼容接口、模型列表、AI 周报/月报/年报和定时生成
-- 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码、波形和 OCR
+- 本地或 S3 兼容对象存储、图片/音频/视频、缩略图、转码和波形
 - 离线编辑队列、增量同步、冲突提示、PWA 安装和移动端壳界面
 - Android 原生相册、拍照、HTTPS 私有服务器切换、原生刷新会话和应用更新检测
 - 设备会话、短期访问令牌、30 天刷新会话、跨账号前端缓存隔离、邮箱验证、密码找回和恢复码
 - 管理员专属邀请码查看、复制和随机轮换，AES-GCM 加密存储并要求密码二次验证
 - 私密限时分享、ZIP v3 便携归档导入导出、PDF/EPUB 日记书导出
-- Redis 缓存、V3 UUID 数据模型、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
+- Redis 缓存、UUID 数据模型、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
 
 完整功能、接口与质量门禁见 [document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
 
@@ -63,7 +63,7 @@ npm --prefix frontend ci
 npm --prefix frontend run dev
 ```
 
-访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，V3 Flyway 会在 `baby_diary_v3` 空库中创建统一结构。JDBC URL 必须保留时区参数，以固定 MySQL 会话并避免依赖命名时区表。已有旧库应先按 [V3 统一架构与迁移运行手册](document/V3统一架构与迁移运行手册.md) 完成受控迁移，不要让 V3 应用直接连接旧库。
+访问 `http://localhost:5173`。后端 API 默认运行在 `http://localhost:10002`，Flyway 会在空库中创建统一结构。JDBC URL 必须保留时区参数，以固定 MySQL 会话并避免依赖命名时区表。当前运行边界和数据不变量见 [统一架构运行手册](document/统一架构运行手册.md)。
 
 ## Android 客户端
 
@@ -123,11 +123,11 @@ Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`sc
 
 ## 生产部署
 
-生产覆盖配置使用 `config/application-v3-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产服务只连接 `V3_DB_URL` 指定的 V3 数据库。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、V3 媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证 `/api/v3/client/bootstrap`、未登录账户响应和 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
+生产覆盖配置使用 `config/application-prod.yml`，数据库密码、JWT 密钥、邀请码加密密钥、AI 加密密钥和站点地址都必须通过服务器私有环境文件注入。生产服务只连接 `V3_DB_URL` 指定的统一数据库。邀请码初始化后以 AES-GCM 密文保存在数据库中，只有系统管理员完成密码二次验证后才能查看或刷新。生产环境默认关闭 Swagger/OpenAPI，并要求 Web 与原生 CORS 使用明确来源。部署脚本会安装 Nginx 安全头、媒体资源策略与后端健康代理片段、启用 systemd `PrivateTmp`，并在停止后端前完成 Nginx 配置校验；健康检查必须验证 `/api/v3/client/bootstrap`、未登录账户响应和 Actuator JSON，确认顶层状态为 `UP`。部署示例见 [document/部署文档.md](document/部署文档.md)。
 
 ## 统一媒体模型
 
-V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；媒体资产使用命名的 `representations.original/thumbnail/poster/waveform/transcoded`，每个 representation 都携带实际 profile、过期时间、MIME、大小和技术元数据。媒体变体由 `variant_type + profile` 唯一标识，迁移原图保留 `ORIGINAL/source`，派生缩略图使用 `THUMBNAIL/default`；签名 URL 会绑定实际 profile 和访问上下文，不能把 profile 当作固定的 `default`。
+系统将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；媒体资产使用命名的 `representations.original/thumbnail/poster/waveform/transcoded`，每个 representation 都携带实际 profile、过期时间、MIME、大小和技术元数据。媒体变体由 `variant_type + profile` 唯一标识；签名 URL 会绑定实际 profile 和访问上下文，不能把 profile 当作固定的 `default`。
 
 媒体上传会校验真实文件头、声明 MIME、图片尺寸和大小；派生处理通过单线程后台任务生成，删除先进入 `DELETE_PENDING`，对象删除和空间额度释放由幂等 GC 任务完成。媒体内容支持 `HEAD`、单段 Range、ETag/304 和 416 响应。锁定日记关联媒体不返回 URL，直接媒体详情和内容读取需要二次验证；前端 Service Worker 只缓存固定壳文件和静态 `/assets/`，不缓存 API、媒体或个性化响应。
 
@@ -137,9 +137,7 @@ V3 将日记图片、相册照片、收藏照片、头像和纪念日/相册封�
 
 部署前 `scripts/disk-audit.sh --enforce` 要求至少保留 5 GiB 可用空间。清理时不得删除当前数据库、`data/objects/`、Docker 数据卷或其他项目的具名回滚镜像。
 
-旧库、旧表和旧目录仅作为回滚隔离保留至少 14 天。生产升级必须先备份、停写，再执行 `scripts/v3-migrate.sh preflight`、`migrate`、`verify`，确认校验和、关系数量和页面访问正常后再完成切换；迁移失败时恢复备份和旧 Jar，不在生产库手工逆向迁移。
-
-迁移期间旧媒体目录只由迁移工具读取；新媒体写入 `DIARY_OBJECT_PATH` 或后续配置的 S3/COS 对象存储。新媒体通过 `/api/v3/public/media/**` 的短时签名 URL 访问。旧版 `/images/**` 路由不属于 V3 运行时，完成回滚窗口后应保持移除。
+生产升级必须先生成并验证备份，再串行构建、测试和部署。媒体写入 `DIARY_OBJECT_PATH` 或 S3/COS 兼容对象存储，通过 `/api/v3/public/media/**` 的短时签名 URL 访问；`/images/**` 不存在公开兼容路由。
 
 项目不会跟踪以下私有内容：
 

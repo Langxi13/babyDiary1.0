@@ -252,7 +252,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
                 <configuration>
-                    <mainClass>com.langxi.babydiary.v3.BabyDiaryV3Application</mainClass>
+                    <mainClass>com.langxi.babydiary.BabyDiaryApplication</mainClass>
                     <skip>false</skip>
                 </configuration>
                 <executions>

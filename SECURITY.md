@@ -24,8 +24,8 @@ Include the affected component, reproduction steps, expected impact, and any sug
 - The browser uses 15-minute access tokens and an HttpOnly rotating refresh cookie. Production must keep `AUTH_SECURE_COOKIE=true` and terminate TLS before the application.
 - Email-verification and password-reset tokens are stored as hashes, locked and consumed exactly once inside the account update transaction.
 - Locked diaries require a short-lived password step-up token. Their content, tags, mood, media, search index, insights, sync payloads, and AI inputs are redacted until verification succeeds; compatibility list, draft, album, photo, and export endpoints omit locked entries rather than bypassing step-up.
-- V2 rich media is stored outside the web root and delivered through expiring signed URLs. `DIARY_OBJECT_PATH` must never be placed below `DIARY_FILE_PATH`.
-- Legacy `/images/**` URLs remain publicly readable for backward compatibility. Their generated names are difficult to guess but are not authorization. Treat this endpoint as a compatibility boundary and use V2 media for new sensitive uploads.
+- Media objects are stored outside the web root and delivered through authorized, expiring signed URLs. Never expose `DIARY_OBJECT_PATH` through Nginx or another static file server.
+- The application has no public `/images/**` compatibility route. Restoring such an alias would bypass space authorization and is a security regression.
 - Private share URLs are bearer secrets. Use short expiration times, optional passwords, view limits, and revoke links that are no longer needed.
 - Swagger/OpenAPI is disabled by default in production. Enable `SPRINGDOC_ENABLED=true` only on a restricted administrative network.
 - The application trusts `X-Forwarded-For` only from a loopback proxy. Keep Nginx and the backend on the same trusted host or adjust proxy handling before using a different topology.

@@ -63,5 +63,5 @@ export V3_JOBS_ENABLED=false
 cd "$PROJECT_ROOT"
 source scripts/java-env.sh
 mvn "${MAVEN_SETTINGS_ARGS[@]}" -q -f backend/pom.xml \
-  -Dspring-boot.run.main-class=com.langxi.babydiary.v3.BabyDiaryV3Application \
+  -Dspring-boot.run.main-class=com.langxi.babydiary.BabyDiaryApplication \
   -Dspring-boot.run.profiles=v3 spring-boot:run

@@ -1,204 +1,148 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.langxi.babydiary.mapper.MediaMapper">
-    <resultMap id="mediaResultMap" type="MediaAsset">
-        <id property="assetId" column="asset_id"/>
-        <result property="diaryId" column="diary_id"/>
-        <result property="publicId" column="public_id"/>
-        <result property="spaceId" column="space_id"/>
-        <result property="ownerUserId" column="owner_user_id"/>
-        <result property="mediaType" column="media_type"/>
-        <result property="originalFilename" column="original_filename"/>
-        <result property="storageProvider" column="storage_provider"/>
-        <result property="storageKey" column="storage_key"/>
-        <result property="thumbnailKey" column="thumbnail_key"/>
-        <result property="posterKey" column="poster_key"/>
-        <result property="waveformKey" column="waveform_key"/>
-        <result property="transcodedKey" column="transcoded_key"/>
-        <result property="contentType" column="content_type"/>
-        <result property="sizeBytes" column="size_bytes"/>
-        <result property="checksumSha256" column="checksum_sha256"/>
-        <result property="accessScope" column="access_scope"/>
-        <result property="libraryVisible" column="library_visible"/>
-        <result property="durationSeconds" column="duration_seconds"/>
-        <result property="width" column="width"/>
-        <result property="height" column="height"/>
-        <result property="caption" column="caption"/>
-        <result property="ocrText" column="ocr_text"/>
-        <result property="takenAt" column="taken_at"/>
-        <result property="locationName" column="location_name"/>
-        <result property="latitude" column="latitude"/>
-        <result property="longitude" column="longitude"/>
-        <result property="status" column="status"/>
-        <result property="processingError" column="processing_error"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
-        <result property="deletedAt" column="deleted_at"/>
-        <result property="sort" column="sort"/>
-        <result property="favorite" column="favorite"/>
-        <result property="diaryPublicId" column="diary_public_id"/>
-        <result property="diaryTitle" column="diary_title"/>
-        <result property="diaryDate" column="diary_date"/>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.media.infrastructure.MediaMapper">
+    <resultMap id="mediaRow" type="com.langxi.babydiary.media.infrastructure.MediaMapper$MediaRow">
+        <id column="asset_id" property="assetId"/>
+        <result column="public_id" property="publicId"/>
+        <result column="space_public_id" property="spacePublicId"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="media_type" property="mediaType"/>
+        <result column="original_filename" property="originalFilename"/>
+        <result column="caption" property="caption"/>
+        <result column="taken_at" property="takenAt"/>
+        <result column="access_scope" property="accessScope"/>
+        <result column="library_visible" property="libraryVisible"/>
+        <result column="asset_status" property="assetStatus"/>
+        <result column="asset_created_at" property="assetCreatedAt"/>
+        <result column="asset_updated_at" property="assetUpdatedAt"/>
+        <result column="variant_type" property="variantType"/>
+        <result column="profile" property="profile"/>
+        <result column="storage_provider" property="storageProvider"/>
+        <result column="storage_key" property="storageKey"/>
+        <result column="content_type" property="contentType"/>
+        <result column="size_bytes" property="sizeBytes"/>
+        <result column="checksum_sha256" property="checksumSha256"/>
+        <result column="width" property="width"/>
+        <result column="height" property="height"/>
+        <result column="duration_millis" property="durationMillis"/>
+        <result column="variant_status" property="variantStatus"/>
     </resultMap>
 
-    <insert id="insertAsset" parameterType="MediaAsset" useGeneratedKeys="true" keyProperty="assetId">
-        INSERT INTO media_asset(public_id,space_id,owner_user_id,media_type,original_filename,storage_provider,
-                                storage_key,content_type,size_bytes,checksum_sha256,access_scope,library_visible,
-                                caption,taken_at,location_name,latitude,longitude,status)
-        VALUES(#{publicId},#{spaceId},#{ownerUserId},#{mediaType},#{originalFilename},#{storageProvider},
-               #{storageKey},#{contentType},#{sizeBytes},#{checksumSha256},#{accessScope},#{libraryVisible},
-               #{caption},#{takenAt},#{locationName},#{latitude},#{longitude},#{status})
-    </insert>
+    <sql id="assetColumns">
+        a.asset_id,a.public_id,s.public_id AS space_public_id,a.owner_id,a.media_type,a.original_filename,
+        a.caption,a.taken_at,a.access_scope,a.library_visible,a.status AS asset_status,
+        a.created_at AS asset_created_at,a.updated_at AS asset_updated_at,
+        v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+        v.checksum_sha256,v.width,v.height,v.duration_millis,v.status AS variant_status
+    </sql>
 
-    <insert id="attachToDiary">
-        INSERT INTO diary_media(diary_id,asset_id,sort) VALUES(#{diaryId},#{assetId},#{sort})
-    </insert>
+    <sql id="accessibleAsset">
+        a.deleted_at IS NULL AND a.status='READY'
+        AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+    </sql>
 
-    <select id="nextDiarySort" resultType="int">
-        SELECT COALESCE(MAX(sort),-1)+1 FROM diary_media WHERE diary_id=#{diaryId}
+    <select id="findPage" resultMap="mediaRow">
+        WITH page_assets AS (
+            SELECT a.asset_id
+            FROM media_asset a
+            WHERE a.space_id=#{query.spaceId} AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{query.accountId} OR a.access_scope='SPACE')
+            <if test="query.libraryOnly">AND a.library_visible=true</if>
+            <if test="query.mediaType != null">AND a.media_type=#{query.mediaType}</if>
+            <if test="query.cursorCreatedAt != null">
+                AND (a.created_at&lt;#{query.cursorCreatedAt}
+                  OR (a.created_at=#{query.cursorCreatedAt} AND a.asset_id&lt;#{query.cursorId}))
+            </if>
+            ORDER BY a.created_at DESC,a.asset_id DESC
+            LIMIT #{query.limit}
+        )
+        SELECT <include refid="assetColumns"/>
+        FROM page_assets p JOIN media_asset a ON a.asset_id=p.asset_id
+        JOIN diary_space s ON s.space_id=a.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
+        ORDER BY a.created_at DESC,a.asset_id DESC,
+          FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
-    <select id="countDiaryInSpace" resultType="int">
-        SELECT COUNT(*) FROM diary
-        WHERE diary_id=#{diaryId} AND space_id=#{spaceId} AND deleted_at IS NULL
+    <select id="findByPublicIdsInSpace" resultMap="mediaRow">
+        SELECT <include refid="assetColumns"/>
+        FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
+        WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL AND a.status='READY'
+          AND a.public_id IN
+          <foreach collection="publicIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY a.created_at DESC,a.asset_id DESC,v.variant_id
     </select>
 
-    <select id="findByPublicId" resultMap="mediaResultMap">
-        SELECT * FROM media_asset WHERE public_id=#{publicId} AND deleted_at IS NULL
+    <select id="findInSpace" resultMap="mediaRow">
+        SELECT <include refid="assetColumns"/>
+        FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.status='READY'
+        WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
+        <if test="!includeDeleted">AND a.deleted_at IS NULL AND a.status='READY' AND v.deleted_at IS NULL</if>
+        ORDER BY v.variant_id
     </select>
 
-    <select id="findByIdForUpdate" resultMap="mediaResultMap">
-        SELECT * FROM media_asset WHERE asset_id=#{assetId} FOR UPDATE
+    <select id="findByPublicId" resultMap="mediaRow">
+        SELECT <include refid="assetColumns"/>
+        FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
+        WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
+        ORDER BY FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
-    <select id="findByDiaryId" resultMap="mediaResultMap">
-        SELECT dm.diary_id,a.*,dm.sort,d.public_id AS diary_public_id,d.title AS diary_title,d.date AS diary_date
-        FROM diary_media dm INNER JOIN media_asset a ON a.asset_id=dm.asset_id
-        INNER JOIN diary d ON d.diary_id=dm.diary_id
-        WHERE dm.diary_id=#{diaryId} AND a.deleted_at IS NULL
-        ORDER BY dm.sort, a.asset_id
+    <select id="findByPublicIds" resultMap="mediaRow">
+        SELECT <include refid="assetColumns"/>
+        FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
+        WHERE a.space_id=#{spaceId} AND <include refid="accessibleAsset"/>
+          AND a.public_id IN
+          <foreach collection="publicIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ORDER BY a.created_at DESC,a.asset_id DESC,
+          FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
-    <select id="findByDiaryIds" resultMap="mediaResultMap">
-        SELECT dm.diary_id,a.*,dm.sort,d.public_id AS diary_public_id,d.title AS diary_title,d.date AS diary_date
-        FROM diary_media dm INNER JOIN media_asset a ON a.asset_id=dm.asset_id
-        INNER JOIN diary d ON d.diary_id=dm.diary_id
-        WHERE dm.diary_id IN
-        <foreach collection="diaryIds" item="diaryId" open="(" separator="," close=")">
-            #{diaryId}
-        </foreach>
-          AND a.deleted_at IS NULL
-        ORDER BY dm.diary_id,dm.sort,a.asset_id
+    <select id="findVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
+          AND v.variant_type=#{type} AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
     </select>
 
-    <select id="findByUserAndDateRange" resultMap="mediaResultMap">
-        SELECT dm.diary_id,a.*,dm.sort,d.public_id AS diary_public_id,d.title AS diary_title,d.date AS diary_date
-        FROM diary_media dm INNER JOIN media_asset a ON a.asset_id=dm.asset_id
-        INNER JOIN diary d ON d.diary_id=dm.diary_id
-        WHERE d.user_id=#{userId} AND d.date BETWEEN #{startDate} AND #{endDate}
-          AND d.deleted_at IS NULL AND d.locked=0 AND a.media_type='IMAGE' AND a.deleted_at IS NULL
-        ORDER BY d.date,dm.sort,a.asset_id
+    <select id="findPreferredVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
+          AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
+        ORDER BY CASE WHEN #{type}='ORIGINAL' THEN
+                   CASE v.profile WHEN 'source' THEN 0 WHEN 'default' THEN 1 ELSE 2 END
+                 ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END END,v.variant_id
+        LIMIT 1
     </select>
 
-    <select id="countAccessibleSharedLinks" resultType="int">
-        SELECT COUNT(*)
-        FROM diary_media dm INNER JOIN diary d ON d.diary_id=dm.diary_id
-        WHERE dm.asset_id=#{assetId} AND d.deleted_at IS NULL AND d.visibility='SHARED' AND d.locked=0
+    <select id="findPublicVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
+        JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
+          AND a.deleted_at IS NULL AND a.status='READY'
+          AND v.variant_type=#{type} AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
     </select>
 
-    <select id="countLockedLinks" resultType="int">
-        SELECT COUNT(*)
-        FROM diary_media dm INNER JOIN diary d ON d.diary_id=dm.diary_id
-        WHERE dm.asset_id=#{assetId} AND d.deleted_at IS NULL AND d.locked=1
+    <select id="findPreferredPublicVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
+        SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+        FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
+        JOIN media_variant v ON v.asset_id=a.asset_id
+        WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
+          AND a.deleted_at IS NULL AND a.status='READY'
+          AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
+        ORDER BY CASE WHEN #{type}='ORIGINAL' THEN
+                   CASE v.profile WHEN 'source' THEN 0 WHEN 'default' THEN 1 ELSE 2 END
+                 ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END END,v.variant_id
+        LIMIT 1
     </select>
-
-    <select id="countDiaryLinks" resultType="int">
-        SELECT COUNT(*) FROM diary_media WHERE asset_id=#{assetId}
-    </select>
-
-    <select id="findPending" resultMap="mediaResultMap">
-        SELECT * FROM media_asset WHERE status='PROCESSING' AND deleted_at IS NULL ORDER BY created_at LIMIT #{limit}
-    </select>
-
-    <update id="updateProcessing" parameterType="MediaAsset">
-        UPDATE media_asset SET status=#{status},thumbnail_key=#{thumbnailKey},poster_key=#{posterKey},
-            waveform_key=#{waveformKey},transcoded_key=#{transcodedKey},duration_seconds=#{durationSeconds},
-            width=#{width},height=#{height},ocr_text=#{ocrText},processing_error=#{processingError}
-        WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </update>
-
-    <update id="updateMetadata">
-        UPDATE media_asset SET caption=#{caption},location_name=#{locationName},latitude=#{latitude},longitude=#{longitude}
-        WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </update>
-
-    <update id="updateUsage">
-        UPDATE media_asset SET access_scope=#{accessScope},library_visible=#{libraryVisible}
-        WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </update>
-
-    <select id="findByPublicIds" resultMap="mediaResultMap">
-        SELECT * FROM media_asset
-        WHERE public_id IN
-        <foreach collection="publicIds" item="publicId" open="(" separator="," close=")">
-            #{publicId}
-        </foreach>
-          AND deleted_at IS NULL
-    </select>
-
-    <select id="findById" resultMap="mediaResultMap">
-        SELECT * FROM media_asset WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </select>
-
-    <select id="findAssetIdByPublicId" resultType="long">
-        SELECT asset_id FROM media_asset WHERE public_id=#{publicId} AND deleted_at IS NULL
-    </select>
-
-    <select id="findPublicIdByAssetId" resultType="string">
-        SELECT public_id FROM media_asset WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </select>
-
-    <insert id="attachToDiaryIfMissing">
-        INSERT IGNORE INTO diary_media(diary_id,asset_id,sort) VALUES(#{diaryId},#{assetId},#{sort})
-    </insert>
-
-    <delete id="detachFromDiary">
-        DELETE FROM diary_media WHERE diary_id=#{diaryId} AND asset_id=#{assetId}
-    </delete>
-
-    <delete id="deleteDiaryMedia">
-        DELETE FROM diary_media WHERE diary_id=#{diaryId}
-    </delete>
-
-    <update id="updateDiaryMediaSort">
-        UPDATE diary_media SET sort=#{sort} WHERE diary_id=#{diaryId} AND asset_id=#{assetId}
-    </update>
-
-    <select id="countAnyLinks" resultType="int">
-        SELECT
-          (SELECT COUNT(*) FROM diary_media WHERE asset_id=#{assetId}) +
-          (SELECT COUNT(*) FROM album_media WHERE asset_id=#{assetId}) +
-          (SELECT COUNT(*) FROM favorite_media WHERE asset_id=#{assetId}) +
-          (SELECT COUNT(*) FROM user_avatar WHERE asset_id=#{assetId}) +
-          (SELECT COUNT(*) FROM album WHERE cover_asset_id=#{assetId}) +
-          (SELECT COUNT(*) FROM anniversary WHERE cover_asset_id=#{assetId})
-    </select>
-
-    <select id="findUsedBytesForUpdate" resultType="long">
-        SELECT used_bytes FROM space_storage_usage WHERE space_id=#{spaceId} FOR UPDATE
-    </select>
-
-    <select id="findQuotaBytes" resultType="long">
-        SELECT storage_quota_bytes FROM diary_space WHERE space_id=#{spaceId}
-    </select>
-
-    <update id="addUsedBytes">
-        UPDATE space_storage_usage SET used_bytes=GREATEST(0,used_bytes+#{delta}) WHERE space_id=#{spaceId}
-    </update>
-
-    <update id="softDelete">
-        UPDATE media_asset SET deleted_at=NOW() WHERE asset_id=#{assetId} AND deleted_at IS NULL
-    </update>
 </mapper>

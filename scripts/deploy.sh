@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SERVICE_NAME="${SERVICE_NAME:-diary-backend}"
 JAR_NAME="${JAR_NAME:-Baby-Diary-0.0.1-SNAPSHOT.jar}"
-SYSTEMD_V3_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-v3.conf"
+SYSTEMD_RUNTIME_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-runtime.conf"
+SYSTEMD_RETIRED_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-v3.conf"
 
 cd "$PROJECT_ROOT"
 
@@ -41,7 +42,8 @@ sed \
   -e "s|@JAVA_BIN@|$escaped_java_bin|g" \
   -e "s|@PROJECT_ROOT@|$escaped_project_root|g" \
   -e "s|@JAR_NAME@|$escaped_jar_name|g" \
-  config/diary-backend-v3.conf | install -D -m 0644 /dev/stdin "$SYSTEMD_V3_OVERRIDE"
+  config/diary-backend-runtime.conf | install -D -m 0644 /dev/stdin "$SYSTEMD_RUNTIME_OVERRIDE"
+rm -f "$SYSTEMD_RETIRED_OVERRIDE"
 
 systemctl daemon-reload
 

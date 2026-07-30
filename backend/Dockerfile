@@ -13,7 +13,7 @@ RUN groupadd --system baby-diary \
 
 WORKDIR /app
 COPY --from=build --chown=baby-diary:baby-diary /workspace/backend/target/Baby-Diary-0.0.1-SNAPSHOT.jar /app/app.jar
-COPY --chown=baby-diary:baby-diary config/application-v3-prod.yml /app/config/application-v3-prod.yml
+COPY --chown=baby-diary:baby-diary config/application-prod.yml /app/config/application-prod.yml
 
 USER baby-diary
 EXPOSE 10002
@@ -21,4 +21,4 @@ EXPOSE 10002
 HEALTHCHECK --interval=10s --timeout=5s --start-period=45s --retries=12 \
   CMD curl --fail --silent http://127.0.0.1:10002/actuator/health >/dev/null || exit 1
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar", "--spring.config.location=file:/app/config/application-v3-prod.yml"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar", "--spring.config.location=file:/app/config/application-prod.yml"]

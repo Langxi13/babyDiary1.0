@@ -2,6 +2,9 @@
 
 ## 2026-07-30
 
+- Removed the dormant legacy Java/API/Mapper/migration runtime and promoted the UUID architecture to the sole `BabyDiaryApplication`, canonical configuration, Mapper and Flyway locations while preserving the applied V1/V2 migration checksums.
+- Activated Android minimum-version enforcement with RFC 9457 HTTP 426 responses and CORS support for native version headers, and activated privacy-safe slow-request observation for `/api/v3/**`.
+- Removed the retired one-time data migration CLI and obsolete run instructions; corrected the security documentation so `/images/**` is explicitly forbidden rather than described as public compatibility behavior.
 - Replaced whole-project backups with permission-hardened minimal recovery bundles containing compressed database, object storage, runtime configuration, release metadata and checksums; added a 5 GiB deployment disk gate.
 - Unified V3 media storage, representations, provider-aware reads, profile selection, signed access contexts, Range/HEAD/ETag delivery, and diary/signed-media regression coverage. Migrated diary images now retain their real `ORIGINAL/source` and `THUMBNAIL/default` profiles across diary, share, album cover, avatar, comment avatar, direct-media, and public-media responses.
 - Rejected old profile-less media signatures instead of retaining an ambiguous compatibility path; every new URL binds variant type, actual profile, expiry, and an HMAC-protected access context ticket.

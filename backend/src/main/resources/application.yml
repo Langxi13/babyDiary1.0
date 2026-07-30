@@ -1,55 +1,44 @@
-server:
-  port: 10002
-  servlet:
-    context-path: /
-
-# MyBatis 配置
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.langxi.babydiary.entity
-
-# 数据库配置
 spring:
-  cache:
-    type: simple
-  data:
-    redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6380}
-      timeout: 2s
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/baby-diary?connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:baby_diary}
-    password: ${DB_PASSWORD}
-
-  # 设置文件上传大小限制
-  servlet:
-    multipart:
-      max-file-size: 256MB
-      max-request-size: 300MB
+    url: ${V3_DB_URL:jdbc:mysql://127.0.0.1:3306/baby_diary_v3?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${V3_DB_USERNAME:${DB_USERNAME:baby_diary}}
+    password: ${V3_DB_PASSWORD:${DB_PASSWORD}}
+    hikari:
+      maximum-pool-size: ${V3_DB_POOL_MAX:8}
+      minimum-idle: ${V3_DB_POOL_MIN:2}
+      connection-timeout: 5000
+      validation-timeout: 2000
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 1
+    locations: classpath:db/migration
+    clean-disabled: true
+    baseline-on-migrate: false
+  task:
+    execution:
+      pool:
+        core-size: 1
+        max-size: 2
+        queue-capacity: 20
 
-diaryFilePath: ${DIARY_FILE_PATH:${user.dir}/data/images/}
-diaryPageSize: ${DIARY_PAGE_SIZE:5}
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:10002}
 
-# JWT配置
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:2592000000}
+  secret: ${JWT_SECRET:development-only-jwt-signing-key-change-before-deploying}
   access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
 
-# CORS配置
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   native-origins: ${CORS_NATIVE_ORIGINS:https://localhost,capacitor://localhost}
 
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
 app:
   release:
-    version: ${APP_RELEASE_VERSION:1.0.0}
+    version: ${APP_RELEASE_VERSION:3.0.0}
     android:
       enabled: ${ANDROID_UPDATE_ENABLED:false}
       distribution: ${ANDROID_UPDATE_DISTRIBUTION:DIRECT}
@@ -62,19 +51,15 @@ app:
       mandatory: ${ANDROID_UPDATE_MANDATORY:false}
   invitation:
     bootstrap-code: ${INVITATION_CODE:}
-    encryption-key: ${INVITATION_CODE_ENCRYPTION_KEY}
   auth:
     refresh-days: ${AUTH_REFRESH_DAYS:30}
     secure-cookie: ${AUTH_SECURE_COOKIE:false}
-    step-up-minutes: ${AUTH_STEP_UP_MINUTES:10}
   mail:
     enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:}
     public-url: ${PUBLIC_URL:http://localhost:5173}
   push:
     vapid-public-key: ${VAPID_PUBLIC_KEY:}
-    vapid-private-key: ${VAPID_PRIVATE_KEY:}
-    subject: ${VAPID_SUBJECT:mailto:admin@example.com}
   storage:
     provider: ${OBJECT_STORAGE_PROVIDER:local}
     local-root: ${DIARY_OBJECT_PATH:${user.dir}/data/objects/}
@@ -84,40 +69,30 @@ app:
       bucket: ${S3_BUCKET:baby-diary}
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
-  media:
-    processing-enabled: ${MEDIA_PROCESSING_ENABLED:true}
-    ffmpeg: ${FFMPEG_BIN:ffmpeg}
-    ffprobe: ${FFPROBE_BIN:ffprobe}
-    tesseract: ${TESSERACT_BIN:tesseract}
-  reminders:
-    delivery-delay-ms: ${REMINDER_DELIVERY_DELAY_MS:60000}
   export:
     pdf-font-path: ${PDF_FONT_PATH:/usr/share/fonts/truetype/unifont/unifont.ttf}
-  cache:
-    prefix: ${CACHE_PREFIX:baby-diary:local:}
+  media:
+    url-signing-key: ${V3_MEDIA_URL_SIGNING_KEY:${JWT_SECRET:development-only-media-signing-key}}
+    url-lifetime-seconds: ${V3_MEDIA_URL_LIFETIME_SECONDS:1800}
+    protected-url-lifetime-seconds: ${V3_MEDIA_PROTECTED_URL_LIFETIME_SECONDS:300}
+    processing-min-free-bytes: ${V3_MEDIA_PROCESSING_MIN_FREE_BYTES:3221225472}
+    ffmpeg: ${FFMPEG_PATH:ffmpeg}
+    ffprobe: ${FFPROBE_PATH:ffprobe}
+  jobs:
+    enabled: ${V3_JOBS_ENABLED:true}
+    worker-id: ${V3_WORKER_ID:${HOSTNAME:single-node}}
+    poll-delay-ms: ${V3_JOB_POLL_DELAY_MS:2000}
+    stale-after-minutes: ${V3_JOB_STALE_MINUTES:30}
+    recovery-delay-ms: ${V3_JOB_RECOVERY_DELAY_MS:300000}
+  rate-limit:
+    enabled: ${V3_RATE_LIMIT_ENABLED:true}
+    redis-enabled: ${V3_RATE_LIMIT_REDIS_ENABLED:false}
   http:
     slow-request-threshold-ms: ${SLOW_REQUEST_THRESHOLD_MS:1000}
 
 ai:
   config:
-    encryption-key: ${AI_CONFIG_ENCRYPTION_KEY}
+    encryption-key: ${AI_CONFIG_ENCRYPTION_KEY:development-only-ai-encryption-key}
 
-# SpringDoc配置
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-    enabled: ${SPRINGDOC_ENABLED:true}
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: ${SPRINGDOC_ENABLED:true}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-  endpoint:
-    health:
-      show-details: never
-      probes:
-        enabled: true
+invitation-code:
+  encryption-key: ${INVITATION_CODE_ENCRYPTION_KEY:development-only-invitation-encryption-key}
