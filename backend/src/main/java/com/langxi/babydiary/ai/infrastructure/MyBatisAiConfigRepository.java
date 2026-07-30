@@ -14,8 +14,15 @@ public class MyBatisAiConfigRepository implements AiConfigRepository {
     @Override
     public Config find() {
         AiConfigMapper.ConfigRow row = mapper.find();
-        return row == null ? null : new Config(row.enabled(), row.baseUrl(), row.model(), row.encryptedApiKey(),
-                row.timeoutSeconds(), row.updatedAt());
+        return row == null
+                ? null
+                : new Config(
+                        row.enabled(),
+                        row.baseUrl(),
+                        row.model(),
+                        row.encryptedApiKey(),
+                        row.timeoutSeconds(),
+                        row.updatedAt());
     }
 
     @Override

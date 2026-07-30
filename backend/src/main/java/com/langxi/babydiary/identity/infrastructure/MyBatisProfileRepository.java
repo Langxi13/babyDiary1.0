@@ -2,10 +2,9 @@ package com.langxi.babydiary.identity.infrastructure;
 
 import com.langxi.babydiary.identity.application.ProfileRepository;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisProfileRepository implements ProfileRepository {
@@ -17,12 +16,26 @@ public class MyBatisProfileRepository implements ProfileRepository {
 
     @Override
     public Optional<Profile> find(long accountId) {
-        return Optional.ofNullable(mapper.find(accountId)).map(row -> new Profile(row.accountId(),
-                BinaryUuid.fromBytes(row.publicId()), row.username(), row.passwordHash(), row.email(),
-                row.emailVerified(), row.systemRole(), row.timezone(),
-                row.avatarPublicId() == null ? null : BinaryUuid.fromBytes(row.avatarPublicId()),
-                row.avatarSpacePublicId() == null ? null : BinaryUuid.fromBytes(row.avatarSpacePublicId()),
-                row.avatarVariantType(), row.avatarVariantProfile()));
+        return Optional.ofNullable(mapper.find(accountId))
+                .map(
+                        row ->
+                                new Profile(
+                                        row.accountId(),
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        row.username(),
+                                        row.passwordHash(),
+                                        row.email(),
+                                        row.emailVerified(),
+                                        row.systemRole(),
+                                        row.timezone(),
+                                        row.avatarPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.avatarPublicId()),
+                                        row.avatarSpacePublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.avatarSpacePublicId()),
+                                        row.avatarVariantType(),
+                                        row.avatarVariantProfile()));
     }
 
     @Override

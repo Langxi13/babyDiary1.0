@@ -1,7 +1,8 @@
 package com.langxi.babydiary.media.api;
 
-import com.langxi.babydiary.storage.StoredObject;
 import com.langxi.babydiary.media.application.MediaService;
+import com.langxi.babydiary.storage.StoredObject;
+import java.time.Duration;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -9,23 +10,27 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
-import java.io.IOException;
-import java.time.Duration;
-
 final class MediaContentResponse {
-    private MediaContentResponse() {
-    }
+    private MediaContentResponse() {}
 
-    static ResponseEntity<StreamingResponseBody> create(MediaService media,
-                                                         MediaService.ResolvedVariant resolved,
-                                                         String rangeHeader, String ifNoneMatch,
-                                                         boolean head, boolean noStore) {
+    static ResponseEntity<StreamingResponseBody> create(
+            MediaService media,
+            MediaService.ResolvedVariant resolved,
+            String rangeHeader,
+            String ifNoneMatch,
+            boolean head,
+            boolean noStore) {
         long total = resolved.variant().sizeBytes();
-        if ((rangeHeader == null || rangeHeader.isBlank()) && matches(ifNoneMatch, resolved.etag())) {
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(resolved.etag())
-                    .cacheControl(noStore ? CacheControl.noStore()
-                            : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate())
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes").build();
+        if ((rangeHeader == null || rangeHeader.isBlank())
+                && matches(ifNoneMatch, resolved.etag())) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(resolved.etag())
+                    .cacheControl(
+                            noStore
+                                    ? CacheControl.noStore()
+                                    : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate())
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .build();
         }
         ByteRange range = range(rangeHeader, total);
         HttpStatus status = range.partial() ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK;
@@ -37,23 +42,30 @@ final class MediaContentResponse {
         headers.set(HttpHeaders.CONTENT_DISPOSITION, "inline");
         headers.set("X-Content-Type-Options", "nosniff");
         if (range.partial()) {
-            headers.set(HttpHeaders.CONTENT_RANGE, "bytes " + range.start() + '-' + range.end() + '/' + total);
+            headers.set(
+                    HttpHeaders.CONTENT_RANGE,
+                    "bytes " + range.start() + '-' + range.end() + '/' + total);
         }
-        headers.setCacheControl(noStore ? CacheControl.noStore()
-                : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate());
+        headers.setCacheControl(
+                noStore
+                        ? CacheControl.noStore()
+                        : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate());
         if (head) return new ResponseEntity<>(null, headers, status);
-        StreamingResponseBody body = output -> {
-            try (StoredObject object = media.open(resolved, range.start(), range.length())) {
-                object.stream().transferTo(output);
-            }
-        };
+        StreamingResponseBody body =
+                output -> {
+                    try (StoredObject object =
+                            media.open(resolved, range.start(), range.length())) {
+                        object.stream().transferTo(output);
+                    }
+                };
         return new ResponseEntity<>(body, headers, status);
     }
 
     private static ByteRange range(String header, long total) {
         if (total < 0) throw new IllegalArgumentException("Negative media length");
         if (header == null || header.isBlank()) return new ByteRange(0, total - 1, false);
-        if (!header.startsWith("bytes=") || header.indexOf(',') >= 0 || total == 0) throw invalidRange(total);
+        if (!header.startsWith("bytes=") || header.indexOf(',') >= 0 || total == 0)
+            throw invalidRange(total);
         String value = header.substring(6).trim();
         int separator = value.indexOf('-');
         if (separator < 0) throw invalidRange(total);
@@ -92,12 +104,18 @@ final class MediaContentResponse {
     }
 
     private static MediaType contentType(String value) {
-        try { return value == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(value); }
-        catch (RuntimeException ignored) { return MediaType.APPLICATION_OCTET_STREAM; }
+        try {
+            return value == null
+                    ? MediaType.APPLICATION_OCTET_STREAM
+                    : MediaType.parseMediaType(value);
+        } catch (RuntimeException ignored) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 
     record ByteRange(long start, long end, boolean partial) {
-        long length() { return end < start ? 0 : end - start + 1; }
+        long length() {
+            return end < start ? 0 : end - start + 1;
+        }
     }
-
 }

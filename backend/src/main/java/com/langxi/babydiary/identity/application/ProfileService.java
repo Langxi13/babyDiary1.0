@@ -1,22 +1,21 @@
 package com.langxi.babydiary.identity.application;
 
-import com.langxi.babydiary.media.application.MediaRepository;
-import com.langxi.babydiary.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.media.application.MediaAccessContext;
+import com.langxi.babydiary.media.application.MediaAccessPolicy;
+import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.domain.MediaAsset;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.space.application.SpaceAccess;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.zone.ZoneRulesException;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProfileService {
@@ -28,30 +27,38 @@ public class ProfileService {
     private final PasswordEncoder passwords;
     private final MediaAccessPolicy mediaAccess;
 
-    public ProfileService(ProfileRepository profiles, SpaceAccess spaces, MediaRepository media,
-                          PasswordEncoder passwords,MediaAccessPolicy mediaAccess) {
+    public ProfileService(
+            ProfileRepository profiles,
+            SpaceAccess spaces,
+            MediaRepository media,
+            PasswordEncoder passwords,
+            MediaAccessPolicy mediaAccess) {
         this.profiles = profiles;
         this.spaces = spaces;
         this.media = media;
         this.passwords = passwords;
-        this.mediaAccess=mediaAccess;
+        this.mediaAccess = mediaAccess;
     }
 
     public ProfileRepository.Profile profile(long accountId) {
-        return profiles.find(accountId).orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
+        return profiles.find(accountId)
+                .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
     }
 
     @Transactional
-    public ProfileRepository.Profile update(long accountId, String username, String email, String timezone) {
+    public ProfileRepository.Profile update(
+            long accountId, String username, String email, String timezone) {
         String normalizedUsername = username == null ? "" : username.trim();
         if (!USERNAME.matcher(normalizedUsername).matches()) {
             throw ApiException.badRequest("USERNAME_INVALID", "用户名仅支持字母、数字、点、下划线和短横线，长度为2至100个字符");
         }
         String normalizedEmail = email == null || email.isBlank() ? null : email.trim();
-        if (normalizedEmail != null && (normalizedEmail.length() > 255 || !EMAIL.matcher(normalizedEmail).matches())) {
+        if (normalizedEmail != null
+                && (normalizedEmail.length() > 255 || !EMAIL.matcher(normalizedEmail).matches())) {
             throw ApiException.badRequest("EMAIL_INVALID", "邮箱格式无效");
         }
-        String normalizedTimezone = timezone == null || timezone.isBlank() ? "Asia/Shanghai" : timezone.trim();
+        String normalizedTimezone =
+                timezone == null || timezone.isBlank() ? "Asia/Shanghai" : timezone.trim();
         try {
             java.time.ZoneId.of(normalizedTimezone);
         } catch (ZoneRulesException exception) {
@@ -60,18 +67,30 @@ public class ProfileService {
         try {
             profiles.update(accountId, normalizedUsername, normalizedEmail, normalizedTimezone);
         } catch (DuplicateKeyException exception) {
-            throw new ApiException(org.springframework.http.HttpStatus.CONFLICT, "ACCOUNT_FIELD_EXISTS", "用户名或邮箱已被使用");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "ACCOUNT_FIELD_EXISTS",
+                    "用户名或邮箱已被使用");
         }
         return profile(accountId);
     }
 
     @Transactional
-    public ProfileRepository.Profile setAvatar(long accountId, UUID spaceId, UUID assetId,boolean elevated) {
+    public ProfileRepository.Profile setAvatar(
+            long accountId, UUID spaceId, UUID assetId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        mediaAccess.require(spaceId,assetId, MediaAccessContext.direct(accountId,elevated));
-        MediaAsset asset = media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream().findFirst()
-                .filter(value -> value.ownerId() == accountId && "IMAGE".equals(value.mediaType()))
-                .orElseThrow(() -> ApiException.badRequest("AVATAR_MEDIA_INVALID", "头像图片不存在、不是图片或不属于当前账户"));
+        mediaAccess.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        MediaAsset asset =
+                media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream()
+                        .findFirst()
+                        .filter(
+                                value ->
+                                        value.ownerId() == accountId
+                                                && "IMAGE".equals(value.mediaType()))
+                        .orElseThrow(
+                                () ->
+                                        ApiException.badRequest(
+                                                "AVATAR_MEDIA_INVALID", "头像图片不存在、不是图片或不属于当前账户"));
         profiles.setAvatar(accountId, space.internalId(), asset.internalId());
         return profile(accountId);
     }
@@ -85,11 +104,13 @@ public class ProfileService {
     public void changePassword(long accountId, String currentPassword, String nextPassword) {
         ProfileRepository.Profile profile = profile(accountId);
         if (!passwords.matches(currentPassword, profile.passwordHash())) {
-            throw new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED, "PASSWORD_INVALID", "当前密码错误");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "PASSWORD_INVALID", "当前密码错误");
         }
         if (nextPassword == null || nextPassword.length() < 8 || nextPassword.length() > 200) {
             throw ApiException.badRequest("PASSWORD_WEAK", "新密码长度需为8至200个字符");
         }
-        profiles.changePassword(accountId, passwords.encode(nextPassword), LocalDateTime.now(ZoneOffset.UTC));
+        profiles.changePassword(
+                accountId, passwords.encode(nextPassword), LocalDateTime.now(ZoneOffset.UTC));
     }
 }

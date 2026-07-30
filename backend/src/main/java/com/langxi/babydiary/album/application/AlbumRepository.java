@@ -11,7 +11,8 @@ public interface AlbumRepository {
 
     Optional<AlbumRow> findAlbum(long spaceId, UUID albumId);
 
-    List<UUID> findMediaPublicIds(long spaceId, UUID albumId, long accountId, int offset, int limit);
+    List<UUID> findMediaPublicIds(
+            long spaceId, UUID albumId, long accountId, int offset, int limit);
 
     default List<UUID> findMediaPublicIds(long spaceId, UUID albumId, long accountId) {
         return findMediaPublicIds(spaceId, albumId, accountId, 0, Integer.MAX_VALUE);
@@ -51,17 +52,31 @@ public interface AlbumRepository {
 
     long countLibraryImages(long spaceId, long accountId);
 
-    record NewGroup(UUID publicId, long spaceId, String name, int sortOrder, long createdBy) {
-    }
+    record NewGroup(UUID publicId, long spaceId, String name, int sortOrder, long createdBy) {}
 
-    record NewAlbum(UUID publicId, long spaceId, Long groupId, long createdBy, String name, String description,
-                    String type, Long coverAssetId, int sortOrder) {
-    }
+    record NewAlbum(
+            UUID publicId,
+            long spaceId,
+            Long groupId,
+            long createdBy,
+            String name,
+            String description,
+            String type,
+            Long coverAssetId,
+            int sortOrder) {}
 
-    record GroupRow(long internalId, UUID id, String name, int sortOrder) {
-    }
+    record GroupRow(long internalId, UUID id, String name, int sortOrder) {}
 
-    record AlbumRow(long internalId, UUID id, Long groupInternalId, UUID groupId, String type, String name, String description,
-                    UUID coverAssetId, String coverVariantType, String coverVariantProfile, long mediaCount) {
-    }
+    record AlbumRow(
+            long internalId,
+            UUID id,
+            Long groupInternalId,
+            UUID groupId,
+            String type,
+            String name,
+            String description,
+            UUID coverAssetId,
+            String coverVariantType,
+            String coverVariantProfile,
+            long mediaCount) {}
 }

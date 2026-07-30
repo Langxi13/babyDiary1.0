@@ -1,7 +1,6 @@
 package com.langxi.babydiary.diary.application;
 
 import com.langxi.babydiary.diary.domain.DiaryEntry;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,7 +12,8 @@ public interface DiaryRepository {
 
     long count(Query query);
 
-    Optional<DiaryEntry> findByPublicId(long spaceId, UUID diaryId, long accountId, boolean includeDeleted);
+    Optional<DiaryEntry> findByPublicId(
+            long spaceId, UUID diaryId, long accountId, boolean includeDeleted);
 
     long insert(NewDiary diary);
 
@@ -29,28 +29,50 @@ public interface DiaryRepository {
 
     void replaceMedia(long spaceId, long diaryId, List<Long> assetIds);
 
-    void insertRevision(long diaryId, int version, long editorId, String snapshotJson, LocalDateTime createdAt);
+    void insertRevision(
+            long diaryId, int version, long editorId, String snapshotJson, LocalDateTime createdAt);
 
     Optional<Revision> findRevision(long diaryId, long revisionId);
 
     List<RevisionSummary> findRevisions(long diaryId);
 
-    record Query(long spaceId, long accountId, LocalDate startDate, LocalDate endDate, String keyword,
-                 String mood, UUID tagId, boolean trash, boolean elevated,
-                 LocalDate cursorDate, Long cursorId, int limit) {
-    }
+    record Query(
+            long spaceId,
+            long accountId,
+            LocalDate startDate,
+            LocalDate endDate,
+            String keyword,
+            String mood,
+            UUID tagId,
+            boolean trash,
+            boolean elevated,
+            LocalDate cursorDate,
+            Long cursorId,
+            int limit) {}
 
-    record NewDiary(UUID publicId, long spaceId, long authorId, String title, LocalDate diaryDate,
-                    String contentHtml, String contentText, String mood, String visibility, boolean locked) {
-    }
+    record NewDiary(
+            UUID publicId,
+            long spaceId,
+            long authorId,
+            String title,
+            LocalDate diaryDate,
+            String contentHtml,
+            String contentText,
+            String mood,
+            String visibility,
+            boolean locked) {}
 
-    record UpdatedDiary(String title, LocalDate diaryDate, String contentHtml, String contentText,
-                        String mood, String visibility, boolean locked) {
-    }
+    record UpdatedDiary(
+            String title,
+            LocalDate diaryDate,
+            String contentHtml,
+            String contentText,
+            String mood,
+            String visibility,
+            boolean locked) {}
 
-    record Revision(long id, int version, long editorId, String snapshotJson, LocalDateTime createdAt) {
-    }
+    record Revision(
+            long id, int version, long editorId, String snapshotJson, LocalDateTime createdAt) {}
 
-    record RevisionSummary(long id, int version, long editorId, LocalDateTime createdAt) {
-    }
+    record RevisionSummary(long id, int version, long editorId, LocalDateTime createdAt) {}
 }

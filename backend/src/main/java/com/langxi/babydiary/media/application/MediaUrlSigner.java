@@ -2,12 +2,6 @@ package com.langxi.babydiary.media.application;
 
 import com.langxi.babydiary.platform.application.ApiException;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -17,6 +11,11 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component
 public class MediaUrlSigner {
@@ -28,11 +27,15 @@ public class MediaUrlSigner {
     private byte[] key;
 
     @Autowired
-    public MediaUrlSigner(@Value("${app.media.url-signing-key:${jwt.secret}}") String secret,
-                          @Value("${app.media.url-lifetime-seconds:1800}") long lifetimeSeconds,
-                          @Value("${app.media.protected-url-lifetime-seconds:300}") long protectedSeconds) {
-        this(secret, Duration.ofSeconds(Math.max(60, lifetimeSeconds)),
-                Duration.ofSeconds(Math.max(60, protectedSeconds)), Clock.systemUTC());
+    public MediaUrlSigner(
+            @Value("${app.media.url-signing-key:${jwt.secret}}") String secret,
+            @Value("${app.media.url-lifetime-seconds:1800}") long lifetimeSeconds,
+            @Value("${app.media.protected-url-lifetime-seconds:300}") long protectedSeconds) {
+        this(
+                secret,
+                Duration.ofSeconds(Math.max(60, lifetimeSeconds)),
+                Duration.ofSeconds(Math.max(60, protectedSeconds)),
+                Clock.systemUTC());
     }
 
     MediaUrlSigner(String secret, Duration lifetime, Duration protectedLifetime, Clock clock) {
@@ -45,46 +48,85 @@ public class MediaUrlSigner {
     @PostConstruct
     void initialize() {
         if (secret == null || secret.length() < 32) {
-            throw new IllegalStateException("Media URL signing key must contain at least 32 characters");
+            throw new IllegalStateException(
+                    "Media URL signing key must contain at least 32 characters");
         }
         key = secret.getBytes(StandardCharsets.UTF_8);
     }
 
-    public SignedUrl url(UUID spaceId, UUID assetId, String variant, String profile,
-                         MediaAccessContext context) {
+    public SignedUrl url(
+            UUID spaceId,
+            UUID assetId,
+            String variant,
+            String profile,
+            MediaAccessContext context) {
         String normalized = normalizeVariant(variant);
         String normalizedProfile = normalizeProfile(profile);
-        String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                context.serialize().getBytes(StandardCharsets.UTF_8));
-        Duration selected = context.elevated() || context.source() == MediaAccessContext.Source.SHARE
-                ? protectedLifetime : lifetime;
+        String ticket =
+                Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(context.serialize().getBytes(StandardCharsets.UTF_8));
+        Duration selected =
+                context.elevated() || context.source() == MediaAccessContext.Source.SHARE
+                        ? protectedLifetime
+                        : lifetime;
         long now = clock.instant().getEpochSecond();
-        long expires = ((now + selected.toSeconds() + BUCKET_SECONDS - 1) / BUCKET_SECONDS) * BUCKET_SECONDS;
+        long expires =
+                ((now + selected.toSeconds() + BUCKET_SECONDS - 1) / BUCKET_SECONDS)
+                        * BUCKET_SECONDS;
         if (expires <= now) expires = now + 60;
-        String signature = sign(payload(spaceId, assetId, normalized, normalizedProfile, ticket, expires));
-        String value = "/api/v3/public/media/" + spaceId + "/" + assetId + "/"
-                + normalized.toLowerCase(Locale.ROOT) + "?profile=" + normalizedProfile
-                + "&ticket=" + ticket + "&expires=" + expires + "&signature=" + signature;
+        String signature =
+                sign(payload(spaceId, assetId, normalized, normalizedProfile, ticket, expires));
+        String value =
+                "/api/v3/public/media/"
+                        + spaceId
+                        + "/"
+                        + assetId
+                        + "/"
+                        + normalized.toLowerCase(Locale.ROOT)
+                        + "?profile="
+                        + normalizedProfile
+                        + "&ticket="
+                        + ticket
+                        + "&expires="
+                        + expires
+                        + "&signature="
+                        + signature;
         return new SignedUrl(value, Instant.ofEpochSecond(expires));
     }
 
-    public VerifiedVariant verify(UUID spaceId, UUID assetId, String variant, String profile,
-                                  String ticket, long expires, String signature) {
+    public VerifiedVariant verify(
+            UUID spaceId,
+            UUID assetId,
+            String variant,
+            String profile,
+            String ticket,
+            long expires,
+            String signature) {
         String normalized = normalizeVariant(variant);
         String normalizedProfile = normalizeProfile(profile);
         long now = clock.instant().getEpochSecond();
         if (expires < now) throw ApiException.notFound("MEDIA_URL_EXPIRED", "媒体访问地址已过期");
-        if (expires > now + Math.max(lifetime.toSeconds(), protectedLifetime.toSeconds()) + BUCKET_SECONDS) {
+        if (expires
+                > now
+                        + Math.max(lifetime.toSeconds(), protectedLifetime.toSeconds())
+                        + BUCKET_SECONDS) {
             throw ApiException.notFound("MEDIA_URL_INVALID", "媒体访问地址无效");
         }
-        String expected = sign(payload(spaceId, assetId, normalized, normalizedProfile, ticket, expires));
-        if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
+        String expected =
+                sign(payload(spaceId, assetId, normalized, normalizedProfile, ticket, expires));
+        if (!MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.US_ASCII),
                 String.valueOf(signature).getBytes(StandardCharsets.US_ASCII))) {
             throw ApiException.notFound("MEDIA_URL_INVALID", "媒体访问地址无效");
         }
         try {
-            String decoded = new String(Base64.getUrlDecoder().decode(ticket), StandardCharsets.UTF_8);
-            return new VerifiedVariant(normalized, normalizedProfile, MediaAccessContext.parse(decoded),
+            String decoded =
+                    new String(Base64.getUrlDecoder().decode(ticket), StandardCharsets.UTF_8);
+            return new VerifiedVariant(
+                    normalized,
+                    normalizedProfile,
+                    MediaAccessContext.parse(decoded),
                     Instant.ofEpochSecond(expires));
         } catch (IllegalArgumentException exception) {
             throw ApiException.notFound("MEDIA_URL_INVALID", "媒体访问地址无效");
@@ -92,7 +134,10 @@ public class MediaUrlSigner {
     }
 
     private String normalizeVariant(String variant) {
-        String value = variant == null || variant.isBlank() ? "ORIGINAL" : variant.trim().toUpperCase(Locale.ROOT);
+        String value =
+                variant == null || variant.isBlank()
+                        ? "ORIGINAL"
+                        : variant.trim().toUpperCase(Locale.ROOT);
         if (!value.matches("[A-Z][A-Z0-9_]{0,31}")) {
             throw ApiException.notFound("MEDIA_URL_INVALID", "媒体访问地址无效");
         }
@@ -107,9 +152,15 @@ public class MediaUrlSigner {
         return value;
     }
 
-    private String payload(UUID spaceId, UUID assetId, String variant, String profile,
-                           String ticket, long expires) {
-        return spaceId + "\n" + assetId + "\n" + variant + "\n" + profile + "\n" + ticket + "\n" + expires;
+    private String payload(
+            UUID spaceId,
+            UUID assetId,
+            String variant,
+            String profile,
+            String ticket,
+            long expires) {
+        return spaceId + "\n" + assetId + "\n" + variant + "\n" + profile + "\n" + ticket + "\n"
+                + expires;
     }
 
     private String sign(String value) {
@@ -122,9 +173,8 @@ public class MediaUrlSigner {
         }
     }
 
-    public record SignedUrl(String url, Instant expiresAt) {
-    }
+    public record SignedUrl(String url, Instant expiresAt) {}
 
-    public record VerifiedVariant(String type, String profile, MediaAccessContext context, Instant expiresAt) {
-    }
+    public record VerifiedVariant(
+            String type, String profile, MediaAccessContext context, Instant expiresAt) {}
 }

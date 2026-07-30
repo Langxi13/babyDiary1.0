@@ -1,18 +1,17 @@
 package com.langxi.babydiary.platform.infrastructure;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.application.ClientReleaseProperties;
 import jakarta.servlet.FilterChain;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class AndroidVersionGateFilterTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -51,32 +50,42 @@ class AndroidVersionGateFilterTest {
     @Test
     void allowsSupportedAndroidAndWebRequests() throws Exception {
         AtomicBoolean supportedContinued = new AtomicBoolean();
-        filter.doFilter(request("/api/v3/spaces", "android", "10"), new MockHttpServletResponse(),
+        filter.doFilter(
+                request("/api/v3/spaces", "android", "10"),
+                new MockHttpServletResponse(),
                 chain(supportedContinued));
         assertThat(supportedContinued).isTrue();
 
         AtomicBoolean webContinued = new AtomicBoolean();
-        filter.doFilter(request("/api/v3/spaces", null, null), new MockHttpServletResponse(), chain(webContinued));
+        filter.doFilter(
+                request("/api/v3/spaces", null, null),
+                new MockHttpServletResponse(),
+                chain(webContinued));
         assertThat(webContinued).isTrue();
     }
 
     @Test
     void neverBlocksBootstrapOrPublicMedia() throws Exception {
         AtomicBoolean bootstrapContinued = new AtomicBoolean();
-        filter.doFilter(request("/api/v3/client/bootstrap", "android", "1"), new MockHttpServletResponse(),
+        filter.doFilter(
+                request("/api/v3/client/bootstrap", "android", "1"),
+                new MockHttpServletResponse(),
                 chain(bootstrapContinued));
         assertThat(bootstrapContinued).isTrue();
 
         AtomicBoolean publicContinued = new AtomicBoolean();
-        filter.doFilter(request("/api/v3/public/media/asset/content", "android", "1"),
-                new MockHttpServletResponse(), chain(publicContinued));
+        filter.doFilter(
+                request("/api/v3/public/media/asset/content", "android", "1"),
+                new MockHttpServletResponse(),
+                chain(publicContinued));
         assertThat(publicContinued).isTrue();
     }
 
     private MockHttpServletRequest request(String path, String platform, String versionCode) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         if (platform != null) request.addHeader(AndroidVersionGateFilter.PLATFORM_HEADER, platform);
-        if (versionCode != null) request.addHeader(AndroidVersionGateFilter.VERSION_CODE_HEADER, versionCode);
+        if (versionCode != null)
+            request.addHeader(AndroidVersionGateFilter.VERSION_CODE_HEADER, versionCode);
         return request;
     }
 

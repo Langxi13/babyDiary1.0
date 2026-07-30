@@ -22,18 +22,22 @@ public record DiaryEntry(
         LocalDateTime updatedAt,
         LocalDateTime deletedAt,
         List<TagRef> tags,
-        List<MediaRef> media
-) {
+        List<MediaRef> media) {
     public DiaryEntry {
         tags = List.copyOf(tags);
         media = List.copyOf(media);
     }
 
-    public record TagRef(UUID id, String name, String color) {
-    }
+    public record TagRef(UUID id, String name, String color) {}
 
-    public record MediaRef(UUID id, String mediaType, String caption, LocalDateTime takenAt,
-                           int position, String status, String originalProfile, String thumbnailProfile,
-                           boolean protectedContent) {
-    }
+    public record MediaRef(
+            UUID id,
+            String mediaType,
+            String caption,
+            LocalDateTime takenAt,
+            int position,
+            String status,
+            String originalProfile,
+            String thumbnailProfile,
+            boolean protectedContent) {}
 }

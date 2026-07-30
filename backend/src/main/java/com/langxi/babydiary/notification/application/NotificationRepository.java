@@ -15,7 +15,13 @@ public interface NotificationRepository {
 
     void markAllRead(long accountId, LocalDateTime now);
 
-    record Row(UUID id, UUID spaceId, String type, String title, String body, String targetRefJson,
-               LocalDateTime readAt, LocalDateTime createdAt) {
-    }
+    record Row(
+            UUID id,
+            UUID spaceId,
+            String type,
+            String title,
+            String body,
+            String targetRefJson,
+            LocalDateTime readAt,
+            LocalDateTime createdAt) {}
 }

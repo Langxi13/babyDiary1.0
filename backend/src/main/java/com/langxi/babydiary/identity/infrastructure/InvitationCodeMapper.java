@@ -13,7 +13,8 @@ public interface InvitationCodeMapper {
     @Select("SELECT encrypted_code FROM system_invitation_config WHERE config_id=1 FOR UPDATE")
     String findEncryptedForUpdate();
 
-    @Insert("""
+    @Insert(
+            """
             INSERT INTO system_invitation_config(config_id,encrypted_code,updated_by,updated_at)
             VALUES(1,#{encryptedCode},#{updatedBy},UTC_TIMESTAMP(6))
             ON DUPLICATE KEY UPDATE encrypted_code=VALUES(encrypted_code),updated_by=VALUES(updated_by),updated_at=UTC_TIMESTAMP(6)

@@ -2,11 +2,9 @@ package com.langxi.babydiary.draft.infrastructure;
 
 import com.langxi.babydiary.draft.application.DraftRepository;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisDraftRepository implements DraftRepository {
@@ -28,8 +26,14 @@ public class MyBatisDraftRepository implements DraftRepository {
 
     @Override
     public void upsert(NewDraft draft) {
-        mapper.upsert(new DraftMapper.DraftInsert(BinaryUuid.toBytes(draft.publicId()), draft.spaceId(), draft.ownerId(),
-                draft.diaryId(), draft.draftKey(), draft.payloadJson()));
+        mapper.upsert(
+                new DraftMapper.DraftInsert(
+                        BinaryUuid.toBytes(draft.publicId()),
+                        draft.spaceId(),
+                        draft.ownerId(),
+                        draft.diaryId(),
+                        draft.draftKey(),
+                        draft.payloadJson()));
     }
 
     @Override
@@ -38,8 +42,13 @@ public class MyBatisDraftRepository implements DraftRepository {
     }
 
     private Row row(DraftMapper.DraftRow value) {
-        return new Row(BinaryUuid.fromBytes(value.publicId()), BinaryUuid.fromBytes(value.spacePublicId()),
-                value.draftKey(), value.diaryPublicId() == null ? null : BinaryUuid.fromBytes(value.diaryPublicId()),
-                value.payload(), value.createdAt(), value.updatedAt());
+        return new Row(
+                BinaryUuid.fromBytes(value.publicId()),
+                BinaryUuid.fromBytes(value.spacePublicId()),
+                value.draftKey(),
+                value.diaryPublicId() == null ? null : BinaryUuid.fromBytes(value.diaryPublicId()),
+                value.payload(),
+                value.createdAt(),
+                value.updatedAt());
     }
 }

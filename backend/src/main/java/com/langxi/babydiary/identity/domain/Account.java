@@ -12,8 +12,7 @@ public record Account(
         String systemRole,
         String timezone,
         int tokenVersion,
-        String status
-) {
+        String status) {
     public boolean active() {
         return "ACTIVE".equals(status);
     }

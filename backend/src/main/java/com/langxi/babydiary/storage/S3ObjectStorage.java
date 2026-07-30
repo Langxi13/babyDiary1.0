@@ -2,15 +2,12 @@ package com.langxi.babydiary.storage;
 
 import io.minio.*;
 import io.minio.errors.*;
+import java.io.IOException;
+import java.io.InputStream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 
 @Service
 @Primary
@@ -19,12 +16,18 @@ public class S3ObjectStorage implements ObjectStorage {
     private final MinioClient client;
     private final String bucket;
 
-    public S3ObjectStorage(@Value("${app.storage.s3.endpoint}") String endpoint,
-                           @Value("${app.storage.s3.region:us-east-1}") String region,
-                           @Value("${app.storage.s3.bucket}") String bucket,
-                           @Value("${app.storage.s3.access-key}") String accessKey,
-                           @Value("${app.storage.s3.secret-key}") String secretKey) {
-        this.client = MinioClient.builder().endpoint(endpoint).credentials(accessKey, secretKey).region(region).build();
+    public S3ObjectStorage(
+            @Value("${app.storage.s3.endpoint}") String endpoint,
+            @Value("${app.storage.s3.region:us-east-1}") String region,
+            @Value("${app.storage.s3.bucket}") String bucket,
+            @Value("${app.storage.s3.access-key}") String accessKey,
+            @Value("${app.storage.s3.secret-key}") String secretKey) {
+        this.client =
+                MinioClient.builder()
+                        .endpoint(endpoint)
+                        .credentials(accessKey, secretKey)
+                        .region(region)
+                        .build();
         this.bucket = bucket;
     }
 
@@ -34,10 +37,13 @@ public class S3ObjectStorage implements ObjectStorage {
     }
 
     @Override
-    public void put(String key, InputStream input, long size, String contentType) throws IOException {
+    public void put(String key, InputStream input, long size, String contentType)
+            throws IOException {
         try {
-            client.putObject(PutObjectArgs.builder().bucket(bucket).object(key)
-                    .stream(input, size, -1).contentType(contentType).build());
+            client.putObject(
+                    PutObjectArgs.builder().bucket(bucket).object(key).stream(input, size, -1)
+                            .contentType(contentType)
+                            .build());
         } catch (Exception exception) {
             throw io(exception);
         }
@@ -46,8 +52,10 @@ public class S3ObjectStorage implements ObjectStorage {
     @Override
     public StoredObject get(String key) throws IOException {
         try {
-            StatObjectResponse stat = client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
-            InputStream stream = client.getObject(GetObjectArgs.builder().bucket(bucket).object(key).build());
+            StatObjectResponse stat =
+                    client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
+            InputStream stream =
+                    client.getObject(GetObjectArgs.builder().bucket(bucket).object(key).build());
             return new StoredObject(stream, stat.size(), stat.contentType());
         } catch (Exception exception) {
             throw io(exception);
@@ -57,9 +65,16 @@ public class S3ObjectStorage implements ObjectStorage {
     @Override
     public StoredObject get(String key, long offset, long length) throws IOException {
         try {
-            StatObjectResponse stat = client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
-            InputStream stream = client.getObject(GetObjectArgs.builder().bucket(bucket).object(key)
-                    .offset(offset).length(length).build());
+            StatObjectResponse stat =
+                    client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
+            InputStream stream =
+                    client.getObject(
+                            GetObjectArgs.builder()
+                                    .bucket(bucket)
+                                    .object(key)
+                                    .offset(offset)
+                                    .length(length)
+                                    .build());
             return new StoredObject(stream, length, stat.contentType());
         } catch (Exception exception) {
             throw io(exception);
@@ -69,7 +84,8 @@ public class S3ObjectStorage implements ObjectStorage {
     @Override
     public StoredObjectInfo stat(String key) throws IOException {
         try {
-            StatObjectResponse stat = client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
+            StatObjectResponse stat =
+                    client.statObject(StatObjectArgs.builder().bucket(bucket).object(key).build());
             return new StoredObjectInfo(stat.size(), stat.contentType());
         } catch (Exception exception) {
             throw io(exception);
@@ -97,6 +113,8 @@ public class S3ObjectStorage implements ObjectStorage {
     }
 
     private IOException io(Exception exception) {
-        return exception instanceof IOException value ? value : new IOException("S3 object operation failed", exception);
+        return exception instanceof IOException value
+                ? value
+                : new IOException("S3 object operation failed", exception);
     }
 }

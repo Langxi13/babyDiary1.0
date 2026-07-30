@@ -1,7 +1,6 @@
 package com.langxi.babydiary.tag.application;
 
 import com.langxi.babydiary.tag.domain.Tag;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +12,5 @@ public interface TagRepository {
 
     long insert(NewTag tag);
 
-    record NewTag(UUID publicId, long spaceId, String name, String color, long createdBy) {
-    }
+    record NewTag(UUID publicId, long spaceId, String name, String color, long createdBy) {}
 }

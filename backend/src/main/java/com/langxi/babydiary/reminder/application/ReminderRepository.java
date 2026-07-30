@@ -1,7 +1,6 @@
 package com.langxi.babydiary.reminder.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -11,11 +10,20 @@ public interface ReminderRepository {
 
     void upsert(NewReminder reminder);
 
-    record Row(UUID id, String type, boolean enabled, JsonNode schedule, LocalDateTime nextRunAt,
-               LocalDateTime lastRunAt) {
-    }
+    record Row(
+            UUID id,
+            String type,
+            boolean enabled,
+            JsonNode schedule,
+            LocalDateTime nextRunAt,
+            LocalDateTime lastRunAt) {}
 
-    record NewReminder(byte[] publicId, long accountId, long spaceId, String type, boolean enabled,
-                       String scheduleJson, LocalDateTime nextRunAt) {
-    }
+    record NewReminder(
+            byte[] publicId,
+            long accountId,
+            long spaceId,
+            String type,
+            boolean enabled,
+            String scheduleJson,
+            LocalDateTime nextRunAt) {}
 }

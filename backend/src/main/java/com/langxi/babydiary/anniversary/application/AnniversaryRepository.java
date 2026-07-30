@@ -1,7 +1,6 @@
 package com.langxi.babydiary.anniversary.application;
 
 import com.langxi.babydiary.anniversary.domain.Anniversary;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,10 +18,16 @@ public interface AnniversaryRepository {
 
     boolean softDelete(long spaceId, UUID publicId, LocalDateTime deletedAt);
 
-    record NewAnniversary(UUID publicId, long spaceId, long createdBy, String title, LocalDate date,
-                          String description, Long coverAssetId, int sortOrder) {
-    }
+    record NewAnniversary(
+            UUID publicId,
+            long spaceId,
+            long createdBy,
+            String title,
+            LocalDate date,
+            String description,
+            Long coverAssetId,
+            int sortOrder) {}
 
-    record UpdatedAnniversary(String title, LocalDate date, String description, Long coverAssetId, int sortOrder) {
-    }
+    record UpdatedAnniversary(
+            String title, LocalDate date, String description, Long coverAssetId, int sortOrder) {}
 }

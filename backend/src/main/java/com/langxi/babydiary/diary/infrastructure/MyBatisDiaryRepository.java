@@ -3,8 +3,6 @@ package com.langxi.babydiary.diary.infrastructure;
 import com.langxi.babydiary.diary.application.DiaryRepository;
 import com.langxi.babydiary.diary.domain.DiaryEntry;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisDiaryRepository implements DiaryRepository {
@@ -35,19 +34,32 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     }
 
     @Override
-    public Optional<DiaryEntry> findByPublicId(long spaceId, UUID diaryId, long accountId, boolean includeDeleted) {
-        DiaryMapper.DiaryRow row = mapper.findByPublicId(spaceId, BinaryUuid.toBytes(diaryId), accountId, includeDeleted);
+    public Optional<DiaryEntry> findByPublicId(
+            long spaceId, UUID diaryId, long accountId, boolean includeDeleted) {
+        DiaryMapper.DiaryRow row =
+                mapper.findByPublicId(
+                        spaceId, BinaryUuid.toBytes(diaryId), accountId, includeDeleted);
         if (row == null) return Optional.empty();
         return hydrate(List.of(row)).stream().findFirst();
     }
 
     @Override
     public long insert(NewDiary diary) {
-        DiaryMapper.DiaryInsert row = new DiaryMapper.DiaryInsert(BinaryUuid.toBytes(diary.publicId()), diary.spaceId(),
-                diary.authorId(), diary.title(), diary.diaryDate(), diary.contentHtml(), diary.contentText(),
-                diary.mood(), diary.visibility(), diary.locked());
+        DiaryMapper.DiaryInsert row =
+                new DiaryMapper.DiaryInsert(
+                        BinaryUuid.toBytes(diary.publicId()),
+                        diary.spaceId(),
+                        diary.authorId(),
+                        diary.title(),
+                        diary.diaryDate(),
+                        diary.contentHtml(),
+                        diary.contentText(),
+                        diary.mood(),
+                        diary.visibility(),
+                        diary.locked());
         mapper.insert(row);
-        if (row.getDiaryId() == null) throw new IllegalStateException("Diary insert returned no ID");
+        if (row.getDiaryId() == null)
+            throw new IllegalStateException("Diary insert returned no ID");
         return row.getDiaryId();
     }
 
@@ -63,15 +75,26 @@ public class MyBatisDiaryRepository implements DiaryRepository {
 
     @Override
     public List<Long> resolveTagIds(long spaceId, List<UUID> publicIds) {
-        return resolve(publicIds, publicIds.isEmpty() ? List.of()
-                : mapper.resolveTagIds(spaceId, publicIds.stream().map(BinaryUuid::toBytes).toList()));
+        return resolve(
+                publicIds,
+                publicIds.isEmpty()
+                        ? List.of()
+                        : mapper.resolveTagIds(
+                                spaceId, publicIds.stream().map(BinaryUuid::toBytes).toList()));
     }
 
     @Override
-    public List<Long> resolveMediaIds(long spaceId, long accountId, boolean locked, List<UUID> publicIds) {
-        return resolve(publicIds, publicIds.isEmpty() ? List.of()
-                : mapper.resolveMediaIds(spaceId, accountId, locked,
-                publicIds.stream().map(BinaryUuid::toBytes).toList()));
+    public List<Long> resolveMediaIds(
+            long spaceId, long accountId, boolean locked, List<UUID> publicIds) {
+        return resolve(
+                publicIds,
+                publicIds.isEmpty()
+                        ? List.of()
+                        : mapper.resolveMediaIds(
+                                spaceId,
+                                accountId,
+                                locked,
+                                publicIds.stream().map(BinaryUuid::toBytes).toList()));
     }
 
     @Override
@@ -89,7 +112,12 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     }
 
     @Override
-    public void insertRevision(long diaryId, int version, long editorId, String snapshotJson, LocalDateTime createdAt) {
+    public void insertRevision(
+            long diaryId,
+            int version,
+            long editorId,
+            String snapshotJson,
+            LocalDateTime createdAt) {
         mapper.insertRevision(diaryId, version, editorId, snapshotJson, createdAt);
     }
 
@@ -108,21 +136,48 @@ public class MyBatisDiaryRepository implements DiaryRepository {
         List<Long> ids = rows.stream().map(DiaryMapper.DiaryRow::diaryId).toList();
         Map<Long, List<DiaryEntry.TagRef>> tags = new HashMap<>();
         for (DiaryMapper.TagRow row : mapper.findTags(ids)) {
-            tags.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>()).add(
-                    new DiaryEntry.TagRef(BinaryUuid.fromBytes(row.publicId()), row.name(), row.color()));
+            tags.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
+                    .add(
+                            new DiaryEntry.TagRef(
+                                    BinaryUuid.fromBytes(row.publicId()), row.name(), row.color()));
         }
         Map<Long, List<DiaryEntry.MediaRef>> media = new HashMap<>();
         for (DiaryMapper.MediaRow row : mapper.findMedia(ids)) {
-            media.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>()).add(
-                    new DiaryEntry.MediaRef(BinaryUuid.fromBytes(row.publicId()), row.mediaType(), row.caption(),
-                            row.takenAt(), row.position(), row.status(), row.originalProfile(),
-                            row.thumbnailProfile(),row.protectedContent()));
+            media.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
+                    .add(
+                            new DiaryEntry.MediaRef(
+                                    BinaryUuid.fromBytes(row.publicId()),
+                                    row.mediaType(),
+                                    row.caption(),
+                                    row.takenAt(),
+                                    row.position(),
+                                    row.status(),
+                                    row.originalProfile(),
+                                    row.thumbnailProfile(),
+                                    row.protectedContent()));
         }
-        return rows.stream().map(row -> new DiaryEntry(row.diaryId(), BinaryUuid.fromBytes(row.publicId()),
-                BinaryUuid.fromBytes(row.spacePublicId()), row.authorId(), row.title(), row.diaryDate(),
-                row.contentHtml(), row.contentText(), row.moodKey(), row.visibility(), row.locked(), row.version(),
-                row.createdAt(), row.updatedAt(), row.deletedAt(), tags.getOrDefault(row.diaryId(), List.of()),
-                media.getOrDefault(row.diaryId(), List.of()))).toList();
+        return rows.stream()
+                .map(
+                        row ->
+                                new DiaryEntry(
+                                        row.diaryId(),
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        BinaryUuid.fromBytes(row.spacePublicId()),
+                                        row.authorId(),
+                                        row.title(),
+                                        row.diaryDate(),
+                                        row.contentHtml(),
+                                        row.contentText(),
+                                        row.moodKey(),
+                                        row.visibility(),
+                                        row.locked(),
+                                        row.version(),
+                                        row.createdAt(),
+                                        row.updatedAt(),
+                                        row.deletedAt(),
+                                        tags.getOrDefault(row.diaryId(), List.of()),
+                                        media.getOrDefault(row.diaryId(), List.of())))
+                .toList();
     }
 
     private List<Long> resolve(List<UUID> requested, List<DiaryMapper.IdRow> rows) {

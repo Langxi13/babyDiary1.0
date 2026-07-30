@@ -1,12 +1,11 @@
 package com.langxi.babydiary.transfer.application;
 
-import org.springframework.core.io.FileSystemResource;
-
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.springframework.core.io.FileSystemResource;
 
 public final class TemporaryDownload extends FileSystemResource {
     private final Path path;

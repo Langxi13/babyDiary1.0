@@ -13,10 +13,11 @@ public class AccountMailService {
     private final String from;
     private final String publicUrl;
 
-    public AccountMailService(ObjectProvider<JavaMailSender> provider,
-                              @Value("${app.mail.enabled:false}") boolean enabled,
-                              @Value("${app.mail.from:}") String from,
-                              @Value("${app.mail.public-url:http://localhost:5173}") String publicUrl) {
+    public AccountMailService(
+            ObjectProvider<JavaMailSender> provider,
+            @Value("${app.mail.enabled:false}") boolean enabled,
+            @Value("${app.mail.from:}") String from,
+            @Value("${app.mail.public-url:http://localhost:5173}") String publicUrl) {
         this.sender = provider.getIfAvailable();
         this.enabled = enabled;
         this.from = from;
@@ -28,12 +29,16 @@ public class AccountMailService {
     }
 
     public void verification(String email, String token) {
-        send(email, "验证 Baby Diary 邮箱",
+        send(
+                email,
+                "验证 Baby Diary 邮箱",
                 "请在 24 小时内打开以下链接完成验证：\n" + publicUrl + "/profile#verifyEmail=" + token);
     }
 
     public void passwordReset(String email, String token) {
-        send(email, "重置 Baby Diary 密码",
+        send(
+                email,
+                "重置 Baby Diary 密码",
                 "请在 30 分钟内打开以下链接重置密码：\n" + publicUrl + "/login#resetToken=" + token);
     }
 

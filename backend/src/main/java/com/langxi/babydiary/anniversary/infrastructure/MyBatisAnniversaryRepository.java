@@ -3,12 +3,11 @@ package com.langxi.babydiary.anniversary.infrastructure;
 import com.langxi.babydiary.anniversary.application.AnniversaryRepository;
 import com.langxi.babydiary.anniversary.domain.Anniversary;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisAnniversaryRepository implements AnniversaryRepository {
@@ -25,16 +24,25 @@ public class MyBatisAnniversaryRepository implements AnniversaryRepository {
 
     @Override
     public Optional<Anniversary> findByPublicId(long spaceId, UUID publicId) {
-        return Optional.ofNullable(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId))).map(this::anniversary);
+        return Optional.ofNullable(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId)))
+                .map(this::anniversary);
     }
 
     @Override
     public long insert(NewAnniversary value) {
-        AnniversaryMapper.AnniversaryInsert row = new AnniversaryMapper.AnniversaryInsert(
-                BinaryUuid.toBytes(value.publicId()), value.spaceId(), value.createdBy(), value.title(), value.date(),
-                value.description(), value.coverAssetId(), value.sortOrder());
+        AnniversaryMapper.AnniversaryInsert row =
+                new AnniversaryMapper.AnniversaryInsert(
+                        BinaryUuid.toBytes(value.publicId()),
+                        value.spaceId(),
+                        value.createdBy(),
+                        value.title(),
+                        value.date(),
+                        value.description(),
+                        value.coverAssetId(),
+                        value.sortOrder());
         mapper.insert(row);
-        if (row.getAnniversaryId() == null) throw new IllegalStateException("Anniversary insert returned no ID");
+        if (row.getAnniversaryId() == null)
+            throw new IllegalStateException("Anniversary insert returned no ID");
         return row.getAnniversaryId();
     }
 
@@ -49,9 +57,16 @@ public class MyBatisAnniversaryRepository implements AnniversaryRepository {
     }
 
     private Anniversary anniversary(AnniversaryMapper.AnniversaryRow row) {
-        return new Anniversary(row.anniversaryId(), BinaryUuid.fromBytes(row.publicId()),
-                BinaryUuid.fromBytes(row.spacePublicId()), row.title(), row.anniversaryDate(), row.description(),
-                row.coverPublicId() == null ? null : BinaryUuid.fromBytes(row.coverPublicId()), row.sortOrder(),
-                row.createdAt(), row.updatedAt());
+        return new Anniversary(
+                row.anniversaryId(),
+                BinaryUuid.fromBytes(row.publicId()),
+                BinaryUuid.fromBytes(row.spacePublicId()),
+                row.title(),
+                row.anniversaryDate(),
+                row.description(),
+                row.coverPublicId() == null ? null : BinaryUuid.fromBytes(row.coverPublicId()),
+                row.sortOrder(),
+                row.createdAt(),
+                row.updatedAt());
     }
 }

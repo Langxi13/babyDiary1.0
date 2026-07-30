@@ -1,10 +1,6 @@
 package com.langxi.babydiary.space.application;
 
 import com.langxi.babydiary.platform.application.ApiException;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -13,6 +9,9 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CollaborationService {
@@ -46,17 +45,31 @@ public class CollaborationService {
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(token);
         LocalDateTime expires = LocalDateTime.now(ZoneOffset.UTC).plusDays(7);
         UUID publicId = UUID.randomUUID();
-        collaboration.insertInvitation(new CollaborationRepository.NewInvitation(publicId, space.internalId(),
-                accountId, normalizedEmail, sha256(rawToken), normalizedRole, expires));
+        collaboration.insertInvitation(
+                new CollaborationRepository.NewInvitation(
+                        publicId,
+                        space.internalId(),
+                        accountId,
+                        normalizedEmail,
+                        sha256(rawToken),
+                        normalizedRole,
+                        expires));
         return new InvitationCreated(publicId, rawToken, expires, normalizedRole);
     }
 
     @Transactional
     public void accept(String rawToken, long accountId) {
-        if (rawToken == null || rawToken.isBlank()) throw ApiException.badRequest("INVITATION_TOKEN_INVALID", "邀请链接无效");
-        CollaborationRepository.Invitation invitation = collaboration.findInvitation(sha256(rawToken), LocalDateTime.now(ZoneOffset.UTC))
-                .orElseThrow(() -> ApiException.notFound("INVITATION_NOT_FOUND", "邀请不存在、已过期或已使用"));
-        if (!collaboration.acceptInvitation(invitation.internalId(), accountId, LocalDateTime.now(ZoneOffset.UTC))) {
+        if (rawToken == null || rawToken.isBlank())
+            throw ApiException.badRequest("INVITATION_TOKEN_INVALID", "邀请链接无效");
+        CollaborationRepository.Invitation invitation =
+                collaboration
+                        .findInvitation(sha256(rawToken), LocalDateTime.now(ZoneOffset.UTC))
+                        .orElseThrow(
+                                () ->
+                                        ApiException.notFound(
+                                                "INVITATION_NOT_FOUND", "邀请不存在、已过期或已使用"));
+        if (!collaboration.acceptInvitation(
+                invitation.internalId(), accountId, LocalDateTime.now(ZoneOffset.UTC))) {
             throw ApiException.conflict("INVITATION_ALREADY_USED", "邀请已被使用");
         }
         try {
@@ -69,13 +82,15 @@ public class CollaborationService {
     public void updateRole(UUID spaceId, long actorId, UUID targetAccountId, String role) {
         SpaceAccess.SpaceContext space = requireSharedOwner(spaceId, actorId);
         CollaborationRepository.Membership target = membership(space.internalId(), targetAccountId);
-        String normalized = switch (role == null ? "" : role.toUpperCase(java.util.Locale.ROOT)) {
-            case "OWNER" -> "OWNER";
-            case "ADMIN" -> "ADMIN";
-            case "VIEWER" -> "VIEWER";
-            default -> "MEMBER";
-        };
-        if ("OWNER".equals(target.role()) && !"OWNER".equals(normalized)
+        String normalized =
+                switch (role == null ? "" : role.toUpperCase(java.util.Locale.ROOT)) {
+                    case "OWNER" -> "OWNER";
+                    case "ADMIN" -> "ADMIN";
+                    case "VIEWER" -> "VIEWER";
+                    default -> "MEMBER";
+                };
+        if ("OWNER".equals(target.role())
+                && !"OWNER".equals(normalized)
                 && collaboration.countOwners(space.internalId()) <= 1) {
             throw ApiException.conflict("SPACE_LAST_OWNER", "空间必须保留至少一名所有者");
         }
@@ -108,19 +123,20 @@ public class CollaborationService {
     }
 
     private CollaborationRepository.Membership membership(long spaceId, UUID targetAccountId) {
-        return collaboration.findMembership(spaceId, targetAccountId)
+        return collaboration
+                .findMembership(spaceId, targetAccountId)
                 .filter(item -> "ACTIVE".equals(item.status()))
                 .orElseThrow(() -> ApiException.notFound("SPACE_MEMBER_NOT_FOUND", "成员不存在"));
     }
 
     private byte[] sha256(String value) {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
-    public record InvitationCreated(UUID id, String token, LocalDateTime expiresAt, String role) {
-    }
+    public record InvitationCreated(UUID id, String token, LocalDateTime expiresAt, String role) {}
 }

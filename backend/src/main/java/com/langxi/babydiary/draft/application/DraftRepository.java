@@ -14,10 +14,20 @@ public interface DraftRepository {
 
     void delete(long spaceId, long ownerId, String draftKey);
 
-    record Row(UUID id, UUID spaceId, String draftKey, UUID diaryId, String payloadJson,
-               LocalDateTime createdAt, LocalDateTime updatedAt) {
-    }
+    record Row(
+            UUID id,
+            UUID spaceId,
+            String draftKey,
+            UUID diaryId,
+            String payloadJson,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {}
 
-    record NewDraft(UUID publicId, long spaceId, long ownerId, Long diaryId, String draftKey, String payloadJson) {
-    }
+    record NewDraft(
+            UUID publicId,
+            long spaceId,
+            long ownerId,
+            Long diaryId,
+            String draftKey,
+            String payloadJson) {}
 }

@@ -16,7 +16,10 @@ public class MyBatisInvitationCodeRepository implements InvitationCodeRepository
         return mapper.findEncrypted();
     }
 
-    @Override public String findEncryptedForUpdate() { return mapper.findEncryptedForUpdate(); }
+    @Override
+    public String findEncryptedForUpdate() {
+        return mapper.findEncryptedForUpdate();
+    }
 
     @Override
     public void upsert(String encryptedCode, Long updatedBy) {

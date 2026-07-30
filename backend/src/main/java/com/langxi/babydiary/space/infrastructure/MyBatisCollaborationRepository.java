@@ -2,12 +2,11 @@ package com.langxi.babydiary.space.infrastructure;
 
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.space.application.CollaborationRepository;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisCollaborationRepository implements CollaborationRepository {
@@ -19,23 +18,45 @@ public class MyBatisCollaborationRepository implements CollaborationRepository {
 
     @Override
     public List<Member> findMembers(long spaceId) {
-        return mapper.findMembers(spaceId).stream().map(row -> new Member(BinaryUuid.fromBytes(row.publicId()),
-                row.username(), row.email(), row.role(), row.status(), row.joinedAt())).toList();
+        return mapper.findMembers(spaceId).stream()
+                .map(
+                        row ->
+                                new Member(
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        row.username(),
+                                        row.email(),
+                                        row.role(),
+                                        row.status(),
+                                        row.joinedAt()))
+                .toList();
     }
 
     @Override
     public long insertInvitation(NewInvitation invitation) {
-        CollaborationMapper.InvitationInsert row = new CollaborationMapper.InvitationInsert(
-                BinaryUuid.toBytes(invitation.publicId()), invitation.spaceId(), invitation.invitedBy(), invitation.email(),
-                invitation.tokenHash(), invitation.role(), invitation.expiresAt());
+        CollaborationMapper.InvitationInsert row =
+                new CollaborationMapper.InvitationInsert(
+                        BinaryUuid.toBytes(invitation.publicId()),
+                        invitation.spaceId(),
+                        invitation.invitedBy(),
+                        invitation.email(),
+                        invitation.tokenHash(),
+                        invitation.role(),
+                        invitation.expiresAt());
         mapper.insertInvitation(row);
         return row.getInvitationId() == null ? 0 : row.getInvitationId();
     }
 
     @Override
     public Optional<Invitation> findInvitation(byte[] tokenHash, LocalDateTime now) {
-        return Optional.ofNullable(mapper.findInvitation(tokenHash, now)).map(row ->
-                new Invitation(row.invitationId(), row.spaceId(), row.email(), row.role(), row.expiresAt()));
+        return Optional.ofNullable(mapper.findInvitation(tokenHash, now))
+                .map(
+                        row ->
+                                new Invitation(
+                                        row.invitationId(),
+                                        row.spaceId(),
+                                        row.email(),
+                                        row.role(),
+                                        row.expiresAt()));
     }
 
     @Override
@@ -50,12 +71,15 @@ public class MyBatisCollaborationRepository implements CollaborationRepository {
 
     @Override
     public Optional<Membership> findMembership(long spaceId, UUID accountPublicId) {
-        return Optional.ofNullable(mapper.findMembership(spaceId, BinaryUuid.toBytes(accountPublicId)))
+        return Optional.ofNullable(
+                        mapper.findMembership(spaceId, BinaryUuid.toBytes(accountPublicId)))
                 .map(row -> new Membership(row.accountId(), row.role(), row.status()));
     }
 
     @Override
-    public int countOwners(long spaceId) { return mapper.countOwners(spaceId); }
+    public int countOwners(long spaceId) {
+        return mapper.countOwners(spaceId);
+    }
 
     @Override
     public boolean updateRole(long spaceId, long accountId, String role) {

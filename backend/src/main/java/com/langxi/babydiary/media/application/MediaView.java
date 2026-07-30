@@ -4,17 +4,34 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-public record MediaView(UUID id, UUID spaceId, String mediaType, String originalFilename,
-                        String caption, LocalDateTime takenAt, String accessScope,
-                        boolean libraryVisible, String status, LocalDateTime createdAt,
-                        boolean protectedContent, Representations representations) {
-    public record Representations(Representation original, Representation thumbnail,
-                                  Representation poster, Representation waveform,
-                                  Representation transcoded) {
-    }
+public record MediaView(
+        UUID id,
+        UUID spaceId,
+        String mediaType,
+        String originalFilename,
+        String caption,
+        LocalDateTime takenAt,
+        String accessScope,
+        boolean libraryVisible,
+        String status,
+        LocalDateTime createdAt,
+        boolean protectedContent,
+        Representations representations) {
+    public record Representations(
+            Representation original,
+            Representation thumbnail,
+            Representation poster,
+            Representation waveform,
+            Representation transcoded) {}
 
-    public record Representation(String variantType, String profile, String url, Instant expiresAt,
-                                 String contentType, long sizeBytes, Integer width, Integer height,
-                                 Long durationMillis) {
-    }
+    public record Representation(
+            String variantType,
+            String profile,
+            String url,
+            Instant expiresAt,
+            String contentType,
+            long sizeBytes,
+            Integer width,
+            Integer height,
+            Long durationMillis) {}
 }

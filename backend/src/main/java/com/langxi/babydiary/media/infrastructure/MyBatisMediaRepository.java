@@ -3,8 +3,6 @@ package com.langxi.babydiary.media.infrastructure;
 import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.domain.MediaAsset;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -12,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisMediaRepository implements MediaRepository {
@@ -28,68 +27,105 @@ public class MyBatisMediaRepository implements MediaRepository {
 
     @Override
     public Optional<MediaAsset> findByPublicId(long spaceId, UUID publicId, long accountId) {
-        return hydrate(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId), accountId)).stream().findFirst();
+        return hydrate(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId), accountId))
+                .stream()
+                .findFirst();
     }
 
     @Override
     public List<MediaAsset> findByPublicIds(long spaceId, List<UUID> publicIds, long accountId) {
         if (publicIds == null || publicIds.isEmpty()) return List.of();
-        Map<UUID, MediaAsset> hydrated = hydrate(mapper.findByPublicIds(spaceId,
-                publicIds.stream().map(BinaryUuid::toBytes).toList(), accountId)).stream()
-                .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        Map<UUID, MediaAsset> hydrated =
+                hydrate(
+                                mapper.findByPublicIds(
+                                        spaceId,
+                                        publicIds.stream().map(BinaryUuid::toBytes).toList(),
+                                        accountId))
+                        .stream()
+                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
         return publicIds.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
     }
 
     @Override
     public List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds) {
         if (publicIds == null || publicIds.isEmpty()) return List.of();
-        Map<UUID, MediaAsset> hydrated = hydrate(mapper.findByPublicIdsInSpace(spaceId,
-                publicIds.stream().map(BinaryUuid::toBytes).toList())).stream()
-                .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        Map<UUID, MediaAsset> hydrated =
+                hydrate(
+                                mapper.findByPublicIdsInSpace(
+                                        spaceId,
+                                        publicIds.stream().map(BinaryUuid::toBytes).toList()))
+                        .stream()
+                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
         return publicIds.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
     }
 
     @Override
     public Optional<MediaAsset> findInSpace(UUID spaceId, UUID publicId, boolean includeDeleted) {
-        return hydrate(mapper.findInSpace(BinaryUuid.toBytes(spaceId), BinaryUuid.toBytes(publicId), includeDeleted))
-                .stream().findFirst();
+        return hydrate(
+                        mapper.findInSpace(
+                                BinaryUuid.toBytes(spaceId),
+                                BinaryUuid.toBytes(publicId),
+                                includeDeleted))
+                .stream()
+                .findFirst();
     }
 
     @Override
-    public Optional<MediaAsset.Variant> findVariant(long spaceId, UUID publicId, String type, String profile,
-                                                    long accountId) {
-        return Optional.ofNullable(mapper.findVariant(spaceId, BinaryUuid.toBytes(publicId), type, profile, accountId))
+    public Optional<MediaAsset.Variant> findVariant(
+            long spaceId, UUID publicId, String type, String profile, long accountId) {
+        return Optional.ofNullable(
+                        mapper.findVariant(
+                                spaceId, BinaryUuid.toBytes(publicId), type, profile, accountId))
                 .map(this::variant);
     }
 
     @Override
-    public Optional<MediaAsset.Variant> findPreferredVariant(long spaceId, UUID publicId, String type,
-                                                             long accountId) {
-        return Optional.ofNullable(mapper.findPreferredVariant(spaceId, BinaryUuid.toBytes(publicId), type, accountId))
+    public Optional<MediaAsset.Variant> findPreferredVariant(
+            long spaceId, UUID publicId, String type, long accountId) {
+        return Optional.ofNullable(
+                        mapper.findPreferredVariant(
+                                spaceId, BinaryUuid.toBytes(publicId), type, accountId))
                 .map(this::variant);
     }
 
     @Override
-    public Optional<MediaAsset.Variant> findPublicVariant(UUID spaceId, UUID publicId, String type, String profile) {
-        return Optional.ofNullable(mapper.findPublicVariant(BinaryUuid.toBytes(spaceId), BinaryUuid.toBytes(publicId),
-                        type, profile))
+    public Optional<MediaAsset.Variant> findPublicVariant(
+            UUID spaceId, UUID publicId, String type, String profile) {
+        return Optional.ofNullable(
+                        mapper.findPublicVariant(
+                                BinaryUuid.toBytes(spaceId),
+                                BinaryUuid.toBytes(publicId),
+                                type,
+                                profile))
                 .map(this::variant);
     }
 
     @Override
-    public Optional<MediaAsset.Variant> findPreferredPublicVariant(UUID spaceId, UUID publicId, String type) {
-        return Optional.ofNullable(mapper.findPreferredPublicVariant(BinaryUuid.toBytes(spaceId),
-                        BinaryUuid.toBytes(publicId), type))
+    public Optional<MediaAsset.Variant> findPreferredPublicVariant(
+            UUID spaceId, UUID publicId, String type) {
+        return Optional.ofNullable(
+                        mapper.findPreferredPublicVariant(
+                                BinaryUuid.toBytes(spaceId), BinaryUuid.toBytes(publicId), type))
                 .map(this::variant);
     }
 
     @Override
     public long insertAsset(NewAsset asset) {
-        MediaMapper.AssetInsert row = new MediaMapper.AssetInsert(BinaryUuid.toBytes(asset.publicId()), asset.spaceId(),
-                asset.ownerId(), asset.mediaType(), asset.originalFilename(), asset.caption(), asset.takenAt(),
-                asset.accessScope(), asset.libraryVisible(), asset.status());
+        MediaMapper.AssetInsert row =
+                new MediaMapper.AssetInsert(
+                        BinaryUuid.toBytes(asset.publicId()),
+                        asset.spaceId(),
+                        asset.ownerId(),
+                        asset.mediaType(),
+                        asset.originalFilename(),
+                        asset.caption(),
+                        asset.takenAt(),
+                        asset.accessScope(),
+                        asset.libraryVisible(),
+                        asset.status());
         mapper.insertAsset(row);
-        if (row.getAssetId() == null) throw new IllegalStateException("Media insert returned no ID");
+        if (row.getAssetId() == null)
+            throw new IllegalStateException("Media insert returned no ID");
         return row.getAssetId();
     }
 
@@ -119,35 +155,43 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
-    public boolean softDelete(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
+    public boolean softDelete(
+            long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
         return mapper.softDelete(spaceId, BinaryUuid.toBytes(publicId), accountId, deletedAt) == 1;
     }
 
     @Override
-    public boolean markDeletePending(long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
-        return mapper.markDeletePending(spaceId, BinaryUuid.toBytes(publicId), accountId, deletedAt) == 1;
+    public boolean markDeletePending(
+            long spaceId, UUID publicId, long accountId, LocalDateTime deletedAt) {
+        return mapper.markDeletePending(spaceId, BinaryUuid.toBytes(publicId), accountId, deletedAt)
+                == 1;
     }
 
     @Override
     @org.springframework.transaction.annotation.Transactional
-    public void finalizeDeletion(long assetId, UUID spaceId, long releasedBytes, LocalDateTime deletedAt) {
+    public void finalizeDeletion(
+            long assetId, UUID spaceId, long releasedBytes, LocalDateTime deletedAt) {
         mapper.markVariantsDeleted(assetId, deletedAt);
         mapper.markAssetDeleted(assetId, deletedAt);
-        if (releasedBytes > 0) mapper.releaseStorageByPublicId(BinaryUuid.toBytes(spaceId), releasedBytes);
+        if (releasedBytes > 0)
+            mapper.releaseStorageByPublicId(BinaryUuid.toBytes(spaceId), releasedBytes);
     }
 
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void failUpload(long assetId, LocalDateTime failedAt) {
-        mapper.markVariantsDeleted(assetId,failedAt);
+        mapper.markVariantsDeleted(assetId, failedAt);
         mapper.failUpload(assetId, failedAt);
     }
 
     @Override
-    public void markReady(long assetId) { mapper.markReady(assetId); }
+    public void markReady(long assetId) {
+        mapper.markReady(assetId);
+    }
 
     @Override
-    public void updateTechnicalMetadata(long assetId, Integer width, Integer height, Long durationMillis) {
+    public void updateTechnicalMetadata(
+            long assetId, Integer width, Integer height, Long durationMillis) {
         mapper.updateTechnicalMetadata(assetId, width, height, durationMillis);
     }
 
@@ -157,16 +201,33 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
-    public ReferenceCounts references(long assetId) { return mapper.references(assetId); }
+    public ReferenceCounts references(long assetId) {
+        return mapper.references(assetId);
+    }
 
     @Override
-    public void removeFavorites(long assetId) { mapper.removeFavorites(assetId); }
+    public void removeFavorites(long assetId) {
+        mapper.removeFavorites(assetId);
+    }
 
     @Override
-    public boolean updateMetadata(long spaceId, UUID publicId, long accountId, String caption,
-                                  LocalDateTime takenAt, String accessScope, boolean libraryVisible) {
-        return mapper.updateMetadata(spaceId, BinaryUuid.toBytes(publicId), accountId, caption, takenAt,
-                accessScope, libraryVisible) == 1;
+    public boolean updateMetadata(
+            long spaceId,
+            UUID publicId,
+            long accountId,
+            String caption,
+            LocalDateTime takenAt,
+            String accessScope,
+            boolean libraryVisible) {
+        return mapper.updateMetadata(
+                        spaceId,
+                        BinaryUuid.toBytes(publicId),
+                        accountId,
+                        caption,
+                        takenAt,
+                        accessScope,
+                        libraryVisible)
+                == 1;
     }
 
     private List<MediaAsset> hydrate(List<MediaMapper.MediaRow> rows) {
@@ -179,15 +240,33 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     private MediaAsset.Variant variant(MediaMapper.MediaRow row) {
-        return new MediaAsset.Variant(row.variantType(), row.profile(), row.storageProvider(), row.storageKey(),
-                row.contentType(), row.sizeBytes(), row.checksumSha256(), row.width(), row.height(),
-                row.durationMillis(), row.variantStatus());
+        return new MediaAsset.Variant(
+                row.variantType(),
+                row.profile(),
+                row.storageProvider(),
+                row.storageKey(),
+                row.contentType(),
+                row.sizeBytes(),
+                row.checksumSha256(),
+                row.width(),
+                row.height(),
+                row.durationMillis(),
+                row.variantStatus());
     }
 
     private MediaAsset.Variant variant(MediaMapper.VariantRow row) {
-        return new MediaAsset.Variant(row.variantType(), row.profile(), row.storageProvider(), row.storageKey(),
-                row.contentType(), row.sizeBytes(), row.checksumSha256(), row.width(), row.height(),
-                row.durationMillis(), row.status());
+        return new MediaAsset.Variant(
+                row.variantType(),
+                row.profile(),
+                row.storageProvider(),
+                row.storageKey(),
+                row.contentType(),
+                row.sizeBytes(),
+                row.checksumSha256(),
+                row.width(),
+                row.height(),
+                row.durationMillis(),
+                row.status());
     }
 
     private static final class Builder {
@@ -199,10 +278,21 @@ public class MyBatisMediaRepository implements MediaRepository {
         }
 
         private MediaAsset build() {
-            return new MediaAsset(row.assetId(), BinaryUuid.fromBytes(row.publicId()),
-                    BinaryUuid.fromBytes(row.spacePublicId()), row.ownerId(), row.mediaType(),
-                    row.originalFilename(), row.caption(), row.takenAt(), row.accessScope(), row.libraryVisible(),
-                    row.assetStatus(), row.assetCreatedAt(), row.assetUpdatedAt(), List.copyOf(variants));
+            return new MediaAsset(
+                    row.assetId(),
+                    BinaryUuid.fromBytes(row.publicId()),
+                    BinaryUuid.fromBytes(row.spacePublicId()),
+                    row.ownerId(),
+                    row.mediaType(),
+                    row.originalFilename(),
+                    row.caption(),
+                    row.takenAt(),
+                    row.accessScope(),
+                    row.libraryVisible(),
+                    row.assetStatus(),
+                    row.assetCreatedAt(),
+                    row.assetUpdatedAt(),
+                    List.copyOf(variants));
         }
     }
 }

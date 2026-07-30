@@ -3,11 +3,10 @@ package com.langxi.babydiary.tag.infrastructure;
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.tag.application.TagRepository;
 import com.langxi.babydiary.tag.domain.Tag;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisTagRepository implements TagRepository {
@@ -24,20 +23,30 @@ public class MyBatisTagRepository implements TagRepository {
 
     @Override
     public Optional<Tag> findByPublicId(long spaceId, UUID publicId) {
-        return Optional.ofNullable(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId))).map(this::toTag);
+        return Optional.ofNullable(mapper.findByPublicId(spaceId, BinaryUuid.toBytes(publicId)))
+                .map(this::toTag);
     }
 
     @Override
     public long insert(NewTag tag) {
-        TagMapper.TagInsert row = new TagMapper.TagInsert(BinaryUuid.toBytes(tag.publicId()), tag.spaceId(),
-                tag.name(), tag.color(), tag.createdBy());
+        TagMapper.TagInsert row =
+                new TagMapper.TagInsert(
+                        BinaryUuid.toBytes(tag.publicId()),
+                        tag.spaceId(),
+                        tag.name(),
+                        tag.color(),
+                        tag.createdBy());
         mapper.insert(row);
         if (row.getTagId() == null) throw new IllegalStateException("Tag insert returned no ID");
         return row.getTagId();
     }
 
     private Tag toTag(TagMapper.TagRow row) {
-        return new Tag(row.tagId(), BinaryUuid.fromBytes(row.publicId()), BinaryUuid.fromBytes(row.spacePublicId()),
-                row.name(), row.color());
+        return new Tag(
+                row.tagId(),
+                BinaryUuid.fromBytes(row.publicId()),
+                BinaryUuid.fromBytes(row.spacePublicId()),
+                row.name(),
+                row.color());
     }
 }

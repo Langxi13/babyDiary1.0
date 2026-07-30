@@ -14,7 +14,8 @@ public interface ObjectStorage {
         StoredObject object = get(key);
         try {
             object.stream().skipNBytes(offset);
-            return new StoredObject(new LimitedInputStream(object.stream(), length), length, object.contentType());
+            return new StoredObject(
+                    new LimitedInputStream(object.stream(), length), length, object.contentType());
         } catch (IOException | RuntimeException exception) {
             object.close();
             throw exception;
@@ -25,6 +26,5 @@ public interface ObjectStorage {
 
     void delete(String key) throws IOException;
 
-    default void verifyReady() throws IOException {
-    }
+    default void verifyReady() throws IOException {}
 }

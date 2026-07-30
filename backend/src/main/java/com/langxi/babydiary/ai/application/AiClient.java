@@ -3,6 +3,10 @@ package com.langxi.babydiary.ai.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.application.ApiException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -12,11 +16,6 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Component
 public class AiClient {
@@ -36,17 +35,27 @@ public class AiClient {
         body.put("messages", messages);
         body.put("temperature", 0.7);
         try {
-            String raw = rest.postForObject(url(config.baseUrl(), "/chat/completions"),
-                    new HttpEntity<>(body, headers), String.class);
-            JsonNode content = json.readTree(raw).path("choices").path(0).path("message").path("content");
+            String raw =
+                    rest.postForObject(
+                            url(config.baseUrl(), "/chat/completions"),
+                            new HttpEntity<>(body, headers),
+                            String.class);
+            JsonNode content =
+                    json.readTree(raw).path("choices").path(0).path("message").path("content");
             if (!content.isTextual() || content.asText().isBlank()) throw failed("AI 响应为空");
             return content.asText();
         } catch (ApiException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_REQUEST_FAILED", "AI 接口请求失败");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "AI_REQUEST_FAILED",
+                    "AI 接口请求失败");
         } catch (Exception exception) {
-            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_RESPONSE_INVALID", "AI 响应格式无效");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "AI_RESPONSE_INVALID",
+                    "AI 响应格式无效");
         }
     }
 
@@ -55,19 +64,33 @@ public class AiClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(config.apiKey());
         try {
-            ResponseEntity<String> response = rest.exchange(url(config.baseUrl(), "/models"), HttpMethod.GET,
-                    new HttpEntity<>(headers), String.class);
+            ResponseEntity<String> response =
+                    rest.exchange(
+                            url(config.baseUrl(), "/models"),
+                            HttpMethod.GET,
+                            new HttpEntity<>(headers),
+                            String.class);
             JsonNode data = json.readTree(response.getBody()).path("data");
             if (!data.isArray()) throw failed("模型列表格式无效");
             List<String> result = new ArrayList<>();
-            data.forEach(item -> { if (item.path("id").isTextual() && !item.path("id").asText().isBlank()) result.add(item.path("id").asText()); });
+            data.forEach(
+                    item -> {
+                        if (item.path("id").isTextual() && !item.path("id").asText().isBlank())
+                            result.add(item.path("id").asText());
+                    });
             return result;
         } catch (ApiException exception) {
             throw exception;
         } catch (RestClientException exception) {
-            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_MODELS_FAILED", "模型列表请求失败");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "AI_MODELS_FAILED",
+                    "模型列表请求失败");
         } catch (Exception exception) {
-            throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_MODELS_INVALID", "模型列表格式无效");
+            throw new ApiException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    "AI_MODELS_INVALID",
+                    "模型列表格式无效");
         }
     }
 
@@ -84,9 +107,9 @@ public class AiClient {
     }
 
     private ApiException failed(String message) {
-        return new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_REQUEST_FAILED", message);
+        return new ApiException(
+                org.springframework.http.HttpStatus.BAD_GATEWAY, "AI_REQUEST_FAILED", message);
     }
 
-    public record Message(String role, String content) {
-    }
+    public record Message(String role, String content) {}
 }

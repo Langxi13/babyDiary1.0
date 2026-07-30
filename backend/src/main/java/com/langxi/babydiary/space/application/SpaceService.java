@@ -2,11 +2,10 @@ package com.langxi.babydiary.space.application;
 
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.space.domain.SpaceSummary;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SpaceService implements SpaceAccess {
@@ -24,29 +23,40 @@ public class SpaceService implements SpaceAccess {
     @Transactional
     public SpaceSummary create(long accountId, String name, String defaultVisibility) {
         String normalizedName = name == null ? "" : name.trim();
-        if (normalizedName.isBlank()) throw ApiException.badRequest("SPACE_NAME_REQUIRED", "空间名称不能为空");
+        if (normalizedName.isBlank())
+            throw ApiException.badRequest("SPACE_NAME_REQUIRED", "空间名称不能为空");
         String visibility = "PRIVATE".equals(defaultVisibility) ? "PRIVATE" : "SHARED";
         UUID publicId = UUID.randomUUID();
-        long spaceId = spaces.insert(publicId, normalizedName, accountId, visibility, DEFAULT_QUOTA);
+        long spaceId =
+                spaces.insert(publicId, normalizedName, accountId, visibility, DEFAULT_QUOTA);
         spaces.insertOwner(spaceId, accountId);
         spaces.insertStorageUsage(spaceId);
-        return new SpaceSummary(publicId, normalizedName, "SHARED", "OWNER", visibility, DEFAULT_QUOTA, 0);
+        return new SpaceSummary(
+                publicId, normalizedName, "SHARED", "OWNER", visibility, DEFAULT_QUOTA, 0);
     }
 
     @Transactional
-    public SpaceSummary update(UUID spaceId, long accountId, String name, String defaultVisibility) {
+    public SpaceSummary update(
+            UUID spaceId, long accountId, String name, String defaultVisibility) {
         SpaceContext context = requireMember(spaceId, accountId);
         if (!("OWNER".equals(context.role()) || "ADMIN".equals(context.role()))) {
             throw ApiException.forbidden("SPACE_MANAGE_FORBIDDEN", "只有空间管理员可以修改空间设置");
         }
         String normalizedName = name == null ? "" : name.trim();
-        if (normalizedName.isBlank()) throw ApiException.badRequest("SPACE_NAME_REQUIRED", "空间名称不能为空");
+        if (normalizedName.isBlank())
+            throw ApiException.badRequest("SPACE_NAME_REQUIRED", "空间名称不能为空");
         String visibility = "PRIVATE".equals(defaultVisibility) ? "PRIVATE" : "SHARED";
         if (!spaces.update(context.internalId(), normalizedName, visibility)) {
             throw ApiException.notFound("SPACE_NOT_FOUND", "空间不存在或无权访问");
         }
-        return new SpaceSummary(spaceId, normalizedName, context.type(), context.role(), visibility,
-                context.storageQuotaBytes(), context.storageUsedBytes());
+        return new SpaceSummary(
+                spaceId,
+                normalizedName,
+                context.type(),
+                context.role(),
+                visibility,
+                context.storageQuotaBytes(),
+                context.storageUsedBytes());
     }
 
     @Override

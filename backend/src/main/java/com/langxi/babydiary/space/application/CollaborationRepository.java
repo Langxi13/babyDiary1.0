@@ -24,18 +24,30 @@ public interface CollaborationRepository {
 
     boolean removeMember(long spaceId, long accountId);
 
-    record Member(UUID id, String username, String email, String role, String status, LocalDateTime joinedAt) {
+    record Member(
+            UUID id,
+            String username,
+            String email,
+            String role,
+            String status,
+            LocalDateTime joinedAt) {
         @com.fasterxml.jackson.annotation.JsonProperty("userId")
-        public UUID userId() { return id; }
+        public UUID userId() {
+            return id;
+        }
     }
 
-    record Membership(long accountId, String role, String status) {
-    }
+    record Membership(long accountId, String role, String status) {}
 
-    record NewInvitation(UUID publicId, long spaceId, long invitedBy, String email, byte[] tokenHash,
-                         String role, LocalDateTime expiresAt) {
-    }
+    record NewInvitation(
+            UUID publicId,
+            long spaceId,
+            long invitedBy,
+            String email,
+            byte[] tokenHash,
+            String role,
+            LocalDateTime expiresAt) {}
 
-    record Invitation(long internalId, long spaceId, String email, String role, LocalDateTime expiresAt) {
-    }
+    record Invitation(
+            long internalId, long spaceId, String email, String role, LocalDateTime expiresAt) {}
 }

@@ -15,8 +15,17 @@ public interface ProfileRepository {
 
     void changePassword(long accountId, String passwordHash, LocalDateTime now);
 
-    record Profile(long accountId, UUID id, String username, String passwordHash, String email,
-                   boolean emailVerified, String role, String timezone, UUID avatarAssetId, UUID avatarSpaceId,
-                   String avatarVariantType, String avatarVariantProfile) {
-    }
+    record Profile(
+            long accountId,
+            UUID id,
+            String username,
+            String passwordHash,
+            String email,
+            boolean emailVerified,
+            String role,
+            String timezone,
+            UUID avatarAssetId,
+            UUID avatarSpaceId,
+            String avatarVariantType,
+            String avatarVariantProfile) {}
 }

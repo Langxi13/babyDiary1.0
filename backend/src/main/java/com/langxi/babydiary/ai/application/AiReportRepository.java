@@ -19,14 +19,36 @@ public interface AiReportRepository {
 
     List<DiaryInput> findDiaries(long spaceId, long accountId, LocalDate start, LocalDate end);
 
-    record Report(long internalId, UUID id, UUID spaceId, String periodType, LocalDate start, LocalDate end,
-                  String title, String markdown, int diaryCount, String model, LocalDateTime createdAt) {
-    }
+    record Report(
+            long internalId,
+            UUID id,
+            UUID spaceId,
+            String periodType,
+            LocalDate start,
+            LocalDate end,
+            String title,
+            String markdown,
+            int diaryCount,
+            String model,
+            LocalDateTime createdAt) {}
 
-    record NewReport(UUID publicId, long spaceId, long createdBy, String periodType, LocalDate start, LocalDate end,
-                     String title, String markdown, int diaryCount, String model) {
-    }
+    record NewReport(
+            UUID publicId,
+            long spaceId,
+            long createdBy,
+            String periodType,
+            LocalDate start,
+            LocalDate end,
+            String title,
+            String markdown,
+            int diaryCount,
+            String model) {}
 
-    record DiaryInput(long internalId, UUID id, LocalDate date, String title, String contentText, String mood) {
-    }
+    record DiaryInput(
+            long internalId,
+            UUID id,
+            LocalDate date,
+            String title,
+            String contentText,
+            String mood) {}
 }

@@ -7,11 +7,19 @@ public interface AiConfigRepository {
 
     void upsert(NewConfig config);
 
-    record Config(boolean enabled, String baseUrl, String model, String encryptedApiKey,
-                  int timeoutSeconds, LocalDateTime updatedAt) {
-    }
+    record Config(
+            boolean enabled,
+            String baseUrl,
+            String model,
+            String encryptedApiKey,
+            int timeoutSeconds,
+            LocalDateTime updatedAt) {}
 
-    record NewConfig(boolean enabled, String baseUrl, String model, String encryptedApiKey,
-                     int timeoutSeconds, long updatedBy) {
-    }
+    record NewConfig(
+            boolean enabled,
+            String baseUrl,
+            String model,
+            String encryptedApiKey,
+            int timeoutSeconds,
+            long updatedBy) {}
 }

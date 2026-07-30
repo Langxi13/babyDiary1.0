@@ -1,12 +1,9 @@
 package com.langxi.babydiary.identity.api;
 
-import com.langxi.babydiary.identity.application.InvitationCodeService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import com.langxi.babydiary.identity.application.InvitationCodeService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,17 +18,18 @@ public class InvitationCodeController {
     }
 
     @PostMapping("/view")
-    public CodeResponse view(@AuthenticationPrincipal AccountPrincipal principal,
-                             @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+    public CodeResponse view(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
         return new CodeResponse(codes.view(principal, token));
     }
 
     @PostMapping("/rotate")
-    public CodeResponse rotate(@AuthenticationPrincipal AccountPrincipal principal,
-                               @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+    public CodeResponse rotate(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
         return new CodeResponse(codes.rotate(principal, token));
     }
 
-    public record CodeResponse(String code) {
-    }
+    public record CodeResponse(String code) {}
 }

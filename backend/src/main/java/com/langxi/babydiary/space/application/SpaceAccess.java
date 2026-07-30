@@ -7,7 +7,12 @@ public interface SpaceAccess {
 
     SpaceContext requireWriter(UUID spaceId, long accountId);
 
-    record SpaceContext(long internalId, UUID publicId, String role, String type,
-                        String defaultVisibility, long storageQuotaBytes, long storageUsedBytes) {
-    }
+    record SpaceContext(
+            long internalId,
+            UUID publicId,
+            String role,
+            String type,
+            String defaultVisibility,
+            long storageQuotaBytes,
+            long storageUsedBytes) {}
 }

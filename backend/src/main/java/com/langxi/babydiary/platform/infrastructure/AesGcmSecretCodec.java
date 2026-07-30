@@ -1,14 +1,15 @@
 package com.langxi.babydiary.platform.infrastructure;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import com.langxi.babydiary.platform.application.SecretCodec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
-public final class AesGcmSecretCodec {
+final class AesGcmSecretCodec implements SecretCodec {
     private static final String PREFIX = "v1:";
     private static final int IV_LENGTH = 12;
     private static final int TAG_LENGTH_BITS = 128;
@@ -33,7 +34,9 @@ public final class AesGcmSecretCodec {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
             byte[] encrypted = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            return PREFIX + Base64.getEncoder().encodeToString(iv) + ":"
+            return PREFIX
+                    + Base64.getEncoder().encodeToString(iv)
+                    + ":"
                     + Base64.getEncoder().encodeToString(encrypted);
         } catch (Exception exception) {
             throw new IllegalStateException("Secret encryption failed", exception);
@@ -67,7 +70,8 @@ public final class AesGcmSecretCodec {
 
     private byte[] sha256(String value) {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
             throw new IllegalStateException("SHA-256 not available", exception);
         }

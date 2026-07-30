@@ -3,10 +3,8 @@ package com.langxi.babydiary.reminder.infrastructure;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.reminder.application.ReminderRepository;
-import org.springframework.stereotype.Repository;
-
 import java.util.List;
-import java.util.UUID;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisReminderRepository implements ReminderRepository {
@@ -20,14 +18,23 @@ public class MyBatisReminderRepository implements ReminderRepository {
 
     @Override
     public List<Row> findForAccount(long spaceId, long accountId) {
-        return mapper.findForAccount(spaceId, accountId).stream().map(row -> {
-            try {
-                return new Row(BinaryUuid.fromBytes(row.publicId()), row.type(), row.enabled(), json.readTree(row.schedule()),
-                        row.nextRunAt(), row.lastRunAt());
-            } catch (Exception exception) {
-                throw new IllegalStateException("Stored reminder schedule is invalid", exception);
-            }
-        }).toList();
+        return mapper.findForAccount(spaceId, accountId).stream()
+                .map(
+                        row -> {
+                            try {
+                                return new Row(
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        row.type(),
+                                        row.enabled(),
+                                        json.readTree(row.schedule()),
+                                        row.nextRunAt(),
+                                        row.lastRunAt());
+                            } catch (Exception exception) {
+                                throw new IllegalStateException(
+                                        "Stored reminder schedule is invalid", exception);
+                            }
+                        })
+                .toList();
     }
 
     @Override
