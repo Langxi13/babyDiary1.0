@@ -1766,6 +1766,8 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.groups[0].albums[0].systemKey").value("all"))
                 .andExpect(jsonPath("$.groups[0].albums[0].mediaCount").value(2))
+                .andExpect(jsonPath("$.groups[0].albums[0].coverAssetId").isNotEmpty())
+                .andExpect(jsonPath("$.groups[0].albums[0].coverMedia.id").isNotEmpty())
                 .andExpect(jsonPath("$.groups[0].albums[1].systemKey").value("favorites"))
                 .andExpect(jsonPath("$.groups[0].albums[1].mediaCount").value(0))
                 .andExpect(jsonPath("$.groups[0].albums[2].systemKey").value("year:2026"))
@@ -1825,6 +1827,16 @@ class ApiIntegrationTest {
                         .andExpect(jsonPath("$.mediaCount").value(2))
                         .andReturn();
         UUID albumId = UUID.fromString(body(album).path("id").asText());
+        jdbc.update("UPDATE album SET cover_asset_id=NULL WHERE public_id=?", uuid(albumId));
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/album-groups", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups[0].albums[1].coverMedia.id").isNotEmpty())
+                .andExpect(jsonPath("$.groups[1].albums[0].coverAssetId").value(assetId.toString()))
+                .andExpect(
+                        jsonPath("$.groups[1].albums[0].coverMedia.id").value(assetId.toString()));
 
         mvc.perform(
                         get("/api/v3/spaces/{spaceId}/albums/{albumId}", OWNER_SPACE_ID, albumId)
@@ -1833,6 +1845,8 @@ class ApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.album.groupId").value(groupId.toString()))
+                .andExpect(jsonPath("$.album.coverAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.album.coverMedia.id").value(assetId.toString()))
                 .andExpect(jsonPath("$.media.length()").value(1))
                 .andExpect(jsonPath("$.media[0].id").value(assetId.toString()))
                 .andExpect(jsonPath("$.totalMedia").value(2))

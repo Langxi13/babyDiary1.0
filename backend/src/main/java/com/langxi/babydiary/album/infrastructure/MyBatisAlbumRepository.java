@@ -35,6 +35,17 @@ public class MyBatisAlbumRepository implements AlbumRepository {
     }
 
     @Override
+    public List<AlbumCover> findFallbackCovers(long spaceId, boolean includeProtected) {
+        return mapper.findFallbackCovers(spaceId, includeProtected).stream()
+                .map(
+                        row ->
+                                new AlbumCover(
+                                        BinaryUuid.fromBytes(row.albumPublicId()),
+                                        BinaryUuid.fromBytes(row.assetPublicId())))
+                .toList();
+    }
+
+    @Override
     public Optional<AlbumRow> findAlbum(long spaceId, UUID albumId, boolean includeProtected) {
         return Optional.ofNullable(
                         mapper.findAlbum(spaceId, BinaryUuid.toBytes(albumId), includeProtected))

@@ -61,14 +61,24 @@ public class AlbumQueryService {
                         .stream()
                         .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
         List<AlbumCatalog.Album> systemAlbums = new ArrayList<>();
+        MediaAsset allCover =
+                firstMedia(
+                        spaceId, albums.findLibraryPublicIds(spaceId, accountId, elevated, 0, 1));
+        MediaAsset favoriteCover =
+                firstMedia(
+                        spaceId, albums.findFavoritePublicIds(spaceId, accountId, elevated, 0, 1));
         systemAlbums.add(
                 systemAlbum(
-                        "all", "所有图片", albums.countLibraryImages(spaceId, accountId, elevated)));
+                        "all",
+                        "所有图片",
+                        albums.countLibraryImages(spaceId, accountId, elevated),
+                        allCover));
         systemAlbums.add(
                 systemAlbum(
                         "favorites",
                         "收藏",
-                        albums.countFavoriteMedia(spaceId, accountId, elevated)));
+                        albums.countFavoriteMedia(spaceId, accountId, elevated),
+                        favoriteCover));
         for (AlbumRepository.YearBucket year : years) {
             MediaAsset cover = yearCovers.get(year.coverAssetId());
             MediaAsset.Variant coverVariant =
@@ -98,12 +108,22 @@ public class AlbumQueryService {
                             group.id(), "CUSTOM", group.name(), byGroup.get(group.internalId())));
         }
         List<AlbumRepository.AlbumRow> albumRows = albums.findAlbums(spaceId, elevated);
+        Map<UUID, UUID> fallbackCoverIds =
+                albums.findFallbackCovers(spaceId, elevated).stream()
+                        .collect(
+                                java.util.stream.Collectors.toMap(
+                                        AlbumRepository.AlbumCover::albumId,
+                                        AlbumRepository.AlbumCover::assetId));
         Map<UUID, MediaAsset> covers =
                 media
                         .findByPublicIdsInSpace(
                                 spaceId,
-                                albumRows.stream()
-                                        .map(AlbumRepository.AlbumRow::coverAssetId)
+                                java.util.stream.Stream.concat(
+                                                albumRows.stream()
+                                                        .map(
+                                                                AlbumRepository.AlbumRow
+                                                                        ::coverAssetId),
+                                                fallbackCoverIds.values().stream())
                                         .filter(java.util.Objects::nonNull)
                                         .distinct()
                                         .toList())
@@ -120,9 +140,11 @@ public class AlbumQueryService {
                     hasUngrouped = true;
                 }
             }
-            target.add(
-                    AlbumProjection.album(
-                            album, album.groupId(), covers.get(album.coverAssetId())));
+            UUID coverId =
+                    album.coverAssetId() == null
+                            ? fallbackCoverIds.get(album.id())
+                            : album.coverAssetId();
+            target.add(AlbumProjection.album(album, album.groupId(), coverId, covers.get(coverId)));
         }
         return new AlbumCatalog(List.copyOf(groups));
     }
@@ -151,16 +173,16 @@ public class AlbumQueryService {
                 albums.findMediaPublicIds(
                         spaceId, albumId, elevated, bounds.offset(), bounds.size());
         List<MediaAsset> items = media.findByPublicIdsInSpace(spaceId, ids);
-        MediaAsset cover =
-                row.coverAssetId() == null
-                        ? null
-                        : media
-                                .findByPublicIdsInSpace(spaceId, List.of(row.coverAssetId()))
-                                .stream()
-                                .findFirst()
-                                .orElse(null);
+        UUID coverId = row.coverAssetId();
+        if (coverId == null && row.mediaCount() > 0) {
+            coverId =
+                    albums.findMediaPublicIds(spaceId, albumId, elevated, 0, 1).stream()
+                            .findFirst()
+                            .orElse(null);
+        }
+        MediaAsset cover = firstMedia(spaceId, coverId == null ? List.of() : List.of(coverId));
         return new AlbumCatalog.Detail(
-                AlbumProjection.album(row, row.groupId(), cover),
+                AlbumProjection.album(row, row.groupId(), coverId, cover),
                 items,
                 albums.countMedia(spaceId, albumId, elevated));
     }
@@ -221,12 +243,39 @@ public class AlbumQueryService {
                                 ? albums.countFavoriteMedia(spaceId, accountId, elevated)
                                 : albums.countLibraryImages(spaceId, accountId, elevated);
         String name = year != null ? year + " 年" : "favorites".equals(key) ? "收藏" : "所有图片";
-        return new AlbumCatalog.Detail(systemAlbum(key, name, total), items, total);
+        List<UUID> coverIds =
+                year != null
+                        ? albums.findLibraryPublicIdsByYear(
+                                spaceId, accountId, year, elevated, 0, 1)
+                        : "favorites".equals(key)
+                                ? albums.findFavoritePublicIds(spaceId, accountId, elevated, 0, 1)
+                                : albums.findLibraryPublicIds(spaceId, accountId, elevated, 0, 1);
+        MediaAsset cover = firstMedia(spaceId, coverIds);
+        return new AlbumCatalog.Detail(systemAlbum(key, name, total, cover), items, total);
     }
 
-    private AlbumCatalog.Album systemAlbum(String key, String name, long count) {
+    private AlbumCatalog.Album systemAlbum(String key, String name, long count, MediaAsset cover) {
+        MediaAsset.Variant coverVariant =
+                cover == null ? null : AlbumProjection.coverVariant(cover);
         return new AlbumCatalog.Album(
-                null, null, key, "SYSTEM", name, "", null, null, null, count, null);
+                null,
+                null,
+                key,
+                "SYSTEM",
+                name,
+                "",
+                cover == null ? null : cover.id(),
+                coverVariant == null ? null : coverVariant.type(),
+                coverVariant == null ? null : coverVariant.profile(),
+                count,
+                cover);
+    }
+
+    private MediaAsset firstMedia(long spaceId, List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return null;
+        return media.findByPublicIdsInSpace(spaceId, List.of(ids.get(0))).stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private Integer systemYear(String key) {

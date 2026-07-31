@@ -8,6 +8,14 @@ final class AlbumProjection {
 
     static AlbumCatalog.Album album(
             AlbumRepository.AlbumRow row, java.util.UUID groupId, MediaAsset cover) {
+        return album(row, groupId, row.coverAssetId(), cover);
+    }
+
+    static AlbumCatalog.Album album(
+            AlbumRepository.AlbumRow row,
+            java.util.UUID groupId,
+            java.util.UUID coverAssetId,
+            MediaAsset cover) {
         return new AlbumCatalog.Album(
                 row.id(),
                 groupId,
@@ -15,7 +23,7 @@ final class AlbumProjection {
                 row.type(),
                 row.name(),
                 row.description(),
-                row.coverAssetId(),
+                coverAssetId,
                 row.coverVariantType(),
                 row.coverVariantProfile(),
                 row.mediaCount(),

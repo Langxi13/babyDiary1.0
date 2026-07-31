@@ -2,6 +2,8 @@
 
 ## 2026-07-31
 
+- Restored authorization-aware covers for non-empty all-photo, favorite, custom and AI albums by falling back to their first visible photo when no usable persisted cover exists.
+- Switched Web album and diary image viewers from original files to the existing 1280-pixel compressed representation with original fallback, and stopped media processing from enlarging small images while recording derived dimensions accurately.
 - Unified the current runtime naming around `/api/v3`, database `baby_diary`, neutral environment variables, `Baby-Diary.jar`, canonical frontend model modules, and product version `1.0.0-beta.5` from one tracked release file.
 - Added encrypted format-3 backups for database, media objects, private runtime configuration and Android signing material, with wrong-passphrase and tamper regressions; used separately verified encrypted archives during the one-time runtime cutover.
 - Completed a rollback-safe one-time cutover that verified row counts, deterministic data hashes, Flyway state, media representations and space boundaries before retiring historical databases, files and narrowly matched Redis keys; removed the migration utility after completion.

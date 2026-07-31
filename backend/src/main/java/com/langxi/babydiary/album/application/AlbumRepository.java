@@ -9,6 +9,8 @@ public interface AlbumRepository {
 
     List<AlbumRow> findAlbums(long spaceId, boolean includeProtected);
 
+    List<AlbumCover> findFallbackCovers(long spaceId, boolean includeProtected);
+
     Optional<AlbumRow> findAlbum(long spaceId, UUID albumId, boolean includeProtected);
 
     List<UUID> findMediaPublicIds(
@@ -82,6 +84,8 @@ public interface AlbumRepository {
     record GroupRow(long internalId, UUID id, String name, int sortOrder) {}
 
     record YearBucket(int year, long mediaCount, UUID coverAssetId) {}
+
+    record AlbumCover(UUID albumId, UUID assetId) {}
 
     record AlbumRow(
             long internalId,

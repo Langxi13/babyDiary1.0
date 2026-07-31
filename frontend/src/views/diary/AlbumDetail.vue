@@ -77,7 +77,7 @@ import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ArrowLeft, Picture, StarFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
-import { mediaOriginalUrl, mediaThumbnailUrl } from '@/api/models'
+import { mediaPreviewUrl, mediaThumbnailUrl } from '@/api/models'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -99,7 +99,7 @@ const photoPage = ref(0)
 const totalPhotos = ref(0)
 let loadVersion = 0
 
-const previewImages = computed(() => photos.value.map(item => mediaOriginalUrl(item.media)).filter(Boolean))
+const previewImages = computed(() => photos.value.map(item => mediaPreviewUrl(item.media)).filter(Boolean))
 const editableAlbum = computed(() => !!albumMeta.value?.editable)
 const hasMorePhotos = computed(() => photos.value.length < totalPhotos.value)
 const albumTitle = computed(() => albumMeta.value?.name || fallbackSystemTitle())

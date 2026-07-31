@@ -46,6 +46,30 @@ public interface AlbumMapper {
 
     @Select(
             """
+            WITH ranked AS (
+              SELECT a.public_id AS album_public_id,ma.public_id AS asset_public_id,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY a.album_id ORDER BY am.position,am.asset_id
+                     ) AS media_rank
+              FROM album a JOIN album_media am
+                ON am.space_id=a.space_id AND am.album_id=a.album_id
+              JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
+              WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
+                AND ma.deleted_at IS NULL AND ma.status='READY'
+                AND (#{includeProtected}=true OR NOT EXISTS (
+                  SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                    ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                  WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id
+                    AND lock_d.locked=1
+                ))
+            )
+            SELECT album_public_id,asset_public_id FROM ranked WHERE media_rank=1
+            """)
+    List<AlbumCoverRow> findFallbackCovers(
+            @Param("spaceId") long spaceId, @Param("includeProtected") boolean includeProtected);
+
+    @Select(
+            """
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
                    ca.public_id AS cover_public_id,NULL AS cover_variant_type,
                    NULL AS cover_variant_profile,COUNT(ma.asset_id) AS media_count
@@ -375,6 +399,29 @@ public interface AlbumMapper {
 
         public void setCoverPublicId(byte[] coverPublicId) {
             this.coverPublicId = coverPublicId;
+        }
+    }
+
+    final class AlbumCoverRow {
+        private byte[] albumPublicId;
+        private byte[] assetPublicId;
+
+        public AlbumCoverRow() {}
+
+        public byte[] albumPublicId() {
+            return albumPublicId;
+        }
+
+        public byte[] assetPublicId() {
+            return assetPublicId;
+        }
+
+        public void setAlbumPublicId(byte[] albumPublicId) {
+            this.albumPublicId = albumPublicId;
+        }
+
+        public void setAssetPublicId(byte[] assetPublicId) {
+            this.assetPublicId = assetPublicId;
         }
     }
 

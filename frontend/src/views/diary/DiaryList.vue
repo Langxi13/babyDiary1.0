@@ -151,7 +151,7 @@
                 v-for="(img, index) in diaryImages(diary).slice(0, 4)"
                 :key="img.id"
                 :src="mediaThumbnailUrl(img)"
-                :preview-src-list="diaryImages(diary).map(mediaOriginalUrl).filter(Boolean)"
+                :preview-src-list="diaryImages(diary).map(mediaPreviewUrl).filter(Boolean)"
                 :initial-index="index"
                 fit="cover"
                 class="diary-image"
@@ -204,7 +204,7 @@ import DiaryMobileFilters from '@/components/diary/DiaryMobileFilters.vue'
 import { useDiaryStore } from '@/stores/diary'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { tagApi } from '@/api/experience'
-import { mediaOriginalUrl, mediaThumbnailUrl } from '@/api/models'
+import { mediaPreviewUrl, mediaThumbnailUrl } from '@/api/models'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'

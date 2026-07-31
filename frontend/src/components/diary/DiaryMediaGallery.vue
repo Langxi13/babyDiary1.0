@@ -36,6 +36,7 @@ import {
   mediaOriginalUrl,
   mediaPlaybackUrl,
   mediaPosterUrl,
+  mediaPreviewUrl,
   mediaThumbnailUrl
 } from '@/api/models'
 import 'element-plus/es/components/image/style/css.mjs'
@@ -46,7 +47,7 @@ const props = defineProps({
 
 const imageUrls = computed(() => props.media
   .filter(item => item.mediaType === 'IMAGE')
-  .map(mediaOriginalUrl)
+  .map(mediaPreviewUrl)
   .filter(Boolean))
 
 const imageIndex = mediaIndex => props.media

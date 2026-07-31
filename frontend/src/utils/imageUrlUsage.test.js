@@ -17,6 +17,7 @@ const buildConfigSource = read('../../vite.config.js')
 test('album and diary grids use signed media urls for rendered tiles and previews', () => {
   for (const source of [albumDetailSource, diaryListSource, diaryGallerySource]) {
     assert.match(source, /mediaThumbnailUrl/)
+    assert.match(source, /mediaPreviewUrl/)
     assert.doesNotMatch(source, /\.thumbnailUrl|\.contentUrl/)
     assert.doesNotMatch(source, /imagePathList/)
   }

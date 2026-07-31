@@ -105,8 +105,9 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
         if (image != null) {
             width = image.getWidth();
             height = image.getHeight();
+            double scale = Math.min(1.0, 1280.0 / Math.max(width, height));
             Thumbnails.of(image)
-                    .size(1280, 1280)
+                    .scale(scale)
                     .outputFormat("jpg")
                     .outputQuality(0.84)
                     .toFile(thumbnail.toFile());
@@ -122,7 +123,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                             "-i",
                             input.toString(),
                             "-vf",
-                            "scale='min(1280,iw)':-2",
+                            "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease",
                             "-frames:v",
                             "1",
                             thumbnail.toString()),
@@ -132,14 +133,16 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
             height = dimensions.height();
         }
         media.updateTechnicalMetadata(asset.internalId(), width, height, null);
+        BufferedImage derived = ImageIO.read(thumbnail.toFile());
+        if (derived == null) throw new IOException("Generated image thumbnail is unreadable");
         store(
                 asset,
                 thumbnail,
                 "THUMBNAIL",
                 "default",
                 "image/jpeg",
-                width,
-                height,
+                derived.getWidth(),
+                derived.getHeight(),
                 null,
                 "thumbnail/default.jpg");
     }

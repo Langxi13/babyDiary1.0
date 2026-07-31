@@ -71,6 +71,8 @@ class MediaProcessingJobHandlerTest {
                 ArgumentCaptor.forClass(MediaRepository.NewVariant.class);
         verify(media).insertVariant(variant.capture());
         assertThat(storage.objects()).containsKeys("source", variant.getValue().storageKey());
+        assertThat(variant.getValue().width()).isEqualTo(3);
+        assertThat(variant.getValue().height()).isEqualTo(2);
         verify(media, never()).releaseStorage(eq(SPACE_ID), anyLong());
     }
 
