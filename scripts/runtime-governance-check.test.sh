@@ -56,6 +56,11 @@ CORS_ALLOWED_ORIGINS=https://diary.example.com
 AI_CONFIG_ENCRYPTION_KEY=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 INVITATION_CODE_ENCRYPTION_KEY=cccccccccccccccccccccccccccccccc
 SERVER_ADDRESS=127.0.0.1
+FFMPEG_PATH=true
+FFPROBE_PATH=true
+VIPSTHUMBNAIL_PATH=true
+VIPSHEADER_PATH=true
+CWEBP_PATH=true
 ENV
 
 mkdir -p "$OBJECT_DIR"
@@ -89,11 +94,31 @@ grep -q "backend.env mode 600" <<<"$OUTPUT"
 grep -q "database user baby_diary_app" <<<"$OUTPUT"
 grep -q "database timezone configured" <<<"$OUTPUT"
 grep -q "security environment configured" <<<"$OUTPUT"
+grep -q "media processing tools available" <<<"$OUTPUT"
 grep -q "backend bound to loopback" <<<"$OUTPUT"
 grep -q "nginx native resource policy included" <<<"$OUTPUT"
 grep -q "nginx backend health proxy included" <<<"$OUTPUT"
 grep -q "private object directory isolated" <<<"$OUTPUT"
 grep -q "object directory writable" <<<"$OUTPUT"
+
+printf '%s\n' 'CWEBP_PATH=baby-diary-missing-cwebp' >> "$ENV_FILE"
+if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
+  SYSTEMD_HARDENING_FILE="$HARDENING_FILE" \
+  BACKEND_ENV_FILE="$ENV_FILE" \
+  OBJECT_DIR="$OBJECT_DIR" \
+  SERVICE_USER="baby-diary" \
+  NGINX_GROUP="$(id -gn)" \
+  DB_APP_USER="baby_diary_app" \
+  NGINX_SITE_FILE="$NGINX_SITE_FILE" \
+  NGINX_HEALTH_SNIPPET_FILE="$NGINX_HEALTH_SNIPPET_FILE" \
+  NGINX_RESOURCE_POLICY_MAP_FILE="$NGINX_RESOURCE_POLICY_MAP_FILE" \
+  TMP_ROOT="$HOST_TMP" \
+  CHECK_OS_USER="false" \
+  "$ROOT/scripts/runtime-governance-check.sh" >/dev/null 2>&1; then
+  echo "runtime governance should require every media processing tool" >&2
+  exit 1
+fi
+printf '%s\n' 'CWEBP_PATH=true' >> "$ENV_FILE"
 
 printf '%s\n' 'SERVER_ADDRESS=0.0.0.0' >> "$ENV_FILE"
 if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
