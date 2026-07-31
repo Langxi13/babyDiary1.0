@@ -59,6 +59,9 @@ class CleanSchemaMigrationTest {
             assertThat(columnType(statement, "diary", "content_html")).isEqualTo("mediumtext");
             assertThat(columnType(statement, "diary_draft", "payload")).isEqualTo("json");
             assertThat(columnType(statement, "sync_change", "visibility")).isEqualTo("varchar(16)");
+            assertThat(columnType(statement, "media_asset", "derivative_version")).isEqualTo("int");
+            assertThat(columnType(statement, "media_variant", "quality_score"))
+                    .isEqualTo("decimal(7,6)");
 
             try (ResultSet result =
                     statement.executeQuery(
@@ -68,6 +71,62 @@ class CleanSchemaMigrationTest {
                     assertThat(result.getString(1)).doesNotContain("general_ci", "unicode_ci");
                 }
             }
+        }
+    }
+
+    @Test
+    void v5AddsAdaptiveDerivativesWithoutChangingOriginalMedia() throws Exception {
+        clean();
+        flyway("4").migrate();
+        byte[] checksum = new byte[32];
+        java.util.Arrays.fill(checksum, (byte) 7);
+        try (Connection connection = connection();
+                java.sql.PreparedStatement account =
+                        connection.prepareStatement(
+                                "INSERT INTO account(account_id,public_id,username,password_hash) VALUES(1,UUID_TO_BIN(UUID()),'owner','hash')");
+                java.sql.PreparedStatement space =
+                        connection.prepareStatement(
+                                "INSERT INTO diary_space(space_id,public_id,name,type,created_by,personal_owner_id,default_visibility) VALUES(10,UUID_TO_BIN(UUID()),'Owner space','PERSONAL',1,1,'PRIVATE')");
+                java.sql.PreparedStatement asset =
+                        connection.prepareStatement(
+                                "INSERT INTO media_asset(asset_id,public_id,space_id,owner_id,media_type,status) VALUES(20,UUID_TO_BIN(UUID()),10,1,'IMAGE','READY')");
+                java.sql.PreparedStatement variant =
+                        connection.prepareStatement(
+                                "INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,size_bytes,checksum_sha256,status) VALUES(20,'ORIGINAL','source','LOCAL','source','image/jpeg',12345,?,'READY')")) {
+            account.executeUpdate();
+            space.executeUpdate();
+            asset.executeUpdate();
+            variant.setBytes(1, checksum);
+            variant.executeUpdate();
+        }
+
+        flyway(null).migrate();
+
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT a.derivative_version,v.variant_type,v.profile,v.storage_key,v.size_bytes,v.checksum_sha256 "
+                                        + "FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id WHERE a.asset_id=20")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1)).isZero();
+            assertThat(result.getString(2)).isEqualTo("ORIGINAL");
+            assertThat(result.getString(3)).isEqualTo("source");
+            assertThat(result.getString(4)).isEqualTo("source");
+            assertThat(result.getLong(5)).isEqualTo(12345);
+            assertThat(result.getBytes(6)).containsExactly(checksum);
+        }
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,size_bytes,quality_score,status) "
+                            + "VALUES(20,'PREVIEW','screen','LOCAL','screen','image/webp',6000,0.991234,'READY')");
+            assertThatThrownBy(
+                            () ->
+                                    statement.execute(
+                                            "INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,size_bytes,quality_score,status) "
+                                                    + "VALUES(20,'PREVIEW','bad','LOCAL','bad','image/webp',1,1.1,'READY')"))
+                    .isInstanceOf(SQLException.class);
         }
     }
 

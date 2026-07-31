@@ -11,6 +11,7 @@ export const normalizeMedia = (media = {}) => ({
   representations: media.representations ? {
     original: normalizeRepresentation(media.representations.original),
     thumbnail: normalizeRepresentation(media.representations.thumbnail),
+    preview: normalizeRepresentation(media.representations.preview),
     poster: normalizeRepresentation(media.representations.poster),
     waveform: normalizeRepresentation(media.representations.waveform),
     transcoded: normalizeRepresentation(media.representations.transcoded)
@@ -18,16 +19,24 @@ export const normalizeMedia = (media = {}) => ({
 })
 
 export const mediaOriginalUrl = media => media?.representations?.original?.url || ''
-export const mediaThumbnailUrl = media => media?.representations?.thumbnail?.url || mediaOriginalUrl(media)
+const usableDerivativeUrl = (representation, original) => {
+  if (!representation?.url) return ''
+  if (Number.isFinite(original?.sizeBytes) && Number.isFinite(representation.sizeBytes) &&
+      original.sizeBytes > 0 && representation.sizeBytes >= original.sizeBytes) {
+    return ''
+  }
+  return representation.url
+}
+
 export const mediaPreviewUrl = media => {
   const original = media?.representations?.original
-  const thumbnail = media?.representations?.thumbnail
-  if (!thumbnail?.url) return original?.url || ''
-  if (Number.isFinite(original?.sizeBytes) && Number.isFinite(thumbnail.sizeBytes) &&
-      original.sizeBytes > 0 && thumbnail.sizeBytes >= original.sizeBytes) {
-    return original.url || thumbnail.url
-  }
-  return thumbnail.url
+  return usableDerivativeUrl(media?.representations?.preview, original) || original?.url || ''
+}
+export const mediaThumbnailUrl = media => {
+  const original = media?.representations?.original
+  return usableDerivativeUrl(media?.representations?.thumbnail, original) ||
+    usableDerivativeUrl(media?.representations?.preview, original) ||
+    original?.url || ''
 }
 export const mediaPosterUrl = media => media?.representations?.poster?.url || ''
 export const mediaPlaybackUrl = media => media?.representations?.transcoded?.url || mediaOriginalUrl(media)

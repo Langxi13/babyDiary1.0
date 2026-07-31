@@ -104,6 +104,7 @@ class MediaContentResponseTest {
                         2,
                         2,
                         null,
+                        null,
                         "READY");
         return new MediaService.ResolvedVariant(null, variant, "\"checksum\"");
     }

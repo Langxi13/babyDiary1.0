@@ -16,6 +16,7 @@ public record MediaAsset(
         String accessScope,
         boolean libraryVisible,
         String status,
+        int derivativeVersion,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<Variant> variants) {
@@ -30,5 +31,6 @@ public record MediaAsset(
             Integer width,
             Integer height,
             Long durationMillis,
+            Double qualityScore,
             String status) {}
 }

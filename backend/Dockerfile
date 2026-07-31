@@ -8,7 +8,10 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -Dmaven.test.skip=true package
 
 FROM eclipse-temurin:17-jre-jammy
 
-RUN groupadd --system baby-diary \
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg libvips-tools webp curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system baby-diary \
     && useradd --system --gid baby-diary --home-dir /app baby-diary \
     && install -d -o baby-diary -g baby-diary /app/config /data/objects
 

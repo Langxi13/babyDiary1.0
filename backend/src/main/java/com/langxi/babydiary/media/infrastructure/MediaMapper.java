@@ -69,9 +69,9 @@ public interface MediaMapper {
     @Insert(
             """
             INSERT IGNORE INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,content_type,
-              size_bytes,checksum_sha256,width,height,duration_millis,status,created_at,updated_at)
+              size_bytes,checksum_sha256,width,height,duration_millis,quality_score,status,created_at,updated_at)
             VALUES(#{assetId},#{type},#{profile},#{storageProvider},#{storageKey},#{contentType},
-              #{sizeBytes},#{checksumSha256},#{width},#{height},#{durationMillis},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
+              #{sizeBytes},#{checksumSha256},#{width},#{height},#{durationMillis},#{qualityScore},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
             """)
     int insertVariant(MediaRepository.NewVariant variant);
 
@@ -161,12 +161,48 @@ public interface MediaMapper {
             @Param("height") Integer height,
             @Param("durationMillis") Long durationMillis);
 
+    @Update(
+            "UPDATE media_asset SET derivative_version=GREATEST(derivative_version,#{version}),updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId} AND status='READY' AND deleted_at IS NULL")
+    void markDerivativeVersion(@Param("assetId") long assetId, @Param("version") int version);
+
     @org.apache.ibatis.annotations.Select(
             "SELECT COUNT(*)>0 FROM media_variant WHERE asset_id=#{assetId} AND variant_type=#{type} AND profile=#{profile} AND status='READY' AND deleted_at IS NULL")
     boolean hasVariant(
             @Param("assetId") long assetId,
             @Param("type") String type,
             @Param("profile") String profile);
+
+    @Update(
+            """
+            UPDATE media_variant v JOIN media_asset a ON a.asset_id=v.asset_id
+            JOIN space_storage_usage u ON u.space_id=a.space_id
+            SET v.deleted_at=#{deletedAt},v.updated_at=UTC_TIMESTAMP(6),
+                u.used_bytes=GREATEST(u.used_bytes-#{sizeBytes},0),u.updated_at=UTC_TIMESTAMP(6)
+            WHERE v.asset_id=#{assetId} AND v.variant_type=#{type} AND v.profile=#{profile}
+              AND v.status='READY' AND v.deleted_at IS NULL
+            """)
+    int retireVariant(
+            @Param("assetId") long assetId,
+            @Param("type") String type,
+            @Param("profile") String profile,
+            @Param("sizeBytes") long sizeBytes,
+            @Param("deletedAt") LocalDateTime deletedAt);
+
+    @Select(
+            """
+            SELECT a.space_id,s.public_id AS space_public_id,a.public_id AS asset_public_id,a.owner_id
+            FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
+            WHERE a.media_type='IMAGE' AND a.status='READY' AND a.deleted_at IS NULL
+              AND a.derivative_version<#{targetVersion}
+              AND NOT EXISTS (
+                SELECT 1 FROM background_job j
+                WHERE j.job_type='MEDIA_PROCESS'
+                  AND j.dedupe_key=CONCAT('asset:v',#{targetVersion},':',BIN_TO_UUID(a.public_id))
+              )
+            ORDER BY a.asset_id LIMIT #{limit}
+            """)
+    List<DerivativeCandidateRow> findDerivativeCandidates(
+            @Param("targetVersion") int targetVersion, @Param("limit") int limit);
 
     @org.apache.ibatis.annotations.Select(
             """
@@ -305,6 +341,9 @@ public interface MediaMapper {
         }
     }
 
+    record DerivativeCandidateRow(
+            long spaceId, byte[] spacePublicId, byte[] assetPublicId, long ownerId) {}
+
     final class MediaRow {
         private long assetId;
         private byte[] publicId;
@@ -317,6 +356,7 @@ public interface MediaMapper {
         private String accessScope;
         private boolean libraryVisible;
         private String assetStatus;
+        private int derivativeVersion;
         private LocalDateTime assetCreatedAt;
         private LocalDateTime assetUpdatedAt;
         private String variantType;
@@ -329,6 +369,7 @@ public interface MediaMapper {
         private Integer width;
         private Integer height;
         private Long durationMillis;
+        private Double qualityScore;
         private String variantStatus;
 
         public MediaRow() {}
@@ -375,6 +416,10 @@ public interface MediaMapper {
 
         public String assetStatus() {
             return assetStatus;
+        }
+
+        public int derivativeVersion() {
+            return derivativeVersion;
         }
 
         public LocalDateTime assetCreatedAt() {
@@ -425,6 +470,10 @@ public interface MediaMapper {
             return durationMillis;
         }
 
+        public Double qualityScore() {
+            return qualityScore;
+        }
+
         public String variantStatus() {
             return variantStatus;
         }
@@ -471,6 +520,10 @@ public interface MediaMapper {
 
         public void setAssetStatus(String assetStatus) {
             this.assetStatus = assetStatus;
+        }
+
+        public void setDerivativeVersion(int derivativeVersion) {
+            this.derivativeVersion = derivativeVersion;
         }
 
         public void setAssetCreatedAt(LocalDateTime assetCreatedAt) {
@@ -521,6 +574,10 @@ public interface MediaMapper {
             this.durationMillis = durationMillis;
         }
 
+        public void setQualityScore(Double qualityScore) {
+            this.qualityScore = qualityScore;
+        }
+
         public void setVariantStatus(String variantStatus) {
             this.variantStatus = variantStatus;
         }
@@ -537,6 +594,7 @@ public interface MediaMapper {
         private Integer width;
         private Integer height;
         private Long durationMillis;
+        private Double qualityScore;
         private String status;
 
         public VariantRow() {}
@@ -581,6 +639,10 @@ public interface MediaMapper {
             return durationMillis;
         }
 
+        public Double qualityScore() {
+            return qualityScore;
+        }
+
         public String status() {
             return status;
         }
@@ -623,6 +685,10 @@ public interface MediaMapper {
 
         public void setDurationMillis(Long durationMillis) {
             this.durationMillis = durationMillis;
+        }
+
+        public void setQualityScore(Double qualityScore) {
+            this.qualityScore = qualityScore;
         }
 
         public void setStatus(String status) {

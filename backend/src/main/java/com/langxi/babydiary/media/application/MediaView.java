@@ -20,6 +20,7 @@ public record MediaView(
     public record Representations(
             Representation original,
             Representation thumbnail,
+            Representation preview,
             Representation poster,
             Representation waveform,
             Representation transcoded) {}

@@ -141,6 +141,16 @@ if tr ',' '\n' <<<"$CORS_ALLOWED_ORIGINS" | grep -Eq '^[[:space:]]*\*[[:space:]]
 fi
 echo "security environment configured"
 
+for tool in "${FFMPEG_PATH:-ffmpeg}" "${FFPROBE_PATH:-ffprobe}" \
+  "${VIPSTHUMBNAIL_PATH:-vipsthumbnail}" "${VIPSHEADER_PATH:-vipsheader}" \
+  "${CWEBP_PATH:-cwebp}"; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "required media processing tool is unavailable: $tool" >&2
+    exit 1
+  }
+done
+echo "media processing tools available"
+
 if [ "${SERVER_ADDRESS:-127.0.0.1}" != "127.0.0.1" ]; then
   echo "SERVER_ADDRESS must remain 127.0.0.1 behind the production reverse proxy" >&2
   exit 1

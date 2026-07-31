@@ -159,13 +159,6 @@
             <version>1.17.2</version>
         </dependency>
 
-        <!-- Image Processing - Thumbnailator for image compression -->
-        <dependency>
-            <groupId>net.coobird</groupId>
-            <artifactId>thumbnailator</artifactId>
-            <version>0.4.20</version>
-        </dependency>
-
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>

@@ -353,6 +353,7 @@ public class DiaryController {
                             value.id(),
                             value.originalProfile(),
                             value.thumbnailProfile(),
+                            value.previewProfile(),
                             context,
                             reveal));
         }

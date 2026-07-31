@@ -33,7 +33,8 @@ public class MediaVariantPolicy {
                 value == null || value.isBlank()
                         ? "ORIGINAL"
                         : value.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("ORIGINAL", "THUMBNAIL", "POSTER", "WAVEFORM", "TRANSCODED").contains(type)) {
+        if (!List.of("ORIGINAL", "THUMBNAIL", "PREVIEW", "POSTER", "WAVEFORM", "TRANSCODED")
+                .contains(type)) {
             throw com.langxi.babydiary.platform.application.ApiException.notFound(
                     "MEDIA_VARIANT_NOT_FOUND", "媒体变体不存在");
         }
@@ -54,6 +55,12 @@ public class MediaVariantPolicy {
         if ("ORIGINAL".equals(type)) {
             if ("source".equals(profile)) return 0;
             if ("default".equals(profile)) return 1;
+        } else if ("THUMBNAIL".equals(type)) {
+            if ("compact".equals(profile)) return 0;
+            return 2;
+        } else if ("PREVIEW".equals(type)) {
+            if ("screen".equals(profile)) return 0;
+            return 2;
         } else {
             if ("default".equals(profile)) return 0;
             if ("source".equals(profile)) return 1;

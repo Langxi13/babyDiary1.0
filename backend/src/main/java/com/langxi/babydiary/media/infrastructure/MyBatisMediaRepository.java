@@ -202,8 +202,35 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
+    public void markDerivativeVersion(long assetId, int version) {
+        mapper.markDerivativeVersion(assetId, version);
+    }
+
+    @Override
     public boolean hasVariant(long assetId, String type, String profile) {
         return mapper.hasVariant(assetId, type, profile);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public boolean retireVariant(
+            long assetId, String type, String profile, long sizeBytes, LocalDateTime deletedAt) {
+        return mapper.retireVariant(assetId, type, profile, sizeBytes, deletedAt) > 0;
+    }
+
+    @Override
+    public List<DerivativeCandidate> findDerivativeCandidates(int targetVersion, int limit) {
+        return mapper
+                .findDerivativeCandidates(targetVersion, Math.max(1, Math.min(limit, 50)))
+                .stream()
+                .map(
+                        row ->
+                                new DerivativeCandidate(
+                                        row.spaceId(),
+                                        BinaryUuid.fromBytes(row.spacePublicId()),
+                                        BinaryUuid.fromBytes(row.assetPublicId()),
+                                        row.ownerId()))
+                .toList();
     }
 
     @Override
@@ -270,6 +297,7 @@ public class MyBatisMediaRepository implements MediaRepository {
                 row.width(),
                 row.height(),
                 row.durationMillis(),
+                row.qualityScore(),
                 row.variantStatus());
     }
 
@@ -285,6 +313,7 @@ public class MyBatisMediaRepository implements MediaRepository {
                 row.width(),
                 row.height(),
                 row.durationMillis(),
+                row.qualityScore(),
                 row.status());
     }
 
@@ -309,6 +338,7 @@ public class MyBatisMediaRepository implements MediaRepository {
                     row.accessScope(),
                     row.libraryVisible(),
                     row.assetStatus(),
+                    row.derivativeVersion(),
                     row.assetCreatedAt(),
                     row.assetUpdatedAt(),
                     List.copyOf(variants));

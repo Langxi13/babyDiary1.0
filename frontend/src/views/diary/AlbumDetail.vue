@@ -19,14 +19,12 @@
       <div v-loading="loadingPhotos" class="album-photo-grid">
         <el-empty v-if="!loadingPhotos && photos.length === 0" description="暂无照片" />
         <article v-for="(photo, index) in photos" :key="photo.id" class="photo-card">
-          <el-image
-            :src="mediaThumbnailUrl(photo.media)"
-            :preview-src-list="previewImages"
+          <MediaImage
+            :media="photo.media"
+            :preview-media="photoMedia"
             :initial-index="index"
             fit="cover"
             class="photo"
-            :preview-teleported="true"
-            lazy
           >
             <template #placeholder>
               <div class="image-state image-loading" />
@@ -37,7 +35,7 @@
                 <span>图片暂不可用</span>
               </div>
             </template>
-          </el-image>
+          </MediaImage>
           <button
             class="favorite-btn"
             :class="{ active: photo.favorite }"
@@ -74,16 +72,14 @@ import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
-import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ArrowLeft, Picture, StarFilled } from '@element-plus/icons-vue'
 import { albumApi } from '@/api/album'
-import { mediaPreviewUrl, mediaThumbnailUrl } from '@/api/models'
+import MediaImage from '@/components/diary/MediaImage.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
-import 'element-plus/es/components/image/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
 
 const route = useRoute()
@@ -99,7 +95,7 @@ const photoPage = ref(0)
 const totalPhotos = ref(0)
 let loadVersion = 0
 
-const previewImages = computed(() => photos.value.map(item => mediaPreviewUrl(item.media)).filter(Boolean))
+const photoMedia = computed(() => photos.value.map(item => item.media))
 const editableAlbum = computed(() => !!albumMeta.value?.editable)
 const hasMorePhotos = computed(() => photos.value.length < totalPhotos.value)
 const albumTitle = computed(() => albumMeta.value?.name || fallbackSystemTitle())

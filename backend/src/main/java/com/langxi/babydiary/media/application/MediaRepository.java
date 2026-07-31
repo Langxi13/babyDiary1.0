@@ -53,7 +53,14 @@ public interface MediaRepository {
 
     void updateTechnicalMetadata(long assetId, Integer width, Integer height, Long durationMillis);
 
+    void markDerivativeVersion(long assetId, int version);
+
     boolean hasVariant(long assetId, String type, String profile);
+
+    boolean retireVariant(
+            long assetId, String type, String profile, long sizeBytes, LocalDateTime deletedAt);
+
+    List<DerivativeCandidate> findDerivativeCandidates(int targetVersion, int limit);
 
     ReferenceCounts references(long assetId);
 
@@ -105,6 +112,7 @@ public interface MediaRepository {
             Integer width,
             Integer height,
             Long durationMillis,
+            Double qualityScore,
             String status) {}
 
     record ReferenceCounts(
@@ -118,4 +126,6 @@ public interface MediaRepository {
             return diaries + albums + albumCovers + anniversaries + avatars + aiProposals;
         }
     }
+
+    record DerivativeCandidate(long spaceId, UUID spacePublicId, UUID assetId, long ownerId) {}
 }

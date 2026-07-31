@@ -32,7 +32,7 @@ public interface CollaborationMapper {
                   AND candidate.deleted_at IS NULL
                   AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
                 ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
-                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         CASE candidate.profile WHEN 'compact' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
                          candidate.variant_id LIMIT 1
             )
             WHERE m.space_id=#{spaceId} AND m.status='ACTIVE' AND a.deleted_at IS NULL

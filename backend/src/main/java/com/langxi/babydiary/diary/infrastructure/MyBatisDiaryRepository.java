@@ -198,6 +198,7 @@ public class MyBatisDiaryRepository implements DiaryRepository {
                                     row.status(),
                                     row.originalProfile(),
                                     row.thumbnailProfile(),
+                                    row.previewProfile(),
                                     row.protectedContent()));
         }
         return rows.stream()

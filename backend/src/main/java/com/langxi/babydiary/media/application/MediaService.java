@@ -118,6 +118,7 @@ public class MediaService {
                             inspected.width(),
                             inspected.height(),
                             inspected.durationMillis(),
+                            null,
                             "READY"))) {
                 throw new IllegalStateException("Original media variant already exists");
             }
@@ -127,7 +128,7 @@ public class MediaService {
                         space.internalId(),
                         accountId,
                         "MEDIA_PROCESS",
-                        "asset:" + publicId,
+                        "asset:v2:" + publicId,
                         java.util.Map.of(
                                 "spaceId", spaceId.toString(), "assetId", publicId.toString()),
                         5);

@@ -147,16 +147,14 @@
             <p class="diary-text">{{ previewContent(diary) }}</p>
 
             <div class="diary-images" v-if="diaryImages(diary).length > 0" @click.stop>
-              <el-image
+              <MediaImage
                 v-for="(img, index) in diaryImages(diary).slice(0, 4)"
                 :key="img.id"
-                :src="mediaThumbnailUrl(img)"
-                :preview-src-list="diaryImages(diary).map(mediaPreviewUrl).filter(Boolean)"
+                :media="img"
+                :preview-media="diaryImages(diary)"
                 :initial-index="index"
                 fit="cover"
                 class="diary-image"
-                :preview-teleported="true"
-                lazy
               />
               <span v-if="diaryImages(diary).length > 4" class="more-images">
                 +{{ diaryImages(diary).length - 4 }}
@@ -193,7 +191,6 @@ import { ElDatePicker } from 'element-plus/es/components/date-picker/index.mjs'
 import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
-import { ElImage } from 'element-plus/es/components/image/index.mjs'
 import { ElInput } from 'element-plus/es/components/input/index.mjs'
 import { ElOption, ElSelect } from 'element-plus/es/components/select/index.mjs'
 import { ElPagination } from 'element-plus/es/components/pagination/index.mjs'
@@ -201,10 +198,10 @@ import { ElPopconfirm } from 'element-plus/es/components/popconfirm/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { Search, Plus, Download, Edit, Delete, View } from '@element-plus/icons-vue'
 import DiaryMobileFilters from '@/components/diary/DiaryMobileFilters.vue'
+import MediaImage from '@/components/diary/MediaImage.vue'
 import { useDiaryStore } from '@/stores/diary'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { tagApi } from '@/api/experience'
-import { mediaPreviewUrl, mediaThumbnailUrl } from '@/api/models'
 import { MOODS, moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -212,7 +209,6 @@ import 'element-plus/es/components/date-picker/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
-import 'element-plus/es/components/image/style/css.mjs'
 import 'element-plus/es/components/input/style/css.mjs'
 import 'element-plus/es/components/message/style/css.mjs'
 import 'element-plus/es/components/pagination/style/css.mjs'

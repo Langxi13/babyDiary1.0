@@ -2,6 +2,10 @@
 
 ## 2026-07-31
 
+- Added Flyway V5 adaptive image derivatives while preserving immutable `ORIGINAL/source` objects and their checksums; image assets now expose `THUMBNAIL/compact` and `PREVIEW/screen` under one media contract.
+- Replaced Thumbnailator with a bounded libvips, cwebp and FFmpeg pipeline: 800-pixel list images, 2048-pixel screen previews, adaptive SSIM-gated WebP, lossless graphics, metadata stripping, no upscaling, animation fallback and a 10% minimum saving rule.
+- Added an explicit “查看原图” viewer action, stable compact-to-screen-to-source fallback, serial background backfill and real-tool/MySQL regressions covering quality, transparency, animation, migration and original-data preservation.
+- Prevented retained failed derivative jobs from occupying subsequent backfill candidate batches while preserving bounded retries and auditable failure state.
 - Restored authorization-aware covers for non-empty all-photo, favorite, custom and AI albums by falling back to their first visible photo when no usable persisted cover exists.
 - Switched Web album and diary image viewers from original files to the existing 1280-pixel compressed representation with original fallback, and stopped media processing from enlarging small images while recording derived dimensions accurately.
 - Unified the current runtime naming around `/api/v3`, database `baby_diary`, neutral environment variables, `Baby-Diary.jar`, canonical frontend model modules, and product version `1.0.0-beta.5` from one tracked release file.

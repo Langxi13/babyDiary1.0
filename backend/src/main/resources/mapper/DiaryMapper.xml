@@ -99,7 +99,7 @@
         SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,a.caption,a.taken_at,dm.position,a.status,
                EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
                  WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1) AS protected_content,
-               ov.profile AS original_profile,tv.profile AS thumbnail_profile
+               ov.profile AS original_profile,tv.profile AS thumbnail_profile,pv.profile AS preview_profile
         FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
         LEFT JOIN media_variant ov ON ov.variant_id=(
             SELECT candidate.variant_id FROM media_variant candidate
@@ -112,7 +112,14 @@
             SELECT candidate.variant_id FROM media_variant candidate
             WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='THUMBNAIL'
               AND candidate.status='READY' AND candidate.deleted_at IS NULL
-            ORDER BY CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+            ORDER BY CASE candidate.profile WHEN 'compact' THEN 0 ELSE 2 END,
+                     candidate.variant_id LIMIT 1
+        )
+        LEFT JOIN media_variant pv ON pv.variant_id=(
+            SELECT candidate.variant_id FROM media_variant candidate
+            WHERE candidate.asset_id=a.asset_id AND candidate.variant_type='PREVIEW'
+              AND candidate.status='READY' AND candidate.deleted_at IS NULL
+            ORDER BY CASE candidate.profile WHEN 'screen' THEN 0 ELSE 2 END,
                      candidate.variant_id LIMIT 1
         )
         WHERE dm.diary_id IN

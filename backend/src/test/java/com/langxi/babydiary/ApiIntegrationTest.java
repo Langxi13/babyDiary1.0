@@ -771,10 +771,11 @@ class ApiIntegrationTest {
     }
 
     @Test
-    void migratedSourceOriginalsAndDefaultThumbnailsRemainReadableFromDiaries() throws Exception {
+    void adaptiveImageRepresentationsRemainReadableAndExportsUseOriginals() throws Exception {
         String token = accessToken(login("owner"));
         byte[] originalBytes = imageBytes();
-        byte[] thumbnailBytes = imageBytes();
+        byte[] compactBytes = imageBytes();
+        byte[] previewBytes = imageBytes();
         MvcResult uploaded =
                 mvc.perform(
                                 multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
@@ -790,19 +791,31 @@ class ApiIntegrationTest {
         UUID assetId = UUID.fromString(body(uploaded).path("id").asText());
         Long internalId = setOriginalProfile(assetId, "source");
 
-        String thumbnailKey = "v3/test/" + assetId + "/thumbnail.jpg";
-        Path thumbnail = Path.of(OBJECT_ROOT).resolve(thumbnailKey);
-        Files.createDirectories(thumbnail.getParent());
-        Files.write(thumbnail, thumbnailBytes);
+        String compactKey = "v3/test/" + assetId + "/compact.webp";
+        Path compact = Path.of(OBJECT_ROOT).resolve(compactKey);
+        Files.createDirectories(compact.getParent());
+        Files.write(compact, compactBytes);
         jdbc.update(
                 """
                 INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,
-                  content_type,size_bytes,status)
-                VALUES(?,'THUMBNAIL','default','LOCAL',?,'image/png',?,'READY')
+                  content_type,size_bytes,quality_score,status)
+                VALUES(?,'THUMBNAIL','compact','LOCAL',?,'image/webp',?,1.0,'READY')
                 """,
                 internalId,
-                thumbnailKey,
-                thumbnailBytes.length);
+                compactKey,
+                compactBytes.length);
+        String previewKey = "v3/test/" + assetId + "/screen.webp";
+        Path preview = Path.of(OBJECT_ROOT).resolve(previewKey);
+        Files.write(preview, previewBytes);
+        jdbc.update(
+                """
+                INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,
+                  content_type,size_bytes,quality_score,status)
+                VALUES(?,'PREVIEW','screen','LOCAL',?,'image/webp',?,1.0,'READY')
+                """,
+                internalId,
+                previewKey,
+                previewBytes.length);
 
         MvcResult created =
                 mvc.perform(
@@ -846,7 +859,12 @@ class ApiIntegrationTest {
                                 jsonPath("$.media[0].representations.thumbnail.url")
                                         .value(
                                                 org.hamcrest.Matchers.containsString(
-                                                        "profile=default")))
+                                                        "profile=compact")))
+                        .andExpect(
+                                jsonPath("$.media[0].representations.preview.url")
+                                        .value(
+                                                org.hamcrest.Matchers.containsString(
+                                                        "profile=screen")))
                         .andReturn();
         String contentUrl =
                 body(detail)
@@ -856,12 +874,20 @@ class ApiIntegrationTest {
                         .path("original")
                         .path("url")
                         .asText();
-        String thumbnailUrl =
+        String compactUrl =
                 body(detail)
                         .path("media")
                         .get(0)
                         .path("representations")
                         .path("thumbnail")
+                        .path("url")
+                        .asText();
+        String previewUrl =
+                body(detail)
+                        .path("media")
+                        .get(0)
+                        .path("representations")
+                        .path("preview")
                         .path("url")
                         .asText();
 
@@ -871,12 +897,18 @@ class ApiIntegrationTest {
                         header().string(
                                         HttpHeaders.CONTENT_LENGTH,
                                         String.valueOf(originalBytes.length)));
-        mvc.perform(get(URI.create(thumbnailUrl)))
+        mvc.perform(get(URI.create(compactUrl)))
                 .andExpect(status().isOk())
                 .andExpect(
                         header().string(
                                         HttpHeaders.CONTENT_LENGTH,
-                                        String.valueOf(thumbnailBytes.length)));
+                                        String.valueOf(compactBytes.length)));
+        mvc.perform(get(URI.create(previewUrl)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        header().string(
+                                        HttpHeaders.CONTENT_LENGTH,
+                                        String.valueOf(previewBytes.length)));
         MvcResult imageExport =
                 mvc.perform(
                                 get("/api/v3/spaces/{spaceId}/transfer/media", OWNER_SPACE_ID)

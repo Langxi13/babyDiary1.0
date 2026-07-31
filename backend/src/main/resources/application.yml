@@ -85,6 +85,13 @@ app:
     processing-min-free-bytes: ${MEDIA_PROCESSING_MIN_FREE_BYTES:3221225472}
     ffmpeg: ${FFMPEG_PATH:ffmpeg}
     ffprobe: ${FFPROBE_PATH:ffprobe}
+    vipsthumbnail: ${VIPSTHUMBNAIL_PATH:vipsthumbnail}
+    vipsheader: ${VIPSHEADER_PATH:vipsheader}
+    cwebp: ${CWEBP_PATH:cwebp}
+    derivative-backfill-enabled: ${MEDIA_DERIVATIVE_BACKFILL_ENABLED:true}
+    derivative-backfill-batch-size: ${MEDIA_DERIVATIVE_BACKFILL_BATCH_SIZE:12}
+    derivative-backfill-initial-delay-ms: ${MEDIA_DERIVATIVE_BACKFILL_INITIAL_DELAY_MS:60000}
+    derivative-backfill-delay-ms: ${MEDIA_DERIVATIVE_BACKFILL_DELAY_MS:300000}
   jobs:
     enabled: ${JOBS_ENABLED:true}
     worker-id: ${WORKER_ID:${HOSTNAME:single-node}}

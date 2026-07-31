@@ -421,6 +421,7 @@ public interface DiaryMapper {
         private String status;
         private String originalProfile;
         private String thumbnailProfile;
+        private String previewProfile;
         private boolean protectedContent;
 
         public MediaRow() {}
@@ -465,6 +466,10 @@ public interface DiaryMapper {
             return thumbnailProfile;
         }
 
+        public String previewProfile() {
+            return previewProfile;
+        }
+
         public boolean protectedContent() {
             return protectedContent;
         }
@@ -507,6 +512,10 @@ public interface DiaryMapper {
 
         public void setThumbnailProfile(String thumbnailProfile) {
             this.thumbnailProfile = thumbnailProfile;
+        }
+
+        public void setPreviewProfile(String previewProfile) {
+            this.previewProfile = previewProfile;
         }
 
         public void setProtectedContent(boolean protectedContent) {

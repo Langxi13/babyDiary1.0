@@ -127,9 +127,9 @@ Android 原生静态检查可单独运行 `scripts/android-native.test.sh`。`sc
 
 ## 统一媒体模型
 
-系统将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；媒体资产使用命名的 `representations.original/thumbnail/poster/waveform/transcoded`，每个 representation 都携带实际 profile、过期时间、MIME、大小和技术元数据。媒体变体由 `variant_type + profile` 唯一标识；签名 URL 会绑定实际 profile 和访问上下文，不能把 profile 当作固定的 `default`。
+系统将日记图片、相册照片、收藏照片、头像和纪念日/相册封面统一为 `media_asset`，通过 `diary_media`、`album_media`、`favorite_media`、`user_avatar` 以及封面资产外键建立类型明确的关系。运行时不再读取或写入旧版媒体表，也不再依赖旧文件名拼接 URL；媒体资产使用命名的 `representations.original/thumbnail/preview/poster/waveform/transcoded`，每个 representation 都携带实际 profile、过期时间、MIME、大小和技术元数据。媒体变体由 `variant_type + profile` 唯一标识；签名 URL 会绑定实际 profile 和访问上下文，不能把 profile 当作固定的 `default`。
 
-媒体上传会校验真实文件头、声明 MIME、图片尺寸和大小；派生处理通过单线程后台任务生成最长边不超过 1280 像素、且不放大小图的 JPEG 缩略/预览图。网页列表与图片查看器优先读取该压缩表示；如果派生图缺失或文件反而不小于原图，则回退到更合适的原图。导出和需要原始质量的操作仍读取原图。删除先进入 `DELETE_PENDING`，对象删除和空间额度释放由幂等 GC 任务完成。媒体内容支持 `HEAD`、单段 Range、ETag/304 和 416 响应。同一资产只要被任意锁定日记引用，就按受保护媒体处理；未经二次验证的日记、相册、头像、分享、AI 提案和导出都不能借其他关系读取它。前端 Service Worker 只缓存固定壳文件和静态 `/assets/`，不缓存 API、媒体或个性化响应，二次验证响应也不进入前后端读缓存。
+媒体上传会校验真实文件头、声明 MIME、图片尺寸和大小，上传字节作为不可变的 `ORIGINAL/source` 保存。单线程后台任务使用 libvips 和 cwebp 生成最长边 800 像素的 `THUMBNAIL/compact` 与最长边 2048 像素的 `PREVIEW/screen`，不放大小图；照片采用自适应 WebP 和 SSIM 质量门槛，透明或图形图片采用无损 WebP，派生文件至少节省 10% 才会保存。列表使用 compact，全屏默认使用 screen，只有用户点击“查看原图”才请求 source；导出、备份和原图下载始终读取 source。动画只生成静态 compact，全屏回退原始动画。删除先进入 `DELETE_PENDING`，对象删除和空间额度释放由幂等 GC 任务完成。媒体内容支持 `HEAD`、单段 Range、ETag/304 和 416 响应。同一资产只要被任意锁定日记引用，就按受保护媒体处理；未经二次验证的日记、相册、头像、分享、AI 提案和导出都不能借其他关系读取它。前端 Service Worker 只缓存固定壳文件和静态 `/assets/`，不缓存 API、媒体或个性化响应，二次验证响应也不进入前后端读缓存。
 
 ## 备份与磁盘门禁
 

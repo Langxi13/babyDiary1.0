@@ -343,6 +343,7 @@ public class AlbumQueryService {
                 value.accessScope(),
                 value.libraryVisible(),
                 value.status(),
+                value.derivativeVersion(),
                 value.createdAt(),
                 value.updatedAt(),
                 value.variants().stream()
@@ -359,6 +360,7 @@ public class AlbumQueryService {
                                                 variant.width(),
                                                 variant.height(),
                                                 variant.durationMillis(),
+                                                variant.qualityScore(),
                                                 variant.status()))
                         .toList());
     }

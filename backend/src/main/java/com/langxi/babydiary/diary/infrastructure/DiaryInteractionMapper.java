@@ -44,7 +44,7 @@ public interface DiaryInteractionMapper {
                 WHERE candidate.asset_id=ma.asset_id AND candidate.status='READY' AND candidate.deleted_at IS NULL
                   AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
                 ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
-                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         CASE candidate.profile WHEN 'compact' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
                          candidate.variant_id LIMIT 1
             )
             WHERE c.diary_id=#{diaryId} AND c.deleted_at IS NULL

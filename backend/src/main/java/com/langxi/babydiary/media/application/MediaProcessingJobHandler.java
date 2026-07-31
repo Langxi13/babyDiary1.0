@@ -8,7 +8,6 @@ import com.langxi.babydiary.platform.application.BackgroundJobHandler;
 import com.langxi.babydiary.storage.ObjectStorage;
 import com.langxi.babydiary.storage.ObjectStorageRegistry;
 import com.langxi.babydiary.storage.StoredObject;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -21,18 +20,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import javax.imageio.ImageIO;
-import net.coobird.thumbnailator.Thumbnails;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 @Component
 public class MediaProcessingJobHandler implements BackgroundJobHandler {
+    private static final Logger log = LoggerFactory.getLogger(MediaProcessingJobHandler.class);
     private final MediaRepository media;
     private final MediaVariantPolicy variants;
     private final ObjectStorageRegistry storages;
     private final ObjectMapper json;
+    private final ImageDerivativeProcessor imageDerivatives;
     private final String ffmpeg;
     private final String ffprobe;
     private final long minimumFreeBytes;
@@ -42,6 +43,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
             MediaVariantPolicy variants,
             ObjectStorageRegistry storages,
             ObjectMapper json,
+            ImageDerivativeProcessor imageDerivatives,
             @Value("${app.media.ffmpeg:ffmpeg}") String ffmpeg,
             @Value("${app.media.ffprobe:ffprobe}") String ffprobe,
             @Value("${app.media.processing-min-free-bytes:3221225472}") long minimumFreeBytes) {
@@ -49,6 +51,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
         this.variants = variants;
         this.storages = storages;
         this.json = json;
+        this.imageDerivatives = imageDerivatives;
         this.ffmpeg = ffmpeg;
         this.ffprobe = ffprobe;
         this.minimumFreeBytes = Math.max(0, minimumFreeBytes);
@@ -72,6 +75,17 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                                 () ->
                                         ApiException.notFound(
                                                 "MEDIA_VARIANT_NOT_FOUND", "媒体原始文件不存在"));
+        if ("IMAGE".equals(asset.mediaType())
+                && asset.derivativeVersion() >= MediaDerivativeCoordinator.TARGET_VERSION) {
+            return json.valueToTree(
+                    Map.of(
+                            "assetId",
+                            asset.id().toString(),
+                            "processed",
+                            true,
+                            "alreadyCurrent",
+                            true));
+        }
         Path directory = Files.createTempDirectory("baby-diary-v3-process-");
         try {
             requireTemporarySpace(directory);
@@ -83,7 +97,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                 Files.copy(stream, input);
             }
             switch (asset.mediaType()) {
-                case "IMAGE" -> processImage(asset, input, directory);
+                case "IMAGE" -> processImage(asset, original, input, directory);
                 case "VIDEO" -> processVideo(asset, input, directory);
                 case "AUDIO" -> processAudio(asset, input, directory);
                 default ->
@@ -96,55 +110,60 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
         }
     }
 
-    private void processImage(MediaAsset asset, Path input, Path directory) throws Exception {
-        if (media.hasVariant(asset.internalId(), "THUMBNAIL", "default")) return;
-        Path thumbnail = directory.resolve("thumbnail.jpg");
-        BufferedImage image = ImageIO.read(input.toFile());
-        Integer width = null;
-        Integer height = null;
-        if (image != null) {
-            width = image.getWidth();
-            height = image.getHeight();
-            double scale = Math.min(1.0, 1280.0 / Math.max(width, height));
-            Thumbnails.of(image)
-                    .scale(scale)
-                    .outputFormat("jpg")
-                    .outputQuality(0.84)
-                    .toFile(thumbnail.toFile());
-        } else {
-            run(
-                    List.of(
-                            ffmpeg,
-                            "-v",
-                            "error",
-                            "-y",
-                            "-threads",
-                            "1",
-                            "-i",
-                            input.toString(),
-                            "-vf",
-                            "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease",
-                            "-frames:v",
-                            "1",
-                            thumbnail.toString()),
-                    180);
-            Dimensions dimensions = dimensions(input);
-            width = dimensions.width();
-            height = dimensions.height();
+    private void processImage(
+            MediaAsset asset, MediaAsset.Variant original, Path input, Path directory)
+            throws Exception {
+        if (asset.derivativeVersion() >= MediaDerivativeCoordinator.TARGET_VERSION) return;
+        ImageDerivativeProcessor.Result result =
+                imageDerivatives.process(
+                        input, directory, original.contentType(), original.sizeBytes());
+        for (ImageDerivativeProcessor.Generated generated : result.variants()) {
+            if (media.hasVariant(asset.internalId(), generated.type(), generated.profile()))
+                continue;
+            store(
+                    asset,
+                    generated.path(),
+                    generated.type(),
+                    generated.profile(),
+                    generated.contentType(),
+                    generated.width(),
+                    generated.height(),
+                    null,
+                    generated.qualityScore(),
+                    generated.type().toLowerCase(java.util.Locale.ROOT)
+                            + "/"
+                            + generated.profile()
+                            + ".webp");
         }
-        media.updateTechnicalMetadata(asset.internalId(), width, height, null);
-        BufferedImage derived = ImageIO.read(thumbnail.toFile());
-        if (derived == null) throw new IOException("Generated image thumbnail is unreadable");
-        store(
-                asset,
-                thumbnail,
-                "THUMBNAIL",
-                "default",
-                "image/jpeg",
-                derived.getWidth(),
-                derived.getHeight(),
-                null,
-                "thumbnail/default.jpg");
+        retireLegacyThumbnail(asset);
+        media.markDerivativeVersion(asset.internalId(), MediaDerivativeCoordinator.TARGET_VERSION);
+    }
+
+    private void retireLegacyThumbnail(MediaAsset asset) throws Exception {
+        MediaAsset.Variant legacy =
+                asset.variants().stream()
+                        .filter(variant -> "THUMBNAIL".equals(variant.type()))
+                        .filter(variant -> "default".equals(variant.profile()))
+                        .filter(variant -> "READY".equals(variant.status()))
+                        .findFirst()
+                        .orElse(null);
+        if (legacy == null) return;
+        boolean retired =
+                media.retireVariant(
+                        asset.internalId(),
+                        legacy.type(),
+                        legacy.profile(),
+                        legacy.sizeBytes(),
+                        java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+        if (!retired) return;
+        try {
+            storages.require(legacy.storageProvider()).delete(legacy.storageKey());
+        } catch (IOException | RuntimeException exception) {
+            log.warn(
+                    "Unable to delete retired media derivative for asset {}",
+                    asset.id(),
+                    exception);
+        }
     }
 
     private void processVideo(MediaAsset asset, Path input, Path directory) throws Exception {
@@ -180,6 +199,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                     "image/jpeg",
                     dimensions.width(),
                     dimensions.height(),
+                    null,
                     null,
                     "poster/default.jpg");
         }
@@ -218,6 +238,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                     null,
                     null,
                     duration,
+                    null,
                     "transcoded/720p.mp4");
         }
     }
@@ -252,6 +273,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                     1200,
                     240,
                     null,
+                    null,
                     "waveform/default.png");
         }
         if (!media.hasVariant(asset.internalId(), "TRANSCODED", "aac")) {
@@ -282,6 +304,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                     null,
                     null,
                     duration,
+                    null,
                     "transcoded/aac.m4a");
         }
     }
@@ -295,6 +318,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
             Integer width,
             Integer height,
             Long duration,
+            Double qualityScore,
             String suffix)
             throws Exception {
         long size = Files.size(path);
@@ -332,6 +356,7 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
                                     width,
                                     height,
                                     duration,
+                                    qualityScore,
                                     "READY"));
             if (!inserted) {
                 storage.delete(key);

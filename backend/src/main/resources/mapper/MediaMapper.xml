@@ -13,6 +13,7 @@
         <result column="access_scope" property="accessScope"/>
         <result column="library_visible" property="libraryVisible"/>
         <result column="asset_status" property="assetStatus"/>
+        <result column="derivative_version" property="derivativeVersion"/>
         <result column="asset_created_at" property="assetCreatedAt"/>
         <result column="asset_updated_at" property="assetUpdatedAt"/>
         <result column="variant_type" property="variantType"/>
@@ -25,15 +26,16 @@
         <result column="width" property="width"/>
         <result column="height" property="height"/>
         <result column="duration_millis" property="durationMillis"/>
+        <result column="quality_score" property="qualityScore"/>
         <result column="variant_status" property="variantStatus"/>
     </resultMap>
 
     <sql id="assetColumns">
         a.asset_id,a.public_id,s.public_id AS space_public_id,a.owner_id,a.media_type,a.original_filename,
         a.caption,a.taken_at,a.access_scope,a.library_visible,a.status AS asset_status,
-        a.created_at AS asset_created_at,a.updated_at AS asset_updated_at,
+        a.derivative_version,a.created_at AS asset_created_at,a.updated_at AS asset_updated_at,
         v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
-        v.checksum_sha256,v.width,v.height,v.duration_millis,v.status AS variant_status
+        v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status AS variant_status
     </sql>
 
     <sql id="accessibleAsset">
@@ -61,7 +63,7 @@
         JOIN diary_space s ON s.space_id=a.space_id
         LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
         ORDER BY a.created_at DESC,a.asset_id DESC,
-          FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
+          FIELD(v.variant_type,'THUMBNAIL','PREVIEW','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
     <select id="findByPublicIdsInSpace" resultMap="mediaRow">
@@ -88,7 +90,7 @@
         FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
         LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
         WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
-        ORDER BY FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
+        ORDER BY FIELD(v.variant_type,'THUMBNAIL','PREVIEW','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
     <select id="findByPublicIds" resultMap="mediaRow">
@@ -99,12 +101,12 @@
           AND a.public_id IN
           <foreach collection="publicIds" item="id" open="(" separator="," close=")">#{id}</foreach>
         ORDER BY a.created_at DESC,a.asset_id DESC,
-          FIELD(v.variant_type,'THUMBNAIL','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
+          FIELD(v.variant_type,'THUMBNAIL','PREVIEW','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
     <select id="findVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
         SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
-               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status
         FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id
         WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
           AND v.variant_type=#{type} AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
@@ -112,19 +114,22 @@
 
     <select id="findPreferredVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
         SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
-               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status
         FROM media_asset a JOIN media_variant v ON v.asset_id=a.asset_id
         WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND <include refid="accessibleAsset"/>
           AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
-        ORDER BY CASE WHEN #{type}='ORIGINAL' THEN
-                   CASE v.profile WHEN 'source' THEN 0 WHEN 'default' THEN 1 ELSE 2 END
-                 ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END END,v.variant_id
+        ORDER BY CASE
+                   WHEN #{type}='ORIGINAL' THEN CASE v.profile WHEN 'source' THEN 0 ELSE 2 END
+                   WHEN #{type}='THUMBNAIL' THEN CASE v.profile WHEN 'compact' THEN 0 ELSE 2 END
+                   WHEN #{type}='PREVIEW' THEN CASE v.profile WHEN 'screen' THEN 0 ELSE 2 END
+                   ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END
+                 END,v.variant_id
         LIMIT 1
     </select>
 
     <select id="findPublicVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
         SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
-               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status
         FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
         JOIN media_variant v ON v.asset_id=a.asset_id
         WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
@@ -134,15 +139,18 @@
 
     <select id="findPreferredPublicVariant" resultType="com.langxi.babydiary.media.infrastructure.MediaMapper$VariantRow">
         SELECT v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
-               v.checksum_sha256,v.width,v.height,v.duration_millis,v.status
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status
         FROM diary_space s JOIN media_asset a ON a.space_id=s.space_id
         JOIN media_variant v ON v.asset_id=a.asset_id
         WHERE s.public_id=#{spaceId} AND a.public_id=#{publicId}
           AND a.deleted_at IS NULL AND a.status='READY'
           AND v.variant_type=#{type} AND v.status='READY' AND v.deleted_at IS NULL
-        ORDER BY CASE WHEN #{type}='ORIGINAL' THEN
-                   CASE v.profile WHEN 'source' THEN 0 WHEN 'default' THEN 1 ELSE 2 END
-                 ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END END,v.variant_id
+        ORDER BY CASE
+                   WHEN #{type}='ORIGINAL' THEN CASE v.profile WHEN 'source' THEN 0 ELSE 2 END
+                   WHEN #{type}='THUMBNAIL' THEN CASE v.profile WHEN 'compact' THEN 0 ELSE 2 END
+                   WHEN #{type}='PREVIEW' THEN CASE v.profile WHEN 'screen' THEN 0 ELSE 2 END
+                   ELSE CASE v.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END
+                 END,v.variant_id
         LIMIT 1
     </select>
 </mapper>

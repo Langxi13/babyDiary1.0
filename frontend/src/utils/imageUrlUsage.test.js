@@ -9,6 +9,7 @@ const albumDetailSource = read('../views/diary/AlbumDetail.vue')
 const diaryListSource = read('../views/diary/DiaryList.vue')
 const diaryDetailSource = read('../views/diary/DiaryDetail.vue')
 const diaryGallerySource = read('../components/diary/DiaryMediaGallery.vue')
+const mediaImageSource = read('../components/diary/MediaImage.vue')
 const homeSource = read('../views/home/Home.vue')
 const timelineSource = read('../views/diary/Timeline.vue')
 const anniversariesSource = read('../views/diary/Anniversaries.vue')
@@ -16,12 +17,14 @@ const buildConfigSource = read('../../vite.config.js')
 
 test('album and diary grids use signed media urls for rendered tiles and previews', () => {
   for (const source of [albumDetailSource, diaryListSource, diaryGallerySource]) {
-    assert.match(source, /mediaThumbnailUrl/)
-    assert.match(source, /mediaPreviewUrl/)
+    assert.match(source, /MediaImage/)
     assert.doesNotMatch(source, /\.thumbnailUrl|\.contentUrl/)
     assert.doesNotMatch(source, /imagePathList/)
   }
-  assert.match(diaryGallerySource, /preview-src-list/)
+  assert.match(mediaImageSource, /mediaThumbnailUrl/)
+  assert.match(mediaImageSource, /mediaPreviewUrl/)
+  assert.match(mediaImageSource, /preview-src-list/)
+  assert.match(mediaImageSource, /查看原图/)
   assert.match(diaryDetailSource, /DiaryMediaGallery/)
 })
 

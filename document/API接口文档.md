@@ -158,11 +158,11 @@
 | `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
 | `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
-媒体变体由 `variant + profile` 共同确定。资产、日记、公开分享、相册、封面、头像、评论头像和成员头像统一使用命名的 `representations`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`。每个 representation 返回实际 `variantType`、`profile`、短时 `url` 和 `expiresAt`；完整媒体响应还返回 MIME、大小和技术元数据，紧凑嵌入响应的这些技术字段可为 `null`。缺少的派生 representation 为 `null`，不再返回 `contentUrl`、`thumbnailUrl` 或 `assetId` 响应别名。同一资产只要被任意锁定日记引用，就按受保护媒体处理；未 step-up 时还会隐藏文件名、说明、拍摄时间、MIME、大小和尺寸，且不能设为头像。
+媒体变体由 `variant + profile` 共同确定。资产、日记、公开分享、相册、封面、头像、评论头像和成员头像统一使用命名的 `representations`：`original`、`thumbnail`、`preview`、`poster`、`waveform`、`transcoded`。图片固定使用 `ORIGINAL/source`、`THUMBNAIL/compact` 和 `PREVIEW/screen`；派生文件因尺寸、动画或节省不足而未保存时，对应字段为 `null`，客户端按 compact、screen、source 的顺序回退。每个 representation 返回实际 `variantType`、`profile`、短时 `url` 和 `expiresAt`；完整媒体响应还返回 MIME、大小和技术元数据，紧凑嵌入响应的这些技术字段可为 `null`。不再返回 `contentUrl`、`thumbnailUrl` 或 `assetId` 响应别名。同一资产只要被任意锁定日记引用，就按受保护媒体处理；未 step-up 时还会隐藏文件名、说明、拍摄时间、MIME、大小和尺寸，且不能设为头像。
 
 公开媒体 URL 的查询参数为 `profile`、`ticket`、`expires` 和 `signature`，其中 profile 与 HMAC 保护的访问上下文都纳入签名，客户端不得修改。旧的无上下文签名不再接受。内容读取支持 `GET`、`HEAD`、单段 `Range`、`ETag/If-None-Match`；无效 Range 返回 `416`。锁定或分享上下文使用 `Cache-Control: no-store`。
 
-上传先写入临时文件，再校验真实文件头和声明 MIME；图片上限 25 MB/8000 万像素，音视频上限 256 MB。原始文件进入 `ORIGINAL/source`，缩略图、海报、转码和波形由 `MEDIA_PROCESS` 后台任务生成。删除不会同步删除对象，而是标记 `DELETE_PENDING` 并排入幂等 `STORAGE_GC`；引用存在时返回 `MEDIA_IN_USE`。
+上传先写入临时文件，再校验真实文件头和声明 MIME；图片上限 25 MB/8000 万像素，音视频上限 256 MB。原始文件以未经转码的字节进入不可变 `ORIGINAL/source`。图片派生任务串行生成最长边 800 的 compact 和最长边 2048 的 screen，派生图剥离 EXIF/GPS/XMP、规范到 sRGB 且不放大；JPEG 照片使用自适应 WebP 与 SSIM 门槛，PNG/透明图使用无损 WebP，节省不足 10% 时不保存该派生。GIF/动画 WebP 只生成静态 compact，screen 回退原始动画。海报、音视频转码和波形同样由 `MEDIA_PROCESS` 后台任务生成。删除不会同步删除对象，而是标记 `DELETE_PENDING` 并排入幂等 `STORAGE_GC`；引用存在时返回 `MEDIA_IN_USE`。
 
 ### 相册与收藏
 

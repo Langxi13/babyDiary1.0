@@ -39,5 +39,6 @@ public record DiaryEntry(
             String status,
             String originalProfile,
             String thumbnailProfile,
+            String previewProfile,
             boolean protectedContent) {}
 }

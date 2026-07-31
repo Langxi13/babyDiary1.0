@@ -1,14 +1,12 @@
 <template>
   <section v-if="media.length" class="diary-media-gallery">
     <figure v-for="(item, index) in media" :key="item.id">
-      <el-image
+      <MediaImage
         v-if="item.mediaType === 'IMAGE'"
-        :src="mediaThumbnailUrl(item)"
-        :preview-src-list="imageUrls"
+        :media="item"
+        :preview-media="imageMedia"
         :initial-index="imageIndex(index)"
-        :preview-teleported="true"
         fit="cover"
-        lazy
       />
       <audio
         v-else-if="item.mediaType === 'AUDIO'"
@@ -31,24 +29,18 @@
 
 <script setup>
 import { computed } from 'vue'
-import { ElImage } from 'element-plus/es/components/image/index.mjs'
+import MediaImage from '@/components/diary/MediaImage.vue'
 import {
   mediaOriginalUrl,
   mediaPlaybackUrl,
-  mediaPosterUrl,
-  mediaPreviewUrl,
-  mediaThumbnailUrl
+  mediaPosterUrl
 } from '@/api/models'
-import 'element-plus/es/components/image/style/css.mjs'
 
 const props = defineProps({
   media: { type: Array, default: () => [] }
 })
 
-const imageUrls = computed(() => props.media
-  .filter(item => item.mediaType === 'IMAGE')
-  .map(mediaPreviewUrl)
-  .filter(Boolean))
+const imageMedia = computed(() => props.media.filter(item => item.mediaType === 'IMAGE'))
 
 const imageIndex = mediaIndex => props.media
   .slice(0, mediaIndex)

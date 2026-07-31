@@ -43,6 +43,7 @@ public class MediaRepresentationService {
                 new MediaView.Representations(
                         representation(asset, "ORIGINAL", context, reveal),
                         representation(asset, "THUMBNAIL", context, reveal),
+                        representation(asset, "PREVIEW", context, reveal),
                         representation(asset, "POSTER", context, reveal),
                         representation(asset, "WAVEFORM", context, reveal),
                         representation(asset, "TRANSCODED", context, reveal)));
@@ -84,6 +85,7 @@ public class MediaRepresentationService {
                 new MediaView.Representations(
                         "ORIGINAL".equals(variantType) ? value : null,
                         "THUMBNAIL".equals(variantType) ? value : null,
+                        "PREVIEW".equals(variantType) ? value : null,
                         "POSTER".equals(variantType) ? value : null,
                         "WAVEFORM".equals(variantType) ? value : null,
                         "TRANSCODED".equals(variantType) ? value : null));
@@ -94,11 +96,13 @@ public class MediaRepresentationService {
             UUID assetId,
             String originalProfile,
             String thumbnailProfile,
+            String previewProfile,
             MediaAccessContext context,
             boolean reveal) {
         return new MediaView.Representations(
                 link(spaceId, assetId, "ORIGINAL", originalProfile, context, reveal),
                 link(spaceId, assetId, "THUMBNAIL", thumbnailProfile, context, reveal),
+                link(spaceId, assetId, "PREVIEW", previewProfile, context, reveal),
                 null,
                 null,
                 null);
