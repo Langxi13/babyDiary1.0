@@ -1,6 +1,7 @@
 package com.langxi.babydiary;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
@@ -52,6 +54,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -117,6 +121,9 @@ class ApiIntegrationTest {
     @Autowired InvitationCodeService invitationCodes;
 
     @Autowired StorageGcJobHandler storageGc;
+
+    @Autowired
+    @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping requestMappings;
 
     @Autowired AiReportJobHandler aiReportJobs;
 
@@ -216,6 +223,32 @@ class ApiIntegrationTest {
 
         mvc.perform(post("/api/v3/auth/refresh").cookie(secondRefresh))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void invalidHttpShapesUseStableProblemDetailsInsteadOfInternalErrors() throws Exception {
+        mvc.perform(
+                        post("/api/v3/auth/login")
+                                .contentType(MediaType.TEXT_PLAIN)
+                                .content("not-json"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("MEDIA_TYPE_UNSUPPORTED"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+
+        mvc.perform(get("/api/v3/auth/login"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+
+        mvc.perform(get("/api/v3/client/bootstrap").accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(jsonPath("$.code").value("RESPONSE_MEDIA_TYPE_UNSUPPORTED"));
+
+        String token = accessToken(login("owner"));
+        mvc.perform(
+                        multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REQUEST_INVALID"));
     }
 
     @Test
@@ -386,7 +419,7 @@ class ApiIntegrationTest {
                                 "contentHtml",
                                         "<p>Hello <strong>V3</strong><script>bad()</script></p>",
                                 "visibility", "PRIVATE",
-                                "locked", false,
+                                "locked", true,
                                 "tagIds", new String[0],
                                 "mediaIds", new String[0]));
         MvcResult created =
@@ -406,6 +439,7 @@ class ApiIntegrationTest {
                                                                 "<script>"))))
                         .andReturn();
         UUID diaryId = UUID.fromString(body(created).path("id").asText());
+        String stepToken = stepUp(ownerToken);
 
         mvc.perform(
                         get("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
@@ -416,6 +450,13 @@ class ApiIntegrationTest {
         mvc.perform(
                         get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                                .header("X-Step-Up-Token", stepToken))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ETAG, "\"1\""));
 
@@ -431,6 +472,7 @@ class ApiIntegrationTest {
                         put("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                                 .header(HttpHeaders.IF_MATCH, "\"0\"")
+                                .header("X-Step-Up-Token", stepToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(createBody))
                 .andExpect(status().isPreconditionFailed())
@@ -440,6 +482,7 @@ class ApiIntegrationTest {
                         put("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
                                 .header(HttpHeaders.IF_MATCH, "\"1\"")
+                                .header("X-Step-Up-Token", stepToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(createBody))
                 .andExpect(status().isOk())
@@ -458,7 +501,8 @@ class ApiIntegrationTest {
                                         OWNER_SPACE_ID,
                                         diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
-                                .header(HttpHeaders.IF_MATCH, "\"2\""))
+                                .header(HttpHeaders.IF_MATCH, "\"2\"")
+                                .header("X-Step-Up-Token", stepToken))
                 .andExpect(status().isNoContent());
 
         mvc.perform(
@@ -480,7 +524,8 @@ class ApiIntegrationTest {
                                         OWNER_SPACE_ID,
                                         diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
-                                .header(HttpHeaders.IF_MATCH, "\"3\""))
+                                .header(HttpHeaders.IF_MATCH, "\"3\"")
+                                .header("X-Step-Up-Token", stepToken))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ETAG, "\"4\""));
     }
@@ -493,6 +538,116 @@ class ApiIntegrationTest {
 
         mvc.perform(get("/api/v3/spaces").header(HttpHeaders.AUTHORIZATION, "Bearer invalid"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void publicApiUsesOnlyV3RoutesAndNeverAcceptsInternalNumericPathIds() {
+        requestMappings
+                .getHandlerMethods()
+                .forEach(
+                        (mapping, handler) -> {
+                            Package controllerPackage = handler.getBeanType().getPackage();
+                            if (controllerPackage == null
+                                    || !controllerPackage
+                                            .getName()
+                                            .startsWith("com.langxi.babydiary")
+                                    || !controllerPackage.getName().endsWith(".api")) return;
+                            assertThat(mapping.getPatternValues())
+                                    .allMatch(path -> path.startsWith("/api/v3"));
+                            for (java.lang.reflect.Parameter parameter :
+                                    handler.getMethod().getParameters()) {
+                                if (parameter.getAnnotation(PathVariable.class) == null) continue;
+                                assertThat(parameter.getType())
+                                        .isNotIn(long.class, Long.class, int.class, Integer.class);
+                            }
+                        });
+    }
+
+    @Test
+    void diaryRevisionsUsePublicIdsAndRestoreTheSelectedSnapshot() throws Exception {
+        String token = accessToken(login("owner"));
+        String first =
+                json.writeValueAsString(
+                        Map.of(
+                                "title", "Revision one",
+                                "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>First body</p>",
+                                "visibility", "PRIVATE",
+                                "locked", true,
+                                "tagIds", List.of(),
+                                "mediaIds", List.of()));
+        MvcResult created =
+                mvc.perform(
+                                post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(first))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID diaryId = UUID.fromString(body(created).path("id").asText());
+        String stepToken = stepUp(token);
+        String second =
+                json.writeValueAsString(
+                        Map.of(
+                                "title", "Revision two",
+                                "diaryDate", "2026-07-30",
+                                "contentHtml", "<p>Second body</p>",
+                                "visibility", "PRIVATE",
+                                "locked", false,
+                                "tagIds", List.of(),
+                                "mediaIds", List.of()));
+        mvc.perform(
+                        put("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken)
+                                .header(HttpHeaders.IF_MATCH, "\"1\"")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(second))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentText").value("Second body"));
+
+        MvcResult revisions =
+                mvc.perform(
+                                get(
+                                                "/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions",
+                                                OWNER_SPACE_ID,
+                                                diaryId)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$[0].editorId").value(OWNER_PUBLIC_ID.toString()))
+                        .andExpect(jsonPath("$[0].editorName").value("owner"))
+                        .andReturn();
+        JsonNode firstRevision =
+                java.util.stream.StreamSupport.stream(body(revisions).spliterator(), false)
+                        .filter(value -> value.path("version").asInt() == 1)
+                        .findFirst()
+                        .orElseThrow();
+        UUID revisionId = UUID.fromString(firstRevision.path("id").asText());
+
+        mvc.perform(
+                        post(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions/{revisionId}/restore",
+                                        OWNER_SPACE_ID,
+                                        diaryId,
+                                        revisionId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header(HttpHeaders.IF_MATCH, "\"2\""))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+        mvc.perform(
+                        post(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}/revisions/{revisionId}/restore",
+                                        OWNER_SPACE_ID,
+                                        diaryId,
+                                        revisionId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken)
+                                .header(HttpHeaders.IF_MATCH, "\"2\""))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, "\"3\""))
+                .andExpect(jsonPath("$.title").value("Revision one"))
+                .andExpect(jsonPath("$.contentText").value("First body"))
+                .andExpect(jsonPath("$.locked").value(true));
     }
 
     @Test
@@ -675,18 +830,32 @@ class ApiIntegrationTest {
                                         .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                         .andExpect(status().isOk())
                         .andExpect(
-                                jsonPath("$.media[0].contentUrl")
+                                jsonPath("$.media[0].representations.original.url")
                                         .value(
                                                 org.hamcrest.Matchers.containsString(
                                                         "profile=source")))
                         .andExpect(
-                                jsonPath("$.media[0].thumbnailUrl")
+                                jsonPath("$.media[0].representations.thumbnail.url")
                                         .value(
                                                 org.hamcrest.Matchers.containsString(
                                                         "profile=default")))
                         .andReturn();
-        String contentUrl = body(detail).path("media").get(0).path("contentUrl").asText();
-        String thumbnailUrl = body(detail).path("media").get(0).path("thumbnailUrl").asText();
+        String contentUrl =
+                body(detail)
+                        .path("media")
+                        .get(0)
+                        .path("representations")
+                        .path("original")
+                        .path("url")
+                        .asText();
+        String thumbnailUrl =
+                body(detail)
+                        .path("media")
+                        .get(0)
+                        .path("representations")
+                        .path("thumbnail")
+                        .path("url")
+                        .asText();
 
         mvc.perform(get(URI.create(contentUrl)))
                 .andExpect(status().isOk())
@@ -700,6 +869,19 @@ class ApiIntegrationTest {
                         header().string(
                                         HttpHeaders.CONTENT_LENGTH,
                                         String.valueOf(thumbnailBytes.length)));
+        MvcResult imageExport =
+                mvc.perform(
+                                get("/api/v3/spaces/{spaceId}/transfer/media", OWNER_SPACE_ID)
+                                        .queryParam("startDate", "2026-07-30")
+                                        .queryParam("endDate", "2026-07-30")
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                        .andExpect(status().isOk())
+                        .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/zip"))
+                        .andReturn();
+        assertThat(zipEntries(imageExport.getResponse().getContentAsByteArray()))
+                .singleElement()
+                .asString()
+                .contains(assetId.toString(), "migrated.png");
         mvc.perform(
                         get(
                                         "/api/v3/spaces/{spaceId}/media/{assetId}/variants/original",
@@ -808,16 +990,178 @@ class ApiIntegrationTest {
                         .andExpect(jsonPath("$.media[0].id").value(assetId.toString()))
                         .andExpect(
                                 jsonPath(
-                                        "$.media[0].contentUrl",
+                                        "$.media[0].representations.original.url",
                                         org.hamcrest.Matchers.containsString("profile=source")))
                         .andReturn();
-        mvc.perform(get(URI.create(body(opened).path("media").get(0).path("contentUrl").asText())))
+        mvc.perform(
+                        get(
+                                URI.create(
+                                        body(opened)
+                                                .path("media")
+                                                .get(0)
+                                                .path("representations")
+                                                .path("original")
+                                                .path("url")
+                                                .asText())))
                 .andExpect(status().isOk());
         mvc.perform(
                         post("/api/v3/public/shares/{token}/open", rawToken)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"password\":\"share-pass\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void mediaProtectedByAnyLockedDiaryCannotEscapeThroughSharesOrExports() throws Exception {
+        String token = accessToken(login("owner"));
+        MvcResult upload =
+                mvc.perform(
+                                multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                                        .file(imageFile("cross-protected.png"))
+                                        .param("caption", "private caption")
+                                        .param("takenAt", "2026-07-30T10:00:00")
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID assetId = UUID.fromString(body(upload).path("id").asText());
+
+        MvcResult ordinary =
+                mvc.perform(
+                                post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                json.writeValueAsString(
+                                                        Map.of(
+                                                                "title",
+                                                                "Ordinary memory",
+                                                                "diaryDate",
+                                                                "2026-07-30",
+                                                                "contentHtml",
+                                                                "<p>ordinary</p>",
+                                                                "visibility",
+                                                                "PRIVATE",
+                                                                "locked",
+                                                                false,
+                                                                "tagIds",
+                                                                List.of(),
+                                                                "mediaIds",
+                                                                List.of(assetId)))))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID ordinaryId = UUID.fromString(body(ordinary).path("id").asText());
+        MvcResult share =
+                mvc.perform(
+                                post(
+                                                "/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares",
+                                                OWNER_SPACE_ID,
+                                                ordinaryId)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"expiresInHours\":24}"))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        String sharePath = body(share).path("sharePath").asText();
+        String shareToken = sharePath.substring(sharePath.lastIndexOf('/') + 1);
+
+        MvcResult locked =
+                mvc.perform(
+                                post("/api/v3/spaces/{spaceId}/diaries", OWNER_SPACE_ID)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                json.writeValueAsString(
+                                                        Map.of(
+                                                                "title",
+                                                                "Locked relation",
+                                                                "diaryDate",
+                                                                "2026-07-29",
+                                                                "contentHtml",
+                                                                "<p>locked</p>",
+                                                                "visibility",
+                                                                "PRIVATE",
+                                                                "locked",
+                                                                true,
+                                                                "tagIds",
+                                                                List.of(),
+                                                                "mediaIds",
+                                                                List.of(assetId)))))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID lockedId = UUID.fromString(body(locked).path("id").asText());
+        int lockedVersion = body(locked).path("version").asInt();
+
+        mvc.perform(
+                        get(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}",
+                                        OWNER_SPACE_ID,
+                                        ordinaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media[0].protectedContent").value(true))
+                .andExpect(jsonPath("$.media[0].caption").value(nullValue()))
+                .andExpect(jsonPath("$.media[0].takenAt").value(nullValue()))
+                .andExpect(
+                        jsonPath("$.media[0].representations.original.contentType")
+                                .value(nullValue()))
+                .andExpect(
+                        jsonPath("$.media[0].representations.original.sizeBytes")
+                                .value(nullValue()));
+        mvc.perform(
+                        post("/api/v3/public/shares/{token}/open", shareToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SHARE_NOT_FOUND"));
+        mvc.perform(
+                        post(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares",
+                                        OWNER_SPACE_ID,
+                                        ordinaryId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"expiresInHours\":24}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOCKED_CONTENT_NOT_SHAREABLE"));
+
+        String stepToken = stepUp(token);
+        mvc.perform(
+                        delete(
+                                        "/api/v3/spaces/{spaceId}/diaries/{diaryId}",
+                                        OWNER_SPACE_ID,
+                                        lockedId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken)
+                                .header(HttpHeaders.IF_MATCH, "\"" + lockedVersion + "\""))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/transfer/export", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/transfer/media", OWNER_SPACE_ID)
+                                .queryParam("startDate", "2026-07-30")
+                                .queryParam("endDate", "2026-07-30")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.code").value("STEP_UP_REQUIRED"));
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/transfer/export", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/zip"));
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/transfer/media", OWNER_SPACE_ID)
+                                .queryParam("startDate", "2026-07-30")
+                                .queryParam("endDate", "2026-07-30")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/zip"));
     }
 
     @Test
@@ -888,7 +1232,9 @@ class ApiIntegrationTest {
                                         body(otherView)
                                                 .path("media")
                                                 .get(0)
-                                                .path("contentUrl")
+                                                .path("representations")
+                                                .path("original")
+                                                .path("url")
                                                 .asText())))
                 .andExpect(status().isOk());
 
@@ -1021,9 +1367,16 @@ class ApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].protectedContent").value(true))
+                .andExpect(jsonPath("$.items[0].originalFilename").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].caption").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].takenAt").value(nullValue()))
+                .andExpect(jsonPath("$.items[0].representations.original.url").value(nullValue()))
                 .andExpect(
-                        jsonPath("$.items[0].representations.original.url")
-                                .value(org.hamcrest.Matchers.nullValue()));
+                        jsonPath("$.items[0].representations.original.contentType")
+                                .value(nullValue()))
+                .andExpect(
+                        jsonPath("$.items[0].representations.original.sizeBytes")
+                                .value(nullValue()));
         mvc.perform(
                         get("/api/v3/spaces/{spaceId}/diaries/{diaryId}", OWNER_SPACE_ID, diaryId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token)))
@@ -1056,9 +1409,18 @@ class ApiIntegrationTest {
                                         .header("X-Step-Up-Token", stepToken))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.title").value("vaultsecret"))
-                        .andExpect(jsonPath("$.media[0].contentUrl").isNotEmpty())
+                        .andExpect(jsonPath("$.media[0].representations.original.url").isNotEmpty())
                         .andReturn();
-        mvc.perform(get(URI.create(body(detail).path("media").get(0).path("contentUrl").asText())))
+        mvc.perform(
+                        get(
+                                URI.create(
+                                        body(detail)
+                                                .path("media")
+                                                .get(0)
+                                                .path("representations")
+                                                .path("original")
+                                                .path("url")
+                                                .asText())))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
         mvc.perform(
@@ -1066,7 +1428,123 @@ class ApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                                 .header("X-Step-Up-Token", stepToken))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.originalFilename").value("locked.png"))
                 .andExpect(jsonPath("$.representations.original.url").isNotEmpty());
+        mvc.perform(
+                        put("/api/v3/account/avatar")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                Map.of(
+                                                        "spaceId",
+                                                        OWNER_SPACE_ID.toString(),
+                                                        "assetId",
+                                                        assetId.toString()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AVATAR_MEDIA_PROTECTED"));
+
+        MvcResult lockedAlbum =
+                mvc.perform(
+                                post("/api/v3/spaces/{spaceId}/albums", OWNER_SPACE_ID)
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .header("X-Step-Up-Token", stepToken)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                json.writeValueAsString(
+                                                        Map.of(
+                                                                "name",
+                                                                "Locked album",
+                                                                "mediaIds",
+                                                                List.of(assetId.toString())))))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID lockedAlbumId = UUID.fromString(body(lockedAlbum).path("id").asText());
+        mvc.perform(
+                        put(
+                                        "/api/v3/spaces/{spaceId}/media/{assetId}/favorite",
+                                        OWNER_SPACE_ID,
+                                        assetId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isNoContent());
+        mvc.perform(
+                        put(
+                                        "/api/v3/spaces/{spaceId}/albums/{albumId}",
+                                        OWNER_SPACE_ID,
+                                        lockedAlbumId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json.writeValueAsString(Map.of("name", "Renamed locked"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mediaCount").value(0))
+                .andExpect(jsonPath("$.coverAssetId").value(nullValue()))
+                .andExpect(jsonPath("$.coverMedia").value(nullValue()));
+        mvc.perform(
+                        put(
+                                        "/api/v3/spaces/{spaceId}/albums/{albumId}",
+                                        OWNER_SPACE_ID,
+                                        lockedAlbumId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json.writeValueAsString(Map.of("name", "Renamed locked"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mediaCount").value(1))
+                .andExpect(jsonPath("$.coverAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.coverMedia.representations.original.url").isNotEmpty());
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/album-groups", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups[0].albums[0].mediaCount").value(0))
+                .andExpect(jsonPath("$.groups[0].albums[1].mediaCount").value(0))
+                .andExpect(jsonPath("$.groups[0].albums.length()").value(2))
+                .andExpect(jsonPath("$.groups[1].albums[0].mediaCount").value(0))
+                .andExpect(jsonPath("$.groups[1].albums[0].coverAssetId").value(nullValue()))
+                .andExpect(jsonPath("$.groups[1].albums[0].coverMedia").value(nullValue()));
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/albums/system/all", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMedia").value(0))
+                .andExpect(jsonPath("$.media").isEmpty());
+        mvc.perform(
+                        get(
+                                        "/api/v3/spaces/{spaceId}/albums/{albumId}",
+                                        OWNER_SPACE_ID,
+                                        lockedAlbumId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.album.mediaCount").value(0))
+                .andExpect(jsonPath("$.album.coverAssetId").value(nullValue()))
+                .andExpect(jsonPath("$.media").isEmpty());
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/album-groups", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups[0].albums[0].mediaCount").value(1))
+                .andExpect(jsonPath("$.groups[0].albums[1].mediaCount").value(1))
+                .andExpect(jsonPath("$.groups[0].albums[2].systemKey").value("year:2026"))
+                .andExpect(jsonPath("$.groups[1].albums[0].mediaCount").value(1))
+                .andExpect(
+                        jsonPath("$.groups[1].albums[0].coverAssetId").value(assetId.toString()));
+        mvc.perform(
+                        get(
+                                        "/api/v3/spaces/{spaceId}/albums/{albumId}",
+                                        OWNER_SPACE_ID,
+                                        lockedAlbumId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header("X-Step-Up-Token", stepToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMedia").value(1))
+                .andExpect(jsonPath("$.media[0].id").value(assetId.toString()))
+                .andExpect(jsonPath("$.media[0].originalFilename").value("locked.png"))
+                .andExpect(jsonPath("$.media[0].representations.original.url").isNotEmpty());
     }
 
     @Test
@@ -1281,7 +1759,10 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.groups[0].albums[0].systemKey").value("all"))
                 .andExpect(jsonPath("$.groups[0].albums[0].mediaCount").value(2))
                 .andExpect(jsonPath("$.groups[0].albums[1].systemKey").value("favorites"))
-                .andExpect(jsonPath("$.groups[0].albums[1].mediaCount").value(0));
+                .andExpect(jsonPath("$.groups[0].albums[1].mediaCount").value(0))
+                .andExpect(jsonPath("$.groups[0].albums[2].systemKey").value("year:2026"))
+                .andExpect(jsonPath("$.groups[0].albums[2].mediaCount").value(2))
+                .andExpect(jsonPath("$.groups[0].albums[2].coverMedia.id").isNotEmpty());
 
         mvc.perform(
                         put(
@@ -1377,6 +1858,17 @@ class ApiIntegrationTest {
                                 .queryParam("size", "1")
                                 .header(HttpHeaders.AUTHORIZATION, bearer(token)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.media.length()").value(1))
+                .andExpect(jsonPath("$.totalMedia").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/albums/system/year:2026", OWNER_SPACE_ID)
+                                .queryParam("page", "0")
+                                .queryParam("size", "1")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.album.systemKey").value("year:2026"))
                 .andExpect(jsonPath("$.media.length()").value(1))
                 .andExpect(jsonPath("$.totalMedia").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2));
@@ -1775,6 +2267,29 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.start").value("2026-01-01"))
                 .andExpect(jsonPath("$.end").value("2026-12-31"));
 
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/ai-reports", OWNER_SPACE_ID)
+                                .queryParam("type", "MONTHLY")
+                                .queryParam("page", "0")
+                                .queryParam("size", "1")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(reportId.toString()))
+                .andExpect(jsonPath("$.pageNumber").value(0))
+                .andExpect(jsonPath("$.pageSize").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/ai-reports", OWNER_SPACE_ID)
+                                .queryParam("page", "1")
+                                .queryParam("size", "1")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
         JsonNode existing =
                 aiReportJobs.handle(
                         json.valueToTree(
@@ -1886,7 +2401,20 @@ class ApiIntegrationTest {
                         .andExpect(jsonPath("$.albums[0].diaryIds[0]").value(diaryId.toString()))
                         .andExpect(jsonPath("$.albums[0].assetIds[0]").value(assetId.toString()))
                         .andReturn();
-        UUID proposalId = UUID.fromString(body(proposal).path("proposalId").asText());
+        UUID proposalId = UUID.fromString(body(proposal).path("id").asText());
+
+        jdbc.update("UPDATE diary SET locked=1 WHERE public_id=?", uuid(diaryId));
+        mvc.perform(
+                        get(
+                                        "/api/v3/spaces/{spaceId}/ai-album-proposals/{proposalId}",
+                                        OWNER_SPACE_ID,
+                                        proposalId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.albums[0].diaryIds").isEmpty())
+                .andExpect(jsonPath("$.albums[0].assetIds").isEmpty())
+                .andExpect(jsonPath("$.albums[0].photos").isEmpty());
+        jdbc.update("UPDATE diary SET locked=0 WHERE public_id=?", uuid(diaryId));
 
         mvc.perform(
                         post(
@@ -1921,7 +2449,8 @@ class ApiIntegrationTest {
                         get("/api/v3/account/profile")
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("owner"));
+                .andExpect(jsonPath("$.username").value("owner"))
+                .andExpect(jsonPath("$.createdAt").isNotEmpty());
 
         MvcResult createdSpace =
                 mvc.perform(
@@ -1975,10 +2504,10 @@ class ApiIntegrationTest {
                                                         "assetId",
                                                         assetId.toString()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.avatarAssetId").value(assetId.toString()))
+                .andExpect(jsonPath("$.avatarMedia.id").value(assetId.toString()))
                 .andExpect(
                         jsonPath(
-                                "$.avatarMedia.contentUrl",
+                                "$.avatarMedia.representations.original.url",
                                 org.hamcrest.Matchers.containsString("profile=source")));
 
         MvcResult invitation =
@@ -2008,7 +2537,12 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(
                         jsonPath("$[?(@.username == 'other')].id")
-                                .value(OTHER_PUBLIC_ID.toString()));
+                                .value(OTHER_PUBLIC_ID.toString()))
+                .andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[1].email").doesNotExist())
+                .andExpect(
+                        jsonPath("$[?(@.username == 'owner')].avatarMedia.id")
+                                .value(assetId.toString()));
         mvc.perform(
                         put(
                                         "/api/v3/spaces/{spaceId}/members/{accountId}/role",
@@ -2259,6 +2793,22 @@ class ApiIntegrationTest {
                                 Integer.class,
                                 uuid(diaryId)))
                 .isEqualTo(2);
+
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/sync/pull", OWNER_SPACE_ID)
+                                .queryParam("cursor", "0")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes[0].actorId").value(OWNER_PUBLIC_ID.toString()));
+        jdbc.update(
+                "INSERT INTO space_member(space_id,account_id,role,status) VALUES(11,202,'VIEWER','ACTIVE')");
+        String otherToken = accessToken(login("other"));
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/sync/pull", OWNER_SPACE_ID)
+                                .queryParam("cursor", "0")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes").isEmpty());
 
         jdbc.update(
                 "INSERT INTO sync_retention(space_id,baseline_cursor) VALUES(11,50) ON DUPLICATE KEY UPDATE baseline_cursor=50");

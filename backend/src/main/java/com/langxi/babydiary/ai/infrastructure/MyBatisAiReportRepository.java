@@ -17,8 +17,16 @@ public class MyBatisAiReportRepository implements AiReportRepository {
     }
 
     @Override
-    public List<Report> findForCreator(long spaceId, long creatorId) {
-        return mapper.findForCreator(spaceId, creatorId).stream().map(this::report).toList();
+    public List<Report> findPage(
+            long spaceId, long creatorId, String periodType, int offset, int limit) {
+        return mapper.findPage(spaceId, creatorId, periodType, offset, limit).stream()
+                .map(this::report)
+                .toList();
+    }
+
+    @Override
+    public long count(long spaceId, long creatorId, String periodType) {
+        return mapper.count(spaceId, creatorId, periodType);
     }
 
     @Override

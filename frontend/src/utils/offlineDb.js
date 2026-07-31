@@ -2,11 +2,10 @@ import { mergeQueuedDiaryOperation } from '@/utils/offlineQueue'
 import { getAccountCacheScope } from '@/utils/sessionScope'
 
 const DB_NAME = 'baby-diary-offline'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const OPERATIONS = 'operations'
 const META = 'meta'
 const CACHE = 'cache'
-const QUARANTINE = 'quarantine'
 
 let dbPromise
 
@@ -18,9 +17,10 @@ function openDb() {
     request.onupgradeneeded = event => {
       const db = request.result
       const transaction = request.transaction
-      const quarantine = db.objectStoreNames.contains(QUARANTINE)
-        ? transaction.objectStore(QUARANTINE)
-        : db.createObjectStore(QUARANTINE, { keyPath: 'id' })
+
+      if (event.oldVersion > 0 && event.oldVersion < 2) {
+        Array.from(db.objectStoreNames).forEach(name => db.deleteObjectStore(name))
+      }
 
       if (!db.objectStoreNames.contains(OPERATIONS)) {
         const store = db.createObjectStore(OPERATIONS, { keyPath: 'id' })
@@ -28,23 +28,10 @@ function openDb() {
       } else {
         const store = transaction.objectStore(OPERATIONS)
         createOperationIndexes(store)
-        if (event.oldVersion < 2) {
-          const cursorRequest = store.openCursor()
-          cursorRequest.onsuccess = () => {
-            const cursor = cursorRequest.result
-            if (!cursor) return
-            if (!cursor.value.accountScope) {
-              quarantine.put({ ...cursor.value, quarantinedAt: Date.now(), reason: 'legacy-account-scope-unknown' })
-              cursor.delete()
-            }
-            cursor.continue()
-          }
-        }
       }
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'key' })
-      else if (event.oldVersion < 2) transaction.objectStore(META).clear()
       if (!db.objectStoreNames.contains(CACHE)) db.createObjectStore(CACHE, { keyPath: 'key' })
-      else if (event.oldVersion < 2) transaction.objectStore(CACHE).clear()
+      if (db.objectStoreNames.contains('quarantine')) db.deleteObjectStore('quarantine')
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -126,10 +113,6 @@ export async function listOfflineOperations(spaceId) {
   const values = await readStore(OPERATIONS, target => target.index('accountScope').getAll(accountScope), [])
   return values.filter(value => !spaceId || value.spaceId === spaceId)
     .sort((left, right) => left.createdAt - right.createdAt)
-}
-
-export async function listQuarantinedOfflineOperations() {
-  return readStore(QUARANTINE, target => target.getAll(), [])
 }
 
 export async function removeOfflineOperations(ids) {
@@ -226,9 +209,16 @@ function stripEphemeralUrls(value) {
   if (!value || typeof value !== 'object') return value
   const result = {}
   for (const [key, item] of Object.entries(value)) {
-    if (['contentUrl', 'thumbnailUrl', 'posterUrl', 'waveformUrl', 'transcodedUrl', 'url', 'expiresAt',
-      'mediaUrlExpiresAt'].includes(key)) continue
+    if (['url', 'expiresAt'].includes(key)) continue
     result[key] = stripEphemeralUrls(item)
+  }
+  if (value.locked === true && ('contentHtml' in value || 'contentText' in value)) {
+    result.title = null
+    result.contentHtml = null
+    result.contentText = null
+    result.mood = null
+    result.tags = []
+    result.media = []
   }
   return result
 }

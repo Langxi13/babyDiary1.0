@@ -80,9 +80,9 @@
               <el-button text type="danger" @click="discardProposalAlbum(album)">取消这个推荐</el-button>
             </div>
             <div class="proposal-photos">
-              <div v-for="photo in album.photos" :key="photo.assetId" class="proposal-photo">
-                <img :src="mediaThumbnailUrl(photo.media)" alt="" loading="lazy" decoding="async" />
-                <button @click="removeProposalPhoto(album, photo.assetId)">移除</button>
+              <div v-for="photo in album.photos" :key="photo.id" class="proposal-photo">
+                <img :src="mediaThumbnailUrl(photo)" alt="" loading="lazy" decoding="async" />
+                <button @click="removeProposalPhoto(album, photo.id)">移除</button>
               </div>
             </div>
           </article>
@@ -313,7 +313,7 @@ const generateProposal = async () => {
 }
 
 const removeProposalPhoto = (album, assetId) => {
-  album.photos = album.photos.filter(photo => photo.assetId !== assetId)
+  album.photos = album.photos.filter(photo => photo.id !== assetId)
   album.assetIds = album.assetIds.filter(id => id !== assetId)
 }
 
@@ -326,11 +326,11 @@ const confirmProposal = async () => {
   confirmingProposal.value = true
   try {
     const spaceId = await requireSpaceId()
-    await albumApi.updateProposal(spaceId, currentProposal.value.proposalId, {
+    await albumApi.updateProposal(spaceId, currentProposal.value.id, {
       ...currentProposal.value,
       albums: proposalAlbums.value
     })
-    await albumApi.confirmProposal(spaceId, currentProposal.value.proposalId)
+    await albumApi.confirmProposal(spaceId, currentProposal.value.id)
     currentProposal.value = null
     proposalAlbums.value = []
     await loadGroups()
@@ -341,8 +341,8 @@ const confirmProposal = async () => {
 }
 
 const discardProposal = async () => {
-  if (currentProposal.value?.proposalId) {
-    await albumApi.discardProposal(await requireSpaceId(), currentProposal.value.proposalId)
+  if (currentProposal.value?.id) {
+    await albumApi.discardProposal(await requireSpaceId(), currentProposal.value.id)
   }
   currentProposal.value = null
   proposalAlbums.value = []

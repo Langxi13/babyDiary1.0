@@ -26,7 +26,7 @@ public class MyBatisSyncRepository implements SyncRepository {
                                         BinaryUuid.fromBytes(row.entityPublicId()),
                                         row.operation(),
                                         row.revision(),
-                                        row.actorId(),
+                                        BinaryUuid.fromBytes(row.actorPublicId()),
                                         row.createdAt()))
                 .toList();
     }

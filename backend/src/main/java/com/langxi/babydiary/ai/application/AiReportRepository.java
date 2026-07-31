@@ -7,7 +7,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AiReportRepository {
-    List<Report> findForCreator(long spaceId, long creatorId);
+    List<Report> findPage(long spaceId, long creatorId, String periodType, int offset, int limit);
+
+    long count(long spaceId, long creatorId, String periodType);
 
     Optional<Report> findByPublicId(long spaceId, long creatorId, UUID publicId);
 

@@ -1,5 +1,6 @@
 package com.langxi.babydiary.share.infrastructure;
 
+import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.share.application.PrivateShareRepository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,6 +65,7 @@ public class MyBatisPrivateShareRepository implements PrivateShareRepository {
                         row.getMaxViews(),
                         row.getViewCount(),
                         row.getSpaceId(),
+                        BinaryUuid.fromBytes(row.getSpacePublicId()),
                         row.getDiaryId(),
                         row.isLocked(),
                         row.getTitle(),

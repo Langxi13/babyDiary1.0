@@ -111,13 +111,13 @@ public class MyBatisAiAlbumProposalRepository implements AiAlbumProposalReposito
     }
 
     @Override
-    public List<byte[]> findCandidateDiaries(long candidateId) {
-        return mapper.findCandidateDiaries(candidateId);
+    public List<byte[]> findCandidateDiaries(long candidateId, long accountId) {
+        return mapper.findCandidateDiaries(candidateId, accountId);
     }
 
     @Override
-    public List<byte[]> findCandidateMedia(long candidateId) {
-        return mapper.findCandidateMedia(candidateId);
+    public List<byte[]> findCandidateMedia(long candidateId, long accountId) {
+        return mapper.findCandidateMedia(candidateId, accountId);
     }
 
     @Override

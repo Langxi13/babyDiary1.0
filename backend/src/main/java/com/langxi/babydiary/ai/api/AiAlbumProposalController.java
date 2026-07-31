@@ -98,7 +98,7 @@ public class AiAlbumProposalController {
 
     private ProposalResponse response(long accountId, AiAlbumProposalService.Proposal proposal) {
         return new ProposalResponse(
-                proposal.proposalId(),
+                proposal.id(),
                 proposal.status(),
                 proposal.startDate(),
                 proposal.endDate(),
@@ -118,14 +118,12 @@ public class AiAlbumProposalController {
                                                 candidate.photos().stream()
                                                         .map(
                                                                 item ->
-                                                                        new PhotoResponse(
-                                                                                item.id(),
-                                                                                media.view(
-                                                                                        item,
-                                                                                        MediaAccessContext
-                                                                                                .direct(
-                                                                                                        accountId,
-                                                                                                        false))))
+                                                                        media.view(
+                                                                                item,
+                                                                                MediaAccessContext
+                                                                                        .direct(
+                                                                                                accountId,
+                                                                                                false)))
                                                         .toList(),
                                                 candidate.discarded()))
                         .toList(),
@@ -162,7 +160,7 @@ public class AiAlbumProposalController {
     }
 
     public record ProposalResponse(
-            UUID proposalId,
+            UUID id,
             String status,
             LocalDate startDate,
             LocalDate endDate,
@@ -180,8 +178,6 @@ public class AiAlbumProposalController {
             String description,
             List<UUID> diaryIds,
             List<UUID> assetIds,
-            List<PhotoResponse> photos,
+            List<MediaView> photos,
             boolean discarded) {}
-
-    public record PhotoResponse(UUID assetId, MediaView media) {}
 }

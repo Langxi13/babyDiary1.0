@@ -1,7 +1,6 @@
 package com.langxi.babydiary.space.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
-import com.langxi.babydiary.space.application.CollaborationRepository;
 import com.langxi.babydiary.space.application.CollaborationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -31,7 +30,7 @@ public class CollaborationController {
     }
 
     @GetMapping("/spaces/{spaceId}/members")
-    public List<CollaborationRepository.Member> members(
+    public List<CollaborationService.Member> members(
             @AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID spaceId) {
         return collaboration.members(spaceId, principal.accountId());
     }

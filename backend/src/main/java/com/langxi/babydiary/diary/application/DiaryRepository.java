@@ -36,7 +36,7 @@ public interface DiaryRepository {
     void insertRevision(
             long diaryId, int version, long editorId, String snapshotJson, LocalDateTime createdAt);
 
-    Optional<Revision> findRevision(long diaryId, long revisionId);
+    Optional<Revision> findRevision(long diaryId, UUID revisionId);
 
     List<RevisionSummary> findRevisions(long diaryId);
 
@@ -76,9 +76,15 @@ public interface DiaryRepository {
             boolean locked) {}
 
     record Revision(
-            long id, int version, long editorId, String snapshotJson, LocalDateTime createdAt) {}
+            UUID id,
+            int version,
+            UUID editorId,
+            String editorName,
+            String snapshotJson,
+            LocalDateTime createdAt) {}
 
-    record RevisionSummary(long id, int version, long editorId, LocalDateTime createdAt) {}
+    record RevisionSummary(
+            UUID id, int version, UUID editorId, String editorName, LocalDateTime createdAt) {}
 
     record PurgeCandidate(
             long internalId,
@@ -86,5 +92,6 @@ public interface DiaryRepository {
             long spaceInternalId,
             UUID spaceId,
             long authorId,
+            String visibility,
             int version) {}
 }

@@ -1,5 +1,8 @@
 package com.langxi.babydiary.space.application;
 
+import com.langxi.babydiary.media.application.MediaAccessContext;
+import com.langxi.babydiary.media.application.MediaLinkView;
+import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.platform.application.ApiException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -17,16 +20,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class CollaborationService {
     private final SpaceAccess spaces;
     private final CollaborationRepository collaboration;
+    private final MediaRepresentationService media;
     private final SecureRandom random = new SecureRandom();
 
-    public CollaborationService(SpaceAccess spaces, CollaborationRepository collaboration) {
+    public CollaborationService(
+            SpaceAccess spaces,
+            CollaborationRepository collaboration,
+            MediaRepresentationService media) {
         this.spaces = spaces;
         this.collaboration = collaboration;
+        this.media = media;
     }
 
-    public List<CollaborationRepository.Member> members(UUID spaceId, long accountId) {
+    public List<Member> members(UUID spaceId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        return collaboration.findMembers(space.internalId());
+        return collaboration.findMembers(space.internalId()).stream()
+                .map(
+                        member ->
+                                new Member(
+                                        member.id(),
+                                        member.username(),
+                                        member.role(),
+                                        member.status(),
+                                        member.joinedAt(),
+                                        avatar(member, accountId)))
+                .toList();
+    }
+
+    private MediaLinkView avatar(CollaborationRepository.Member member, long viewerAccountId) {
+        if (member.avatarAssetId() == null
+                || member.avatarSpaceId() == null
+                || member.avatarVariantType() == null
+                || member.avatarVariantProfile() == null) return null;
+        return media.link(
+                member.avatarSpaceId(),
+                member.avatarAssetId(),
+                member.avatarVariantType(),
+                member.avatarVariantProfile(),
+                MediaAccessContext.avatar(viewerAccountId, member.id(), false));
     }
 
     @Transactional
@@ -139,4 +170,12 @@ public class CollaborationService {
     }
 
     public record InvitationCreated(UUID id, String token, LocalDateTime expiresAt, String role) {}
+
+    public record Member(
+            UUID id,
+            String username,
+            String role,
+            String status,
+            LocalDateTime joinedAt,
+            MediaLinkView avatarMedia) {}
 }

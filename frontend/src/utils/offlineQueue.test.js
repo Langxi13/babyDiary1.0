@@ -36,7 +36,7 @@ test('deleting a not-yet-synced create cancels the local create', () => {
 })
 
 test('pending diary operations remain visible after cached data is reloaded', () => {
-  const diaries = [{ publicId: 'existing', title: '线上标题', version: 3 }]
+  const diaries = [{ id: 'existing', title: '线上标题', version: 3 }]
   const operations = [
     { kind: 'diary', entityId: 'existing', action: 'UPDATE', payload: { title: '本地标题' }, baseVersion: 3 },
     { kind: 'diary', entityId: 'new-entry', action: 'CREATE', payload: { title: '离线新日记' }, baseVersion: null }
@@ -44,6 +44,6 @@ test('pending diary operations remain visible after cached data is reloaded', ()
 
   const merged = applyPendingDiaryOperations(diaries, operations)
 
-  assert.equal(merged.find(item => item.publicId === 'existing').title, '本地标题')
-  assert.equal(merged.find(item => item.publicId === 'new-entry').pendingAction, 'CREATE')
+  assert.equal(merged.find(item => item.id === 'existing').title, '本地标题')
+  assert.equal(merged.find(item => item.id === 'new-entry').pendingAction, 'CREATE')
 })

@@ -112,6 +112,7 @@ import { useAuthStore } from '@/stores/auth'
 import { preloadRouteComponent } from '@/router'
 import { DESKTOP_COMPACT_NAVIGATION, DESKTOP_MORE_NAVIGATION, DESKTOP_PRIMARY_NAVIGATION } from '@/config/navigation'
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/dropdown/style/css.mjs'
@@ -136,7 +137,7 @@ const activeMenu = computed(() => {
   return route.path
 })
 const username = computed(() => authStore.username)
-const avatarUrl = computed(() => authStore.userInfo?.avatarMedia?.contentUrl || '')
+const avatarUrl = computed(() => mediaThumbnailUrl(authStore.userInfo?.avatarMedia))
 const moreMenuActive = computed(() => desktopMoreNavigation.some(item => item.path === activeMenu.value))
 const preload = (path) => preloadRouteComponent(path)
 

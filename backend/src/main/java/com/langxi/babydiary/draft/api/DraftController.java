@@ -2,7 +2,6 @@ package com.langxi.babydiary.draft.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.langxi.babydiary.draft.application.DraftService;
-import com.langxi.babydiary.draft.domain.DiaryDraft;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -29,13 +28,13 @@ public class DraftController {
     }
 
     @GetMapping
-    public List<DiaryDraft> list(
+    public List<DraftService.DraftView> list(
             @AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID spaceId) {
         return drafts.list(spaceId, principal.accountId());
     }
 
     @GetMapping("/{draftKey}")
-    public DiaryDraft detail(
+    public DraftService.DraftView detail(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable String draftKey) {
@@ -43,7 +42,7 @@ public class DraftController {
     }
 
     @PutMapping("/{draftKey}")
-    public DiaryDraft save(
+    public DraftService.DraftView save(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable String draftKey,

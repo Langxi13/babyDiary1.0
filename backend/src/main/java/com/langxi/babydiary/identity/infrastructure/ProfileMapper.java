@@ -1,6 +1,5 @@
 package com.langxi.babydiary.identity.infrastructure;
 
-import java.time.LocalDateTime;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -12,11 +11,16 @@ import org.apache.ibatis.annotations.Update;
 public interface ProfileMapper {
     @Select(
             """
-            SELECT a.account_id,a.public_id,a.username,a.password_hash,a.email,a.email_verified,a.system_role,
-                   a.timezone,ma.public_id AS avatar_public_id,s.public_id AS avatar_space_public_id,
+            SELECT a.account_id,a.public_id,a.username,a.email,a.email_verified,a.system_role,
+                   a.timezone,a.created_at,ma.public_id AS avatar_public_id,s.public_id AS avatar_space_public_id,
                    av.variant_type AS avatar_variant_type,av.profile AS avatar_variant_profile
             FROM account a LEFT JOIN user_avatar ua ON ua.account_id=a.account_id
             LEFT JOIN media_asset ma ON ma.space_id=ua.space_id AND ma.asset_id=ua.asset_id AND ma.deleted_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              )
             LEFT JOIN diary_space s ON s.space_id=ua.space_id
             LEFT JOIN media_variant av ON av.variant_id=(
                 SELECT candidate.variant_id FROM media_variant candidate
@@ -56,29 +60,15 @@ public interface ProfileMapper {
     @Delete("DELETE FROM user_avatar WHERE account_id=#{accountId}")
     void clearAvatar(long accountId);
 
-    @Update(
-            """
-            UPDATE account SET password_hash=#{passwordHash},token_version=token_version+1,updated_at=#{now}
-            WHERE account_id=#{accountId} AND deleted_at IS NULL
-            """)
-    void updatePassword(
-            @Param("accountId") long accountId,
-            @Param("passwordHash") String passwordHash,
-            @Param("now") LocalDateTime now);
-
-    @Update(
-            "UPDATE auth_session SET revoked_at=#{now} WHERE account_id=#{accountId} AND revoked_at IS NULL")
-    void revokeSessions(@Param("accountId") long accountId, @Param("now") LocalDateTime now);
-
     final class ProfileRow {
         private long accountId;
         private byte[] publicId;
         private String username;
-        private String passwordHash;
         private String email;
         private boolean emailVerified;
         private String systemRole;
         private String timezone;
+        private java.time.LocalDateTime createdAt;
         private byte[] avatarPublicId;
         private byte[] avatarSpacePublicId;
         private String avatarVariantType;
@@ -98,10 +88,6 @@ public interface ProfileMapper {
             return username;
         }
 
-        public String passwordHash() {
-            return passwordHash;
-        }
-
         public String email() {
             return email;
         }
@@ -116,6 +102,10 @@ public interface ProfileMapper {
 
         public String timezone() {
             return timezone;
+        }
+
+        public java.time.LocalDateTime createdAt() {
+            return createdAt;
         }
 
         public byte[] avatarPublicId() {
@@ -146,10 +136,6 @@ public interface ProfileMapper {
             this.username = username;
         }
 
-        public void setPasswordHash(String passwordHash) {
-            this.passwordHash = passwordHash;
-        }
-
         public void setEmail(String email) {
             this.email = email;
         }
@@ -164,6 +150,10 @@ public interface ProfileMapper {
 
         public void setTimezone(String timezone) {
             this.timezone = timezone;
+        }
+
+        public void setCreatedAt(java.time.LocalDateTime createdAt) {
+            this.createdAt = createdAt;
         }
 
         public void setAvatarPublicId(byte[] avatarPublicId) {

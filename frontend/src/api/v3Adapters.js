@@ -9,8 +9,6 @@ const normalizeRepresentation = representation => representation ? {
 
 export const normalizeMedia = (media = {}) => ({
   ...media,
-  contentUrl: resolveUrl(media.contentUrl),
-  thumbnailUrl: resolveUrl(media.thumbnailUrl),
   representations: media.representations ? {
     original: normalizeRepresentation(media.representations.original),
     thumbnail: normalizeRepresentation(media.representations.thumbnail),
@@ -21,11 +19,11 @@ export const normalizeMedia = (media = {}) => ({
 })
 
 export const mediaOriginalUrl = media => (
-  media?.representations?.original?.url || media?.contentUrl || ''
+  media?.representations?.original?.url || ''
 )
 
 export const mediaThumbnailUrl = media => (
-  media?.representations?.thumbnail?.url || media?.thumbnailUrl || mediaOriginalUrl(media)
+  media?.representations?.thumbnail?.url || mediaOriginalUrl(media)
 )
 
 export const mediaPosterUrl = media => media?.representations?.poster?.url || ''

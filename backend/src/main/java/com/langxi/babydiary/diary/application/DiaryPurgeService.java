@@ -31,7 +31,8 @@ public class DiaryPurgeService {
                 candidate.id(),
                 "DIARY_PURGED",
                 candidate.version() + 1,
-                Map.of("retention", true));
+                ChangeRecorder.Scope.diary(candidate.visibility(), candidate.authorId()),
+                Map.of("retention", true, "visibility", candidate.visibility()));
         cacheInvalidator.diary(candidate.spaceId());
         return true;
     }

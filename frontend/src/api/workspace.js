@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { normalizeSpace } from '@/api/v3Adapters'
+import { normalizeDiary, normalizeMedia, normalizeSpace } from '@/api/v3Adapters'
 
 export const workspaceApi = {
   spaces: {
@@ -13,7 +13,12 @@ export const workspaceApi = {
       }))
     },
     rename: (spaceId, data) => request.put(`/api/v3/spaces/${spaceId}`, data),
-    members: spaceId => request.get(`/api/v3/spaces/${spaceId}/members`),
+    async members(spaceId) {
+      return (await request.get(`/api/v3/spaces/${spaceId}/members`) || []).map(member => ({
+        ...member,
+        avatarMedia: member.avatarMedia ? normalizeMedia(member.avatarMedia) : null
+      }))
+    },
     invite: (spaceId, data) => request.post(`/api/v3/spaces/${spaceId}/invitations`, data),
     accept: token => request.post(`/api/v3/invitations/${token}/accept`),
     removeMember: (spaceId, accountId) => request.delete(`/api/v3/spaces/${spaceId}/members/${accountId}`),
@@ -98,7 +103,9 @@ export const workspaceApi = {
       `/api/v3/spaces/${spaceId}/diaries/${diaryId}/shares`,
       { headers: stepHeader(stepUpToken) }
     ),
-    open: (token, password) => request.post(`/api/v3/public/shares/${token}/open`, { password }),
+    async open(token, password) {
+      return normalizeDiary(await request.post(`/api/v3/public/shares/${token}/open`, { password }))
+    },
     revoke: shareId => request.delete(`/api/v3/shares/${shareId}`)
   }
 }

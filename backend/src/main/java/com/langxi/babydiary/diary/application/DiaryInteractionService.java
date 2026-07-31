@@ -1,7 +1,8 @@
 package com.langxi.babydiary.diary.application;
 
 import com.langxi.babydiary.media.application.MediaAccessContext;
-import com.langxi.babydiary.media.application.MediaUrlSigner;
+import com.langxi.babydiary.media.application.MediaLinkView;
+import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import com.langxi.babydiary.space.application.SpaceAccess;
@@ -16,13 +17,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class DiaryInteractionService {
     private final SpaceAccess spaces;
     private final DiaryInteractionRepository mapper;
-    private final MediaUrlSigner mediaUrls;
+    private final MediaRepresentationService media;
 
     public DiaryInteractionService(
-            SpaceAccess spaces, DiaryInteractionRepository mapper, MediaUrlSigner mediaUrls) {
+            SpaceAccess spaces,
+            DiaryInteractionRepository mapper,
+            MediaRepresentationService media) {
         this.spaces = spaces;
         this.mapper = mapper;
-        this.mediaUrls = mediaUrls;
+        this.media = media;
     }
 
     public List<Comment> comments(UUID spaceId, UUID diaryId, long accountId, boolean elevated) {
@@ -46,7 +49,8 @@ public class DiaryInteractionService {
                                         row.publicId(), BinaryUuid.toBytes(publicId)))
                 .findFirst()
                 .map(row -> comment(row, accountId))
-                .orElseThrow();
+                .orElseThrow(
+                        () -> new IllegalStateException("Inserted diary comment was not readable"));
     }
 
     @Transactional
@@ -109,7 +113,7 @@ public class DiaryInteractionService {
     }
 
     private Comment comment(DiaryInteractionRepository.CommentData row, long viewerAccountId) {
-        AvatarMedia avatar = null;
+        MediaLinkView avatar = null;
         if (row.avatarAssetPublicId() != null
                 && row.avatarSpacePublicId() != null
                 && row.avatarVariantType() != null
@@ -118,17 +122,12 @@ public class DiaryInteractionService {
             UUID spaceId = BinaryUuid.fromBytes(row.avatarSpacePublicId());
             UUID authorPublicId = BinaryUuid.fromBytes(row.authorPublicId());
             avatar =
-                    new AvatarMedia(
+                    media.link(
+                            spaceId,
                             assetId,
-                            mediaUrls
-                                    .url(
-                                            spaceId,
-                                            assetId,
-                                            row.avatarVariantType(),
-                                            row.avatarVariantProfile(),
-                                            MediaAccessContext.avatar(
-                                                    viewerAccountId, authorPublicId, false))
-                                    .url());
+                            row.avatarVariantType(),
+                            row.avatarVariantProfile(),
+                            MediaAccessContext.avatar(viewerAccountId, authorPublicId, false));
         }
         UUID authorId = BinaryUuid.fromBytes(row.authorPublicId());
         return new Comment(
@@ -154,11 +153,9 @@ public class DiaryInteractionService {
             UUID authorId,
             String username,
             String content,
-            AvatarMedia avatarMedia,
+            MediaLinkView avatarMedia,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {}
-
-    public record AvatarMedia(UUID assetId, String contentUrl) {}
 
     public record Reaction(String emoji, long count, boolean reactedByMe) {}
 }

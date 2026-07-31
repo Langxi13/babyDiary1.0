@@ -19,7 +19,7 @@ public class SyncService {
         this.executor = executor;
     }
 
-    public List<SyncOperationExecutor.Result> push(
+    public List<PushResult> push(
             UUID spaceId, long accountId, List<PushOperation> operations, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         if (operations == null || operations.isEmpty() || operations.size() > 100) {
@@ -40,6 +40,7 @@ public class SyncService {
                                                 item.entityId(),
                                                 item.baseVersion(),
                                                 item.payload())))
+                .map(this::toPushResult)
                 .toList();
     }
 
@@ -51,14 +52,54 @@ public class SyncService {
         if (requested < baseline) {
             return new PullResponse(List.of(), baseline, false, true, baseline);
         }
-        List<SyncRepository.Change> changes =
-                sync.findChanges(space.internalId(), accountId, requested, size);
+        List<ChangeView> changes =
+                sync.findChanges(space.internalId(), accountId, requested, size).stream()
+                        .map(this::toView)
+                        .toList();
         long next = changes.isEmpty() ? requested : changes.get(changes.size() - 1).cursor();
         return new PullResponse(changes, next, changes.size() == size, false, baseline);
     }
 
+    private ChangeView toView(SyncRepository.Change change) {
+        return new ChangeView(
+                change.cursor(),
+                change.entityType(),
+                change.entityId(),
+                change.operation(),
+                change.revision(),
+                change.actorId(),
+                change.createdAt());
+    }
+
+    private PushResult toPushResult(SyncOperationExecutor.Result result) {
+        return new PushResult(
+                result.operationId(),
+                result.status(),
+                result.entityId(),
+                result.version(),
+                result.errorCode(),
+                result.message());
+    }
+
+    public record ChangeView(
+            long cursor,
+            String entityType,
+            UUID entityId,
+            String operation,
+            int revision,
+            UUID actorId,
+            java.time.LocalDateTime createdAt) {}
+
+    public record PushResult(
+            UUID operationId,
+            String status,
+            UUID entityId,
+            Integer version,
+            String errorCode,
+            String message) {}
+
     public record PullResponse(
-            List<SyncRepository.Change> changes,
+            List<ChangeView> changes,
             long nextCursor,
             boolean hasMore,
             boolean resetRequired,

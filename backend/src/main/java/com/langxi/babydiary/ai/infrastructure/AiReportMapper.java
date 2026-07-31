@@ -14,14 +14,35 @@ import org.apache.ibatis.annotations.Select;
 public interface AiReportMapper {
     @Select(
             """
+            <script>
             SELECT r.report_id,r.public_id,s.public_id AS space_public_id,r.period_type,r.period_start,r.period_end,
                    r.title,r.content_markdown,r.diary_count,r.model,r.created_at
             FROM ai_report r JOIN diary_space s ON s.space_id=r.space_id
             WHERE r.space_id=#{spaceId} AND r.created_by=#{creatorId}
+            <if test="periodType != null">AND r.period_type=#{periodType}</if>
             ORDER BY r.created_at DESC,r.report_id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
             """)
-    List<ReportRow> findForCreator(
-            @Param("spaceId") long spaceId, @Param("creatorId") long creatorId);
+    List<ReportRow> findPage(
+            @Param("spaceId") long spaceId,
+            @Param("creatorId") long creatorId,
+            @Param("periodType") String periodType,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    @Select(
+            """
+            <script>
+            SELECT COUNT(*) FROM ai_report
+            WHERE space_id=#{spaceId} AND created_by=#{creatorId}
+            <if test="periodType != null">AND period_type=#{periodType}</if>
+            </script>
+            """)
+    long count(
+            @Param("spaceId") long spaceId,
+            @Param("creatorId") long creatorId,
+            @Param("periodType") String periodType);
 
     @Select(
             """

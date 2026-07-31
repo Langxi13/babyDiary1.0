@@ -45,8 +45,8 @@
         <div class="profile-panel">
           <h2>修改密码</h2>
           <el-form ref="passwordFormRef" class="password-form" :model="passwordForm" :rules="passwordRules" label-position="top">
-            <el-form-item label="旧密码" prop="oldPassword">
-              <el-input v-model="passwordForm.oldPassword" type="password" show-password autocomplete="current-password" />
+            <el-form-item label="当前密码" prop="currentPassword">
+              <el-input v-model="passwordForm.currentPassword" type="password" show-password autocomplete="current-password" />
             </el-form-item>
             <el-form-item label="新密码" prop="newPassword">
               <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" />
@@ -167,6 +167,7 @@ import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { ElUpload } from 'element-plus/es/components/upload/index.mjs'
 import { CopyDocument, Hide, Key, Lock, Monitor, RefreshRight, Upload, View } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
@@ -227,13 +228,13 @@ const resetNativeServer = async () => {
 }
 
 const passwordForm = reactive({
-  oldPassword: '',
+  currentPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
 
 const passwordRules = {
-  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
+  currentPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 8, max: 200, message: '新密码长度需在8到200位之间', trigger: 'blur' }
@@ -253,7 +254,7 @@ const passwordRules = {
   ]
 }
 
-const avatarUrl = computed(() => authStore.userInfo?.avatarMedia?.contentUrl || '')
+const avatarUrl = computed(() => mediaThumbnailUrl(authStore.userInfo?.avatarMedia))
 const usernameInitial = computed(() => authStore.username?.charAt(0)?.toUpperCase() || '')
 const joinedAt = computed(() => formatChineseDate(authStore.userInfo?.createdAt))
 const isAdmin = computed(() => authStore.userInfo?.role === 'ADMIN')

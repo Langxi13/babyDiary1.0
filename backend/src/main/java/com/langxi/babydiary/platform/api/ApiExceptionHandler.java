@@ -9,19 +9,27 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
-@RestControllerAdvice(basePackages = "com.langxi.babydiary")
+@RestControllerAdvice
 public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
@@ -52,11 +60,45 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({
         MissingServletRequestParameterException.class,
+        MissingRequestHeaderException.class,
+        MissingServletRequestPartException.class,
         MethodArgumentTypeMismatchException.class,
-        HttpMediaTypeNotSupportedException.class
+        HandlerMethodValidationException.class,
+        MultipartException.class
     })
     ResponseEntity<ProblemDetail> requestShape(Exception exception) {
         return problem(HttpStatus.BAD_REQUEST, "REQUEST_INVALID", "请求参数或媒体类型无效", null);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ProblemDetail> unsupportedMedia(HttpMediaTypeNotSupportedException exception) {
+        return problem(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE, "MEDIA_TYPE_UNSUPPORTED", "请求媒体类型不受支持", null);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    ResponseEntity<ProblemDetail> unacceptableMedia(HttpMediaTypeNotAcceptableException exception) {
+        return problem(
+                HttpStatus.NOT_ACCEPTABLE,
+                "RESPONSE_MEDIA_TYPE_UNSUPPORTED",
+                "无法生成客户端要求的响应类型",
+                null);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ProblemDetail> methodNotAllowed(
+            HttpRequestMethodNotSupportedException exception) {
+        return problem(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "请求方法不受支持", null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemDetail> uploadTooLarge(MaxUploadSizeExceededException exception) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE", "上传内容超过服务器限制", null);
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    ResponseEntity<ProblemDetail> duplicateKey(DuplicateKeyException exception) {
+        return problem(HttpStatus.CONFLICT, "RESOURCE_CONFLICT", "资源已存在或状态已发生变化", null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -33,6 +33,11 @@ public interface DiaryInteractionMapper {
             FROM diary_comment c JOIN account a ON a.account_id=c.author_id
             LEFT JOIN user_avatar ua ON ua.account_id=a.account_id
             LEFT JOIN media_asset ma ON ma.asset_id=ua.asset_id AND ma.deleted_at IS NULL AND ma.status='READY'
+              AND NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              )
             LEFT JOIN diary_space avs ON avs.space_id=ma.space_id
             LEFT JOIN media_variant av ON av.variant_id=(
                 SELECT candidate.variant_id FROM media_variant candidate

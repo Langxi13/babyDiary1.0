@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { copyText } from '@/utils/copyText'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
@@ -158,7 +159,7 @@ export function useDiaryImages({ route, isEdit }) {
     initialImageCount.value = images.length
     fileList.value = images.map((item, index) => ({
       name: item.id,
-      url: item.thumbnailUrl || item.contentUrl,
+      url: mediaThumbnailUrl(item),
       uid: `existing-${index}`,
       isExisting: true,
       media: item

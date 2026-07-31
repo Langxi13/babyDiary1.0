@@ -483,7 +483,7 @@ watch(activeSpaceId, (next, previous) => {
 })
 
 const handleWorkspaceChanges = event => {
-  if (!event.detail?.spaceId || event.detail.spaceId === activeSpaceId.value) loadDiaries()
+  if (!event.detail?.spaceId || event.detail.spaceId === activeSpaceId.value) loadDiaries(true)
 }
 
 const handleSyncIssues = event => {

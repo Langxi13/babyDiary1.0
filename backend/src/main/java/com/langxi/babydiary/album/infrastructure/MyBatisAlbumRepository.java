@@ -2,6 +2,7 @@ package com.langxi.babydiary.album.infrastructure;
 
 import com.langxi.babydiary.album.application.AlbumRepository;
 import com.langxi.babydiary.platform.application.BinaryUuid;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,29 +30,31 @@ public class MyBatisAlbumRepository implements AlbumRepository {
     }
 
     @Override
-    public List<AlbumRow> findAlbums(long spaceId) {
-        return mapper.findAlbums(spaceId).stream().map(this::album).toList();
+    public List<AlbumRow> findAlbums(long spaceId, boolean includeProtected) {
+        return mapper.findAlbums(spaceId, includeProtected).stream().map(this::album).toList();
     }
 
     @Override
-    public Optional<AlbumRow> findAlbum(long spaceId, UUID albumId) {
-        return Optional.ofNullable(mapper.findAlbum(spaceId, BinaryUuid.toBytes(albumId)))
+    public Optional<AlbumRow> findAlbum(long spaceId, UUID albumId, boolean includeProtected) {
+        return Optional.ofNullable(
+                        mapper.findAlbum(spaceId, BinaryUuid.toBytes(albumId), includeProtected))
                 .map(this::album);
     }
 
     @Override
     public List<UUID> findMediaPublicIds(
-            long spaceId, UUID albumId, long accountId, int offset, int limit) {
+            long spaceId, UUID albumId, boolean includeProtected, int offset, int limit) {
         return mapper
-                .findMediaPublicIds(spaceId, BinaryUuid.toBytes(albumId), accountId, offset, limit)
+                .findMediaPublicIds(
+                        spaceId, BinaryUuid.toBytes(albumId), includeProtected, offset, limit)
                 .stream()
                 .map(BinaryUuid::fromBytes)
                 .toList();
     }
 
     @Override
-    public long countMedia(long spaceId, UUID albumId, long accountId) {
-        return mapper.countMedia(spaceId, BinaryUuid.toBytes(albumId), accountId);
+    public long countMedia(long spaceId, UUID albumId, boolean includeProtected) {
+        return mapper.countMedia(spaceId, BinaryUuid.toBytes(albumId), includeProtected);
     }
 
     @Override
@@ -141,27 +144,81 @@ public class MyBatisAlbumRepository implements AlbumRepository {
     }
 
     @Override
-    public List<UUID> findFavoritePublicIds(long spaceId, long accountId, int offset, int limit) {
-        return mapper.findFavoritePublicIds(spaceId, accountId, offset, limit).stream()
+    public List<UUID> findFavoritePublicIds(
+            long spaceId, long accountId, boolean includeProtected, int offset, int limit) {
+        return mapper
+                .findFavoritePublicIds(spaceId, accountId, includeProtected, offset, limit)
+                .stream()
                 .map(BinaryUuid::fromBytes)
                 .toList();
     }
 
     @Override
-    public long countFavoriteMedia(long spaceId, long accountId) {
-        return mapper.countFavoriteMedia(spaceId, accountId);
+    public long countFavoriteMedia(long spaceId, long accountId, boolean includeProtected) {
+        return mapper.countFavoriteMedia(spaceId, accountId, includeProtected);
     }
 
     @Override
-    public List<UUID> findLibraryPublicIds(long spaceId, long accountId, int offset, int limit) {
-        return mapper.findLibraryPublicIds(spaceId, accountId, offset, limit).stream()
+    public List<UUID> findLibraryPublicIds(
+            long spaceId, long accountId, boolean includeProtected, int offset, int limit) {
+        return mapper
+                .findLibraryPublicIds(spaceId, accountId, includeProtected, offset, limit)
+                .stream()
                 .map(BinaryUuid::fromBytes)
                 .toList();
     }
 
     @Override
-    public long countLibraryImages(long spaceId, long accountId) {
-        return mapper.countLibraryImages(spaceId, accountId);
+    public long countLibraryImages(long spaceId, long accountId, boolean includeProtected) {
+        return mapper.countLibraryImages(spaceId, accountId, includeProtected);
+    }
+
+    @Override
+    public List<YearBucket> findLibraryYears(
+            long spaceId, long accountId, boolean includeProtected) {
+        return mapper.findLibraryYears(spaceId, accountId, includeProtected).stream()
+                .map(
+                        row ->
+                                new YearBucket(
+                                        row.mediaYear(),
+                                        row.mediaCount(),
+                                        BinaryUuid.fromBytes(row.coverPublicId())))
+                .toList();
+    }
+
+    @Override
+    public List<UUID> findLibraryPublicIdsByYear(
+            long spaceId,
+            long accountId,
+            int year,
+            boolean includeProtected,
+            int offset,
+            int limit) {
+        LocalDate start = LocalDate.of(year, 1, 1);
+        return mapper
+                .findLibraryPublicIdsByRange(
+                        spaceId,
+                        accountId,
+                        includeProtected,
+                        start.atStartOfDay(),
+                        start.plusYears(1).atStartOfDay(),
+                        offset,
+                        limit)
+                .stream()
+                .map(BinaryUuid::fromBytes)
+                .toList();
+    }
+
+    @Override
+    public long countLibraryImagesByYear(
+            long spaceId, long accountId, int year, boolean includeProtected) {
+        LocalDate start = LocalDate.of(year, 1, 1);
+        return mapper.countLibraryImagesByRange(
+                spaceId,
+                accountId,
+                includeProtected,
+                start.atStartOfDay(),
+                start.plusYears(1).atStartOfDay());
     }
 
     private AlbumRow album(AlbumMapper.AlbumRow row) {

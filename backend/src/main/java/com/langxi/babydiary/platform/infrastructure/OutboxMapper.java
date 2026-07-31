@@ -8,8 +8,8 @@ import org.apache.ibatis.annotations.Mapper;
 public interface OutboxMapper {
     @Insert(
             """
-            INSERT INTO sync_change(space_id,entity_type,entity_public_id,operation,revision,actor_id,created_at)
-            VALUES(#{spaceId},#{aggregateType},#{aggregateId},#{operation},#{revision},#{actorId},#{createdAt})
+            INSERT INTO sync_change(space_id,entity_type,entity_public_id,operation,revision,visibility,owner_id,actor_id,created_at)
+            VALUES(#{spaceId},#{aggregateType},#{aggregateId},#{operation},#{revision},#{visibility},#{ownerId},#{actorId},#{createdAt})
             """)
     void insertSync(
             long spaceId,
@@ -17,6 +17,8 @@ public interface OutboxMapper {
             byte[] aggregateId,
             String operation,
             int revision,
+            String visibility,
+            Long ownerId,
             long actorId,
             LocalDateTime createdAt);
 

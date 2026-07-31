@@ -49,6 +49,28 @@ test('cachedRequest reuses values inside ttl and reloads after invalidation', as
   assert.deepEqual(refreshed, { calls: 2 })
 })
 
+test('cachedRequest deduplicates but never reuses values rejected by cacheIf', async () => {
+  clearApiCache()
+  let resolveFirst
+  let calls = 0
+  const loader = () => new Promise(resolve => {
+    calls += 1
+    resolveFirst = resolve
+  })
+  const first = cachedRequest('sensitive-key', loader, { cacheIf: () => false })
+  const concurrent = cachedRequest('sensitive-key', loader, { cacheIf: () => false })
+  assert.strictEqual(first, concurrent)
+  await Promise.resolve()
+  resolveFirst({ secret: true })
+  await first
+
+  const fresh = await cachedRequest('sensitive-key', async () => ({ calls: ++calls }), {
+    cacheIf: () => false
+  })
+  assert.equal(calls, 2)
+  assert.deepEqual(fresh, { calls: 2 })
+})
+
 test('an invalidated in-flight request cannot restore stale cache data', async () => {
   clearApiCache()
   let resolveOld

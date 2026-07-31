@@ -13,7 +13,8 @@ test('user info refresh is throttled and deduplicated', () => {
 
 test('an obsolete user info response cannot restore a cleared or replaced session', () => {
   assert.match(source, /const requestedToken = token\.value/)
-  assert.match(source, /response\.code === 200 && token\.value === requestedToken/)
+  assert.match(source, /const profile = await authApi\.getUserInfo\(\)/)
+  assert.match(source, /if \(token\.value === requestedToken\)/)
   assert.doesNotMatch(source, /console\.error\('获取用户信息失败/)
 })
 

@@ -18,8 +18,8 @@ describe('useDiaryImages', () => {
       isEdit: ref(true)
     })
     images.setExistingImages([
-      { id: 'old-a', mediaType: 'IMAGE', contentUrl: '/media/old-a' },
-      { id: 'old-b', mediaType: 'IMAGE', contentUrl: '/media/old-b' }
+      { id: 'old-a', mediaType: 'IMAGE', representations: { original: { url: '/media/old-a' } } },
+      { id: 'old-b', mediaType: 'IMAGE', representations: { original: { url: '/media/old-b' } } }
     ])
 
     const replacement = new File(['replacement'], 'replacement.jpg', { type: 'image/jpeg' })

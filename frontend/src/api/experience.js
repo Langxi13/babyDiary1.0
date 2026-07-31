@@ -31,12 +31,13 @@ const anniversaryPayload = value => ({
 
 export const anniversaryApi = {
   list(spaceId, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:anniversaries:list`, async () => {
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:anniversaries:list:access:${stepUpToken ? 'elevated' : 'standard'}`, async () => {
       const result = await request.get(`/api/v3/spaces/${spaceId}/anniversaries`, {
-        headers: stepHeader(getStepUpToken())
+        headers: stepHeader(stepUpToken)
       })
       return (result || []).map(normalizeAnniversary)
-    }, { ttl: options.ttl ?? 600000, force: options.force })
+    }, { ttl: options.ttl ?? 600000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   async create(spaceId, payload) {

@@ -167,7 +167,7 @@ request.interceptors.response.use(
               localStorage.setItem('userInfo', JSON.stringify(refreshedUser ? {
                 ...refreshedUser,
                 avatarMedia: refreshedUser.avatarMedia
-                  ? { ...refreshedUser.avatarMedia, contentUrl: undefined }
+                  ? { id: refreshedUser.avatarMedia.id }
                   : null
               } : null))
               localStorage.setItem('token', refreshed.token)

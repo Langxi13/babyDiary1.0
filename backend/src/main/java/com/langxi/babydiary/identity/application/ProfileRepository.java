@@ -13,17 +13,15 @@ public interface ProfileRepository {
 
     void clearAvatar(long accountId);
 
-    void changePassword(long accountId, String passwordHash, LocalDateTime now);
-
     record Profile(
             long accountId,
             UUID id,
             String username,
-            String passwordHash,
             String email,
             boolean emailVerified,
             String role,
             String timezone,
+            LocalDateTime createdAt,
             UUID avatarAssetId,
             UUID avatarSpaceId,
             String avatarVariantType,

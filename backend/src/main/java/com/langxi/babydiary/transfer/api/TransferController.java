@@ -2,6 +2,7 @@ package com.langxi.babydiary.transfer.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.transfer.application.DiaryBookService;
+import com.langxi.babydiary.transfer.application.DiaryMediaExportService;
 import com.langxi.babydiary.transfer.application.PortableArchiveService;
 import com.langxi.babydiary.transfer.application.TemporaryDownload;
 import java.io.IOException;
@@ -25,10 +26,15 @@ import org.springframework.web.multipart.MultipartFile;
 public class TransferController {
     private final PortableArchiveService archives;
     private final DiaryBookService books;
+    private final DiaryMediaExportService mediaExports;
 
-    public TransferController(PortableArchiveService archives, DiaryBookService books) {
+    public TransferController(
+            PortableArchiveService archives,
+            DiaryBookService books,
+            DiaryMediaExportService mediaExports) {
         this.archives = archives;
         this.books = books;
+        this.mediaExports = mediaExports;
     }
 
     @GetMapping("/transfer/export")
@@ -71,5 +77,27 @@ public class TransferController {
                 .contentType(MediaType.parseMediaType(book.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + book.filename())
                 .body(book.resource());
+    }
+
+    @GetMapping("/transfer/media")
+    public ResponseEntity<TemporaryDownload> exportMedia(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken)
+            throws IOException {
+        TemporaryDownload file =
+                mediaExports.export(spaceId, principal, startDate, endDate, stepUpToken);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=Baby-Diary-images-"
+                                + startDate
+                                + "-"
+                                + endDate
+                                + ".zip")
+                .body(file);
     }
 }

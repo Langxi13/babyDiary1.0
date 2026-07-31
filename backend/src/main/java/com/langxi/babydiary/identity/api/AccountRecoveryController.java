@@ -2,7 +2,7 @@ package com.langxi.babydiary.identity.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.AccountRecoveryService;
-import com.langxi.babydiary.media.application.MediaUrlSigner;
+import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.platform.application.RequestRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -17,15 +17,15 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v3")
 public class AccountRecoveryController {
     private final AccountRecoveryService recovery;
-    private final MediaUrlSigner mediaUrls;
+    private final MediaRepresentationService media;
     private final RequestRateLimiter rateLimiter;
 
     public AccountRecoveryController(
             AccountRecoveryService recovery,
-            MediaUrlSigner mediaUrls,
+            MediaRepresentationService media,
             RequestRateLimiter rateLimiter) {
         this.recovery = recovery;
-        this.mediaUrls = mediaUrls;
+        this.media = media;
         this.rateLimiter = rateLimiter;
     }
 
@@ -36,7 +36,8 @@ public class AccountRecoveryController {
         AccountRecoveryService.EmailUpdate result =
                 recovery.updateEmail(principal.accountId(), request.email());
         return new EmailResponse(
-                ProfileController.ProfileResponse.from(result.profile(), mediaUrls),
+                ProfileController.ProfileResponse.from(
+                        result.profile(), media, principal.accountId()),
                 result.mailSent());
     }
 

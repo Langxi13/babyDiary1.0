@@ -27,10 +27,13 @@ public interface CollaborationRepository {
     record Member(
             UUID id,
             String username,
-            String email,
             String role,
             String status,
-            LocalDateTime joinedAt) {}
+            LocalDateTime joinedAt,
+            UUID avatarAssetId,
+            UUID avatarSpaceId,
+            String avatarVariantType,
+            String avatarVariantProfile) {}
 
     record Membership(long accountId, String role, String status) {}
 

@@ -135,7 +135,7 @@ public class AiAlbumProposalService {
         for (AiAlbumProposalRepository.CandidateData row :
                 mapper.findCandidates(proposal.proposalId())) {
             if (row.discarded()) continue;
-            List<UUID> assetIds = uuids(mapper.findCandidateMedia(row.candidateId()));
+            List<UUID> assetIds = uuids(mapper.findCandidateMedia(row.candidateId(), accountId));
             if (assetIds.isEmpty()) continue;
             if ("MERGE".equals(row.mode())) {
                 UUID targetId =
@@ -147,7 +147,7 @@ public class AiAlbumProposalService {
                 }
                 AlbumRepository.AlbumRow target =
                         albumRepository
-                                .findAlbum(space.internalId(), targetId)
+                                .findAlbum(space.internalId(), targetId, true)
                                 .filter(album -> "AI".equals(album.type()))
                                 .orElseThrow(
                                         () ->
@@ -172,8 +172,8 @@ public class AiAlbumProposalService {
 
     private Candidate candidate(
             long spaceId, long accountId, AiAlbumProposalRepository.CandidateData row) {
-        List<UUID> diaryIds = uuids(mapper.findCandidateDiaries(row.candidateId()));
-        List<UUID> assetIds = uuids(mapper.findCandidateMedia(row.candidateId()));
+        List<UUID> diaryIds = uuids(mapper.findCandidateDiaries(row.candidateId(), accountId));
+        List<UUID> assetIds = uuids(mapper.findCandidateMedia(row.candidateId(), accountId));
         List<MediaAsset> photos = media.findByPublicIdsInSpace(spaceId, assetIds);
         UUID targetId =
                 row.targetAlbumPublicId() == null
@@ -211,7 +211,7 @@ public class AiAlbumProposalService {
                 }
                 targetId =
                         albumRepository
-                                .findAlbum(spaceId, command.targetAlbumId())
+                                .findAlbum(spaceId, command.targetAlbumId(), true)
                                 .filter(album -> "AI".equals(album.type()))
                                 .map(AlbumRepository.AlbumRow::internalId)
                                 .orElseThrow(
@@ -322,7 +322,7 @@ public class AiAlbumProposalService {
         if (prompt != null && !prompt.isBlank())
             value.append("用户提示：").append(trim(prompt, 500)).append('\n');
         value.append("可合并的已有 AI 相册：\n");
-        albumRepository.findAlbums(spaceId).stream()
+        albumRepository.findAlbums(spaceId, true).stream()
                 .filter(album -> "AI".equals(album.type()))
                 .forEach(
                         album ->
@@ -437,7 +437,7 @@ public class AiAlbumProposalService {
     }
 
     public record Proposal(
-            UUID proposalId,
+            UUID id,
             String status,
             LocalDate startDate,
             LocalDate endDate,

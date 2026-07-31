@@ -1,6 +1,5 @@
 package com.langxi.babydiary.ai.api;
 
-import com.langxi.babydiary.ai.application.AiReportRepository;
 import com.langxi.babydiary.ai.application.AiReportService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import jakarta.validation.Valid;
@@ -8,7 +7,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,11 +30,20 @@ public class AiReportController {
     }
 
     @GetMapping
-    public List<ReportSummary> list(
-            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID spaceId) {
-        return reports.list(spaceId, principal.accountId()).stream()
-                .map(ReportSummary::from)
-                .toList();
+    public ReportPageResponse list(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @RequestParam(required = false) String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        AiReportService.ReportPage result =
+                reports.list(spaceId, principal.accountId(), type, page, size);
+        return new ReportPageResponse(
+                result.content().stream().map(ReportSummary::from).toList(),
+                result.pageNumber(),
+                result.pageSize(),
+                result.totalElements(),
+                result.totalPages());
     }
 
     @GetMapping("/{reportId}")
@@ -79,7 +87,7 @@ public class AiReportController {
             int diaryCount,
             String model,
             LocalDateTime createdAt) {
-        static ReportSummary from(AiReportRepository.Report report) {
+        static ReportSummary from(AiReportService.ReportView report) {
             return new ReportSummary(
                     report.id(),
                     report.spaceId(),
@@ -93,6 +101,13 @@ public class AiReportController {
         }
     }
 
+    public record ReportPageResponse(
+            java.util.List<ReportSummary> content,
+            int pageNumber,
+            int pageSize,
+            long totalElements,
+            long totalPages) {}
+
     public record ReportResponse(
             UUID id,
             UUID spaceId,
@@ -104,7 +119,7 @@ public class AiReportController {
             int diaryCount,
             String model,
             LocalDateTime createdAt) {
-        static ReportResponse from(AiReportRepository.Report report) {
+        static ReportResponse from(AiReportService.ReportView report) {
             return new ReportResponse(
                     report.id(),
                     report.spaceId(),

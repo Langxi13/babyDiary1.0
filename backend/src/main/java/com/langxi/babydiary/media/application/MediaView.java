@@ -30,7 +30,7 @@ public record MediaView(
             String url,
             Instant expiresAt,
             String contentType,
-            long sizeBytes,
+            Long sizeBytes,
             Integer width,
             Integer height,
             Long durationMillis) {}

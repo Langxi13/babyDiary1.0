@@ -3,7 +3,6 @@ package com.langxi.babydiary.draft.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.diary.application.DiaryRepository;
-import com.langxi.babydiary.draft.domain.DiaryDraft;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.util.List;
@@ -32,14 +31,14 @@ public class DraftService {
         this.json = json;
     }
 
-    public List<DiaryDraft> list(UUID spaceId, long accountId) {
+    public List<DraftView> list(UUID spaceId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         return drafts.findForOwner(space.internalId(), accountId).stream()
                 .map(this::toDraft)
                 .toList();
     }
 
-    public DiaryDraft detail(UUID spaceId, String draftKey, long accountId) {
+    public DraftView detail(UUID spaceId, String draftKey, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         validateKey(draftKey);
         return drafts.findByKey(space.internalId(), accountId, draftKey)
@@ -48,7 +47,7 @@ public class DraftService {
     }
 
     @Transactional
-    public DiaryDraft save(
+    public DraftView save(
             UUID spaceId, String draftKey, long accountId, UUID diaryId, JsonNode payload) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         validateKey(draftKey);
@@ -93,9 +92,9 @@ public class DraftService {
         drafts.delete(space.internalId(), accountId, draftKey);
     }
 
-    private DiaryDraft toDraft(DraftRepository.Row row) {
+    private DraftView toDraft(DraftRepository.Row row) {
         try {
-            return new DiaryDraft(
+            return new DraftView(
                     row.id(),
                     row.spaceId(),
                     row.draftKey(),
@@ -113,4 +112,13 @@ public class DraftService {
             throw ApiException.badRequest("DRAFT_KEY_INVALID", "草稿标识格式无效");
         }
     }
+
+    public record DraftView(
+            UUID id,
+            UUID spaceId,
+            String draftKey,
+            UUID diaryId,
+            JsonNode payload,
+            java.time.LocalDateTime createdAt,
+            java.time.LocalDateTime updatedAt) {}
 }

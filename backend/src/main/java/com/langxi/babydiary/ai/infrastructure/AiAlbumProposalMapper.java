@@ -77,17 +77,25 @@ public interface AiAlbumProposalMapper {
     @Select(
             """
             SELECT d.public_id FROM ai_album_candidate_diary cd JOIN diary d ON d.diary_id=cd.diary_id
-            WHERE cd.candidate_id=#{candidateId} ORDER BY cd.position,cd.diary_id
+            WHERE cd.candidate_id=#{candidateId} AND d.deleted_at IS NULL AND d.locked=0
+              AND (d.visibility='SHARED' OR d.author_id=#{accountId})
+            ORDER BY cd.position,cd.diary_id
             """)
-    List<byte[]> findCandidateDiaries(long candidateId);
+    List<byte[]> findCandidateDiaries(
+            @Param("candidateId") long candidateId, @Param("accountId") long accountId);
 
     @Select(
             """
             SELECT a.public_id FROM ai_album_candidate_media cm JOIN media_asset a ON a.asset_id=cm.asset_id
             WHERE cm.candidate_id=#{candidateId} AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND NOT EXISTS (SELECT 1 FROM diary_media protected_dm JOIN diary protected_d
+                ON protected_d.diary_id=protected_dm.diary_id
+                WHERE protected_dm.asset_id=a.asset_id AND protected_d.locked=1)
             ORDER BY cm.position,cm.asset_id
             """)
-    List<byte[]> findCandidateMedia(long candidateId);
+    List<byte[]> findCandidateMedia(
+            @Param("candidateId") long candidateId, @Param("accountId") long accountId);
 
     @Select(
             """

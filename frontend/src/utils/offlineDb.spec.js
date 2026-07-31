@@ -24,7 +24,23 @@ describe('offline account boundaries', () => {
     const db = await openFreshModule()
     await db.queueOfflineOperation({ kind: 'diary', spaceId: 'space-a', entityId: 'diary-a' })
     await db.setOfflineCache('diaries', {
-      items: [{ id: 'diary-a', contentUrl: '/signed-url', thumbnailUrl: '/signed-thumb', title: 'A' }]
+      items: [{
+        id: 'diary-a',
+        title: 'A',
+        representations: {
+          original: { variantType: 'ORIGINAL', profile: 'source', url: '/signed-url', expiresAt: 'soon' }
+        }
+      }, {
+        id: 'locked-diary',
+        title: 'Private title',
+        diaryDate: '2026-07-30',
+        contentHtml: '<p>Private body</p>',
+        contentText: 'Private body',
+        mood: 'happy',
+        locked: true,
+        tags: [{ id: 'tag-1' }],
+        media: [{ id: 'media-1' }]
+      }]
     })
 
     setAccount('account-b')
@@ -37,33 +53,56 @@ describe('offline account boundaries', () => {
     setAccount('account-a')
     expect(await db.listOfflineOperations()).toHaveLength(1)
     expect(await db.getOfflineCache('diaries')).toEqual({
-      items: [{ id: 'diary-a', title: 'A' }]
+      items: [{
+        id: 'diary-a',
+        title: 'A',
+        representations: { original: { variantType: 'ORIGINAL', profile: 'source' } }
+      }, {
+        id: 'locked-diary',
+        title: null,
+        diaryDate: '2026-07-30',
+        contentHtml: null,
+        contentText: null,
+        mood: null,
+        locked: true,
+        tags: [],
+        media: []
+      }]
     })
     await db.clearOfflineSessionCache('user:account-a')
     expect(await db.getOfflineCache('diaries')).toBeNull()
     expect(await db.listOfflineOperations()).toHaveLength(1)
   })
 
-  it('quarantines v1 operations that have no account scope during upgrade', async () => {
-    await createV1Database()
+  it('preserves account-scoped operations while upgrading the supported schema', async () => {
+    await createV2Database()
     const db = await openFreshModule()
 
-    expect(await db.listOfflineOperations()).toHaveLength(0)
-    expect(await db.listQuarantinedOfflineOperations()).toEqual([
-      expect.objectContaining({ id: 'legacy-operation', reason: 'legacy-account-scope-unknown' })
+    expect(await db.listOfflineOperations()).toEqual([
+      expect.objectContaining({ id: 'scoped-operation', accountScope: 'user:account-a' })
     ])
   })
 })
 
-function createV1Database() {
+function createV2Database() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1)
+    const request = indexedDB.open(DB_NAME, 2)
     request.onupgradeneeded = () => {
       const database = request.result
       const operations = database.createObjectStore('operations', { keyPath: 'id' })
+      operations.createIndex('accountScope', 'accountScope', { unique: false })
+      operations.createIndex('scopeSpace', ['accountScope', 'spaceId'], { unique: false })
+      operations.createIndex('createdAt', 'createdAt', { unique: false })
       database.createObjectStore('meta', { keyPath: 'key' })
       database.createObjectStore('cache', { keyPath: 'key' })
-      operations.put({ id: 'legacy-operation', kind: 'diary', createdAt: 1 })
+      database.createObjectStore('quarantine', { keyPath: 'id' })
+      operations.put({
+        id: 'scoped-operation',
+        accountScope: 'user:account-a',
+        spaceId: 'space-a',
+        kind: 'diary',
+        createdAt: 1
+      })
     }
     request.onsuccess = () => {
       request.result.close()

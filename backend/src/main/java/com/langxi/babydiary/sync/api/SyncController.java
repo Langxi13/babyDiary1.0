@@ -42,7 +42,7 @@ public class SyncController {
     }
 
     @PostMapping("/push")
-    public List<com.langxi.babydiary.sync.application.SyncOperationExecutor.Result> push(
+    public List<SyncService.PushResult> push(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @Valid @RequestBody PushRequest request,

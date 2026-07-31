@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MediaAccessPolicy {
+    private static final int ID_BATCH_SIZE = 500;
     private final MediaAccessRepository access;
 
     public MediaAccessPolicy(MediaAccessRepository access) {
@@ -51,12 +52,19 @@ public class MediaAccessPolicy {
 
     public Set<UUID> protectedAssets(UUID spaceId, List<UUID> assetIds) {
         if (assetIds == null || assetIds.isEmpty()) return Set.of();
-        return access
-                .protectedAssets(
-                        BinaryUuid.toBytes(spaceId),
-                        assetIds.stream().map(BinaryUuid::toBytes).toList())
-                .stream()
-                .map(BinaryUuid::fromBytes)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        List<UUID> distinct = assetIds.stream().distinct().toList();
+        java.util.HashSet<UUID> result = new java.util.HashSet<>();
+        for (int start = 0; start < distinct.size(); start += ID_BATCH_SIZE) {
+            List<UUID> batch =
+                    distinct.subList(start, Math.min(start + ID_BATCH_SIZE, distinct.size()));
+            access
+                    .protectedAssets(
+                            BinaryUuid.toBytes(spaceId),
+                            batch.stream().map(BinaryUuid::toBytes).toList())
+                    .stream()
+                    .map(BinaryUuid::fromBytes)
+                    .forEach(result::add);
+        }
+        return Set.copyOf(result);
     }
 }

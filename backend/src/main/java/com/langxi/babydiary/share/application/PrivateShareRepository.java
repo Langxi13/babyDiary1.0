@@ -3,6 +3,7 @@ package com.langxi.babydiary.share.application;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 public interface PrivateShareRepository {
     DiaryData findManageableDiary(
@@ -48,7 +49,8 @@ public interface PrivateShareRepository {
             LocalDateTime expiresAt,
             Integer maxViews,
             int viewCount,
-            long spaceId,
+            long spaceInternalId,
+            UUID spaceId,
             long diaryId,
             boolean locked,
             String title,

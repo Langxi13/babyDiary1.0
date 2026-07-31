@@ -28,6 +28,7 @@ public class MyBatisChangeRecorder implements ChangeRecorder {
             UUID aggregateId,
             String eventType,
             int revision,
+            Scope scope,
             Map<String, Object> payload) {
         try {
             LocalDateTime now = LocalDateTime.now(clock);
@@ -38,7 +39,16 @@ public class MyBatisChangeRecorder implements ChangeRecorder {
                                             || eventType.endsWith("_PURGED"))
                             ? "DELETE"
                             : "UPSERT";
-            mapper.insertSync(spaceId, aggregateType, binaryId, operation, revision, actorId, now);
+            mapper.insertSync(
+                    spaceId,
+                    aggregateType,
+                    binaryId,
+                    operation,
+                    revision,
+                    scope.visibility(),
+                    scope.ownerId(),
+                    actorId,
+                    now);
             mapper.insertOutbox(
                     spaceId,
                     actorId,

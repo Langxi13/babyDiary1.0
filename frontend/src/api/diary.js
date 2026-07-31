@@ -31,8 +31,13 @@ const rememberVersion = diary => {
   return diary
 }
 
-async function cursorForPage(spaceId, params, targetPage) {
-  const key = `${spaceId}:${filterKey(params)}`
+const normalizeComment = comment => comment ? {
+  ...comment,
+  avatarMedia: comment.avatarMedia ? normalizeMedia(comment.avatarMedia) : null
+} : comment
+
+async function cursorForPage(spaceId, params, targetPage, stepUpToken) {
+  const key = `${spaceId}:${filterKey(params)}:${accessMode(stepUpToken)}`
   let state = listCursors.get(key)
   if (!state) {
     state = { cursors: [null] }
@@ -41,7 +46,7 @@ async function cursorForPage(spaceId, params, targetPage) {
   for (let page = state.cursors.length - 1; page < targetPage; page += 1) {
     const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
       params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined },
-      headers: stepHeader(getStepUpToken())
+      headers: stepHeader(stepUpToken)
     })
     if (!result.nextCursor) break
     state.cursors[page + 1] = result.nextCursor
@@ -113,14 +118,15 @@ async function requiredVersion(spaceId, diaryId) {
 
 export const diaryApi = {
   getDiaryList(spaceId, params = {}, options = {}) {
+    const stepUpToken = getStepUpToken()
     return cachedRequest(
-      `spaces:${spaceId}:diaries:list:${stableStringify(params)}`,
+      `spaces:${spaceId}:diaries:list:${stableStringify(params)}:access:${accessMode(stepUpToken)}`,
       async () => {
         const page = Math.max(0, Number(params.page) || 0)
-        const cursor = await cursorForPage(spaceId, params, page)
+        const cursor = await cursorForPage(spaceId, params, page, stepUpToken)
         const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
           params: { ...normalizeListParams(params), cursor: cursor || undefined },
-          headers: stepHeader(getStepUpToken())
+          headers: stepHeader(stepUpToken)
         })
         const content = (result.items || []).map(item => rememberVersion(normalizeDiary(item)))
         const totalElements = Number(result.totalElements) || 0
@@ -134,18 +140,19 @@ export const diaryApi = {
           nextCursor: result.nextCursor
         }
       },
-      { ttl: options.ttl ?? 30000, force: options.force }
+      { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => !stepUpToken }
     )
   },
 
   getDiary(spaceId, id, options = {}) {
+    const stepUpToken = getStepUpToken()
     return cachedRequest(
-      `spaces:${spaceId}:diaries:detail:${id}`,
+      `spaces:${spaceId}:diaries:detail:${id}:access:${accessMode(stepUpToken)}`,
       async () => rememberVersion(normalizeDiary(await withStepUpRetry(token => request.get(
         `/api/v3/spaces/${spaceId}/diaries/${id}`,
-        { headers: stepHeader(token) }
+        { headers: stepHeader(token || stepUpToken) }
       )))),
-      { ttl: options.ttl ?? 30000, force: options.force }
+      { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => false }
     )
   },
 
@@ -226,24 +233,30 @@ export const diaryApi = {
     { headers: stepHeader(stepUpToken) }
   ),
 
-  restoreRevision: async (spaceId, id, revisionId, version, stepUpToken) => normalizeDiary(
-    await request.post(
+  async restoreRevision(spaceId, id, revisionId, version, stepUpToken) {
+    const diary = rememberVersion(normalizeDiary(await request.post(
       `/api/v3/spaces/${spaceId}/diaries/${id}/revisions/${revisionId}/restore`,
       null,
       { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }
-    )
-  ),
+    )))
+    invalidateDiaryReads(spaceId)
+    return diary
+  },
 
-  comments: (spaceId, id, stepUpToken) => request.get(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
-    { headers: stepHeader(stepUpToken) }
-  ),
+  async comments(spaceId, id, stepUpToken) {
+    return (await request.get(
+      `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+      { headers: stepHeader(stepUpToken) }
+    ) || []).map(normalizeComment)
+  },
 
-  addComment: (spaceId, id, content, stepUpToken) => request.post(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
-    { content },
-    { headers: stepHeader(stepUpToken) }
-  ),
+  async addComment(spaceId, id, content, stepUpToken) {
+    return normalizeComment(await request.post(
+      `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+      { content },
+      { headers: stepHeader(stepUpToken) }
+    ))
+  },
 
   updateComment: (spaceId, id, commentId, content, stepUpToken) => request.put(
     `/api/v3/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
@@ -267,17 +280,48 @@ export const diaryApi = {
     { headers: stepHeader(stepUpToken) }
   ),
 
-  exportImages() {
-    return Promise.reject(new Error('图片导出请从相册下载原图'))
+  exportImages(spaceId, startDate, endDate) {
+    return withStepUpRetry(token => request.get(
+      `/api/v3/spaces/${spaceId}/transfer/media`,
+      {
+        params: { startDate, endDate },
+        responseType: 'blob',
+        headers: stepHeader(token),
+        timeout: 5 * 60 * 1000
+      }
+    ))
   },
 
   getTimeline(spaceId, params = {}, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:diaries:timeline:${stableStringify(params)}`, async () => {
-      const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
-        params: { ...normalizeListParams(params), size: 50 },
-        headers: stepHeader(getStepUpToken())
-      })
-      const diaries = (result.items || []).map(item => rememberVersion(normalizeDiary(item)))
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:diaries:timeline:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, async () => {
+      const query = { ...normalizeListParams(params), size: 50, includeTotal: false }
+      if (Number.isInteger(params.year)) {
+        const month = Number.isInteger(params.month)
+          ? String(params.month).padStart(2, '0')
+          : null
+        query.startDate = month ? `${params.year}-${month}-01` : `${params.year}-01-01`
+        query.endDate = month
+          ? new Date(Date.UTC(params.year, params.month, 0)).toISOString().slice(0, 10)
+          : `${params.year}-12-31`
+      }
+
+      const diaries = []
+      const seenCursors = new Set()
+      let cursor
+      do {
+        const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+          params: { ...query, cursor },
+          headers: stepHeader(stepUpToken)
+        })
+        diaries.push(...(result.items || []).map(item => rememberVersion(normalizeDiary(item))))
+        cursor = result.nextCursor || undefined
+        if (cursor && seenCursors.has(cursor)) {
+          throw new Error('时间轴分页游标重复，无法继续加载')
+        }
+        if (cursor) seenCursors.add(cursor)
+      } while (cursor)
+
       const groups = new Map()
       for (const diary of diaries) {
         const month = diary.diaryDate?.slice(0, 7)
@@ -286,26 +330,31 @@ export const diaryApi = {
         groups.get(month).diaries.push(diary)
       }
       return [...groups.values()]
-    }, { ttl: options.ttl ?? 120000, force: options.force })
+    }, { ttl: options.ttl ?? 120000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   getCalendar(spaceId, params = {}, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:diaries:calendar:${stableStringify(params)}`, async () => {
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:diaries:calendar:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, async () => {
       const month = `${params.year}-${String(params.month).padStart(2, '0')}`
       const result = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, {
-        params: { month }, headers: stepHeader(getStepUpToken())
+        params: { month }, headers: stepHeader(stepUpToken)
       })
       return (result.days || []).map(day => ({
         ...day,
         firstTitle: day.entries?.[0]?.title || '',
         firstDiaryId: day.entries?.[0]?.diaryId || null
       }))
-    }, { ttl: options.ttl ?? 120000, force: options.force })
+    }, { ttl: options.ttl ?? 120000, force: options.force, cacheIf: () => !stepUpToken })
   }
 }
 
 function stepHeader(token) {
   return token ? { 'X-Step-Up-Token': token } : {}
+}
+
+function accessMode(token) {
+  return token ? 'elevated' : 'standard'
 }
 
 export function invalidateDiaryReads(spaceId) {

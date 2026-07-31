@@ -92,6 +92,7 @@ public class MyBatisDiaryRepository implements DiaryRepository {
                                         row.spaceId(),
                                         BinaryUuid.fromBytes(row.spacePublicId()),
                                         row.authorId(),
+                                        row.visibility(),
                                         row.version()))
                 .toList();
     }
@@ -145,13 +146,33 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     }
 
     @Override
-    public Optional<Revision> findRevision(long diaryId, long revisionId) {
-        return Optional.ofNullable(mapper.findRevision(diaryId, revisionId));
+    public Optional<Revision> findRevision(long diaryId, UUID revisionId) {
+        return Optional.ofNullable(mapper.findRevision(diaryId, BinaryUuid.toBytes(revisionId)))
+                .map(this::revision);
     }
 
     @Override
     public List<RevisionSummary> findRevisions(long diaryId) {
-        return mapper.findRevisions(diaryId);
+        return mapper.findRevisions(diaryId).stream()
+                .map(
+                        row ->
+                                new RevisionSummary(
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        row.version(),
+                                        BinaryUuid.fromBytes(row.editorPublicId()),
+                                        row.editorName(),
+                                        row.createdAt()))
+                .toList();
+    }
+
+    private Revision revision(DiaryMapper.RevisionRow row) {
+        return new Revision(
+                BinaryUuid.fromBytes(row.publicId()),
+                row.version(),
+                BinaryUuid.fromBytes(row.editorPublicId()),
+                row.editorName(),
+                row.snapshotJson(),
+                row.createdAt());
     }
 
     private List<DiaryEntry> hydrate(List<DiaryMapper.DiaryRow> rows) {

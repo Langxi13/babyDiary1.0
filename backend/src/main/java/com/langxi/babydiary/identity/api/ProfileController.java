@@ -1,11 +1,10 @@
 package com.langxi.babydiary.identity.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
-import com.langxi.babydiary.identity.application.ProfileRepository;
 import com.langxi.babydiary.identity.application.ProfileService;
-import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
-import com.langxi.babydiary.media.application.MediaUrlSigner;
+import com.langxi.babydiary.media.application.MediaLinkView;
+import com.langxi.babydiary.media.application.MediaRepresentationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,19 +25,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v3/account")
 public class ProfileController {
     private final ProfileService profiles;
-    private final MediaUrlSigner mediaUrls;
-    private final StepUpService stepUp;
+    private final MediaRepresentationService media;
 
-    public ProfileController(
-            ProfileService profiles, MediaUrlSigner mediaUrls, StepUpService stepUp) {
+    public ProfileController(ProfileService profiles, MediaRepresentationService media) {
         this.profiles = profiles;
-        this.mediaUrls = mediaUrls;
-        this.stepUp = stepUp;
+        this.media = media;
     }
 
     @GetMapping("/profile")
     public ProfileResponse profile(@AuthenticationPrincipal AccountPrincipal principal) {
-        return ProfileResponse.from(profiles.profile(principal.accountId()), mediaUrls);
+        return ProfileResponse.from(
+                profiles.profile(principal.accountId()), media, principal.accountId());
     }
 
     @PutMapping("/profile")
@@ -52,21 +48,18 @@ public class ProfileController {
                         request.username(),
                         request.email(),
                         request.timezone()),
-                mediaUrls);
+                media,
+                principal.accountId());
     }
 
     @PutMapping("/avatar")
     public ProfileResponse avatar(
             @AuthenticationPrincipal AccountPrincipal principal,
-            @Valid @RequestBody AvatarRequest request,
-            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+            @Valid @RequestBody AvatarRequest request) {
         return ProfileResponse.from(
-                profiles.setAvatar(
-                        principal.accountId(),
-                        request.spaceId(),
-                        request.assetId(),
-                        stepUp.valid(principal, token)),
-                mediaUrls);
+                profiles.setAvatar(principal.accountId(), request.spaceId(), request.assetId()),
+                media,
+                principal.accountId());
     }
 
     @DeleteMapping("/avatar")
@@ -102,10 +95,12 @@ public class ProfileController {
             boolean emailVerified,
             String role,
             String timezone,
-            UUID avatarAssetId,
-            UUID avatarSpaceId,
-            AvatarMedia avatarMedia) {
-        static ProfileResponse from(ProfileRepository.Profile profile, MediaUrlSigner mediaUrls) {
+            java.time.LocalDateTime createdAt,
+            MediaLinkView avatarMedia) {
+        static ProfileResponse from(
+                ProfileService.ProfileView profile,
+                MediaRepresentationService media,
+                long accountId) {
             return new ProfileResponse(
                     profile.id(),
                     profile.username(),
@@ -113,27 +108,17 @@ public class ProfileController {
                     profile.emailVerified(),
                     profile.role(),
                     profile.timezone(),
-                    profile.avatarAssetId(),
-                    profile.avatarSpaceId(),
+                    profile.createdAt(),
                     profile.avatarAssetId() == null
                                     || profile.avatarVariantType() == null
                                     || profile.avatarVariantProfile() == null
                             ? null
-                            : new AvatarMedia(
+                            : media.link(
+                                    profile.avatarSpaceId(),
                                     profile.avatarAssetId(),
-                                    mediaUrls
-                                            .url(
-                                                    profile.avatarSpaceId(),
-                                                    profile.avatarAssetId(),
-                                                    profile.avatarVariantType(),
-                                                    profile.avatarVariantProfile(),
-                                                    MediaAccessContext.avatar(
-                                                            profile.accountId(),
-                                                            profile.id(),
-                                                            false))
-                                            .url()));
+                                    profile.avatarVariantType(),
+                                    profile.avatarVariantProfile(),
+                                    MediaAccessContext.avatar(accountId, profile.id(), false)));
         }
     }
-
-    public record AvatarMedia(UUID assetId, String contentUrl) {}
 }

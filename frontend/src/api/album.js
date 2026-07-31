@@ -25,11 +25,11 @@ const pageResult = (content, page, size, total, nextCursor = null) => ({
   nextCursor
 })
 
-const albumDetailPage = async (path, params, favorite = false) => {
+const albumDetailPage = async (path, params, favorite = false, stepUpToken = '') => {
   const page = Math.max(0, Number(params.page) || 0)
   const size = Math.max(1, Math.min(60, Number(params.size) || 24))
   const result = await request.get(path, {
-    params: { page, size }, headers: stepHeader(getStepUpToken())
+    params: { page, size }, headers: stepHeader(stepUpToken)
   })
   const content = (result.media || []).map(item => photo(item, favorite))
   const total = Number(result.totalMedia ?? result.album?.mediaCount ?? content.length)
@@ -45,40 +45,41 @@ const normalizeProposal = proposal => proposal ? {
   ...proposal,
   albums: (proposal.albums || []).map(album => ({
     ...album,
-    photos: (album.photos || []).map(item => ({
-      ...item,
-      media: normalizeMedia(item.media)
-    }))
+    photos: (album.photos || []).map(normalizeMedia)
   }))
 } : proposal
 
 export const albumApi = {
   getGroups(spaceId, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:albums:groups`, async () => {
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:albums:groups:access:${accessMode(stepUpToken)}`, async () => {
       const result = await request.get(`/api/v3/spaces/${spaceId}/album-groups`, {
-        headers: stepHeader(getStepUpToken())
+        headers: stepHeader(stepUpToken)
       })
       return (result.groups || []).map(normalizeAlbumGroup)
-    }, { ttl: options.ttl ?? 30000, force: options.force })
+    }, { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   getSystemPhotoPage(spaceId, systemKey, params = {}, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:albums:system:${systemKey}:page:${stableStringify(params)}`, async () => {
-      if (!['all', 'favorites'].includes(systemKey)) {
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:albums:system:${systemKey}:page:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, async () => {
+      if (!['all', 'favorites'].includes(systemKey) && !/^year:[0-9]{4}$/.test(systemKey)) {
         return pageResult([], 0, Number(params.size) || 24, 0)
       }
       return albumDetailPage(
         `/api/v3/spaces/${spaceId}/albums/system/${systemKey}`,
         params,
-        systemKey === 'favorites'
+        systemKey === 'favorites',
+        stepUpToken
       )
-    }, { ttl: options.ttl ?? 30000, force: options.force })
+    }, { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   getAlbumPhotoPage(spaceId, albumId, params = {}, options = {}) {
-    return cachedRequest(`spaces:${spaceId}:albums:${albumId}:photos:page:${stableStringify(params)}`, () => (
-      albumDetailPage(`/api/v3/spaces/${spaceId}/albums/${albumId}`, params)
-    ), { ttl: options.ttl ?? 30000, force: options.force })
+    const stepUpToken = getStepUpToken()
+    return cachedRequest(`spaces:${spaceId}:albums:${albumId}:photos:page:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, () => (
+      albumDetailPage(`/api/v3/spaces/${spaceId}/albums/${albumId}`, params, false, stepUpToken)
+    ), { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   async createGroup(spaceId, payload) {
@@ -172,3 +173,5 @@ export const albumApi = {
     ), { ttl: options.ttl ?? 30000, force: options.force })
   }
 }
+
+const accessMode = token => token ? 'elevated' : 'standard'

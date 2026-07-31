@@ -16,22 +16,28 @@ import org.springframework.stereotype.Service;
 @Service
 public class StepUpService {
     private final ProfileRepository profiles;
+    private final CredentialRepository credentials;
     private final PasswordEncoder passwords;
     private final SecretKey key;
     private final Clock clock = Clock.systemUTC();
 
     public StepUpService(
             ProfileRepository profiles,
+            CredentialRepository credentials,
             PasswordEncoder passwords,
             @Value("${jwt.secret}") String secret) {
         this.profiles = profiles;
+        this.credentials = credentials;
         this.passwords = passwords;
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public Verified verifyPassword(AccountPrincipal principal, String password) {
         ProfileRepository.Profile profile = requireProfile(principal);
-        if (password == null || !passwords.matches(password, profile.passwordHash())) {
+        String passwordHash = credentials.findPasswordHash(profile.accountId()).orElse(null);
+        if (password == null
+                || passwordHash == null
+                || !passwords.matches(password, passwordHash)) {
             throw new ApiException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED, "STEP_UP_INVALID", "二次验证失败");
         }

@@ -4,13 +4,14 @@ import { readFileSync } from 'node:fs'
 
 const detail = readFileSync(new URL('./SpaceDiaryDetail.vue', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../api/workspace.js', import.meta.url), 'utf8')
+const diaryApi = readFileSync(new URL('../../api/diary.js', import.meta.url), 'utf8')
 
 test('workspace comments expose edit and delete controls for their author', () => {
   assert.match(detail, /isOwnComment\(comment\)/)
   assert.match(detail, /beginCommentEdit\(comment\)/)
   assert.match(detail, /removeComment\(comment\)/)
-  assert.match(api, /updateComment:/)
-  assert.match(api, /removeComment:/)
+  assert.match(diaryApi, /updateComment:/)
+  assert.match(diaryApi, /removeComment:/)
 })
 
 test('private shares can be listed and revoked after creation', () => {

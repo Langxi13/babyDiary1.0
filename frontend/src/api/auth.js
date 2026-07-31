@@ -1,14 +1,11 @@
 import request from '@/utils/request'
 import { nativeAuthResultRequest } from '@/platform/nativeAuth'
-import { isNativeApp, resolveServerUrl } from '@/platform/runtimeConfig'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import { normalizeMedia } from '@/api/v3Adapters'
 
 const normalizeUser = user => user ? {
   ...user,
-  avatarMedia: user.avatarMedia ? {
-    ...user.avatarMedia,
-    contentUrl: resolveServerUrl(user.avatarMedia.contentUrl)
-  } : null
+  avatarMedia: user.avatarMedia ? normalizeMedia(user.avatarMedia) : null
 } : user
 
 const normalizeSession = session => ({
@@ -60,7 +57,7 @@ export const authApi = {
 
   changePassword(data) {
     return request.post('/api/v3/account/password', {
-      currentPassword: data.currentPassword || data.oldPassword,
+      currentPassword: data.currentPassword,
       newPassword: data.newPassword
     })
   },

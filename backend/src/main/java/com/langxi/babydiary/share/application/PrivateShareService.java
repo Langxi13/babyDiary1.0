@@ -3,6 +3,7 @@ package com.langxi.babydiary.share.application;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
+import com.langxi.babydiary.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaView;
@@ -31,6 +32,7 @@ public class PrivateShareService {
     private final PasswordEncoder passwords;
     private final MediaRepository media;
     private final MediaRepresentationService representations;
+    private final MediaAccessPolicy mediaAccess;
     private final SecureRandom random = new SecureRandom();
 
     public PrivateShareService(
@@ -39,13 +41,15 @@ public class PrivateShareService {
             StepUpService stepUp,
             PasswordEncoder passwords,
             MediaRepository media,
-            MediaRepresentationService representations) {
+            MediaRepresentationService representations,
+            MediaAccessPolicy mediaAccess) {
         this.spaces = spaces;
         this.mapper = mapper;
         this.stepUp = stepUp;
         this.passwords = passwords;
         this.media = media;
         this.representations = representations;
+        this.mediaAccess = mediaAccess;
     }
 
     @Transactional
@@ -59,7 +63,7 @@ public class PrivateShareService {
             Integer maxViews) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, principal.accountId());
         PrivateShareRepository.DiaryData diary = manageable(space, diaryId, principal.accountId());
-        if (diary.locked())
+        if (diary.locked() || hasProtectedMedia(spaceId, diary.diaryId()))
             throw ApiException.conflict("LOCKED_CONTENT_NOT_SHAREABLE", "锁定日记不能创建公开分享");
         if (hours < 1 || hours > 720)
             throw ApiException.badRequest("SHARE_EXPIRY_INVALID", "分享有效期应为1小时到30天");
@@ -116,16 +120,19 @@ public class PrivateShareService {
         if (row.passwordHash() != null
                 && (password == null || !passwords.matches(password, row.passwordHash())))
             throw new ApiException(HttpStatus.UNAUTHORIZED, "SHARE_PASSWORD_INVALID", "分享密码不正确");
+        List<PrivateShareRepository.MediaLink> links = mapper.findMedia(row.diaryId());
+        if (hasProtectedMedia(row.spaceId(), links)) {
+            throw ApiException.notFound("SHARE_NOT_FOUND", "分享不存在或已过期");
+        }
         if (mapper.incrementView(row.shareId(), now) != 1)
             throw ApiException.notFound("SHARE_NOT_FOUND", "分享不存在或已过期");
         MediaAccessContext mediaContext =
                 MediaAccessContext.share(BinaryUuid.fromBytes(row.publicId()));
-        List<PrivateShareRepository.MediaLink> links = mapper.findMedia(row.diaryId());
         java.util.Map<UUID, MediaView> views =
                 representations
                         .views(
                                 media.findByPublicIdsInSpace(
-                                        row.spaceId(),
+                                        row.spaceInternalId(),
                                         links.stream()
                                                 .map(item -> BinaryUuid.fromBytes(item.publicId()))
                                                 .toList()),
@@ -142,14 +149,11 @@ public class PrivateShareService {
                                             view == null ? null : view.representations();
                                     return new SharedMedia(
                                             id,
-                                            item.mediaType(),
-                                            item.caption(),
-                                            item.takenAt(),
+                                            view == null ? item.mediaType() : view.mediaType(),
+                                            view == null ? null : view.caption(),
+                                            view == null ? null : view.takenAt(),
                                             item.position(),
-                                            url(reps == null ? null : reps.original()),
-                                            url(reps == null ? null : reps.thumbnail()),
-                                            url(reps == null ? null : reps.poster()),
-                                            url(reps == null ? null : reps.transcoded()));
+                                            reps);
                                 })
                         .toList();
         return new SharedDiary(
@@ -168,6 +172,21 @@ public class PrivateShareService {
         return row;
     }
 
+    private boolean hasProtectedMedia(UUID spaceId, long diaryId) {
+        return hasProtectedMedia(spaceId, mapper.findMedia(diaryId));
+    }
+
+    private boolean hasProtectedMedia(UUID spaceId, List<PrivateShareRepository.MediaLink> links) {
+        return !mediaAccess
+                .protectedAssets(
+                        spaceId,
+                        links.stream()
+                                .map(item -> BinaryUuid.fromBytes(item.publicId()))
+                                .distinct()
+                                .toList())
+                .isEmpty();
+    }
+
     private Summary summary(PrivateShareRepository.ShareData row) {
         return new Summary(
                 BinaryUuid.fromBytes(row.publicId()),
@@ -176,10 +195,6 @@ public class PrivateShareService {
                 row.viewCount(),
                 row.passwordHash() != null,
                 row.createdAt());
-    }
-
-    private String url(MediaView.Representation representation) {
-        return representation == null ? null : representation.url();
     }
 
     private byte[] sha256(String value) {
@@ -214,8 +229,5 @@ public class PrivateShareService {
             String caption,
             LocalDateTime takenAt,
             int position,
-            String contentUrl,
-            String thumbnailUrl,
-            String posterUrl,
-            String transcodedUrl) {}
+            MediaView.Representations representations) {}
 }

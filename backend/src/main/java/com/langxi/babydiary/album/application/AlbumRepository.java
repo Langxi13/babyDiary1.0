@@ -7,18 +7,18 @@ import java.util.UUID;
 public interface AlbumRepository {
     List<GroupRow> findGroups(long spaceId);
 
-    List<AlbumRow> findAlbums(long spaceId);
+    List<AlbumRow> findAlbums(long spaceId, boolean includeProtected);
 
-    Optional<AlbumRow> findAlbum(long spaceId, UUID albumId);
+    Optional<AlbumRow> findAlbum(long spaceId, UUID albumId, boolean includeProtected);
 
     List<UUID> findMediaPublicIds(
-            long spaceId, UUID albumId, long accountId, int offset, int limit);
+            long spaceId, UUID albumId, boolean includeProtected, int offset, int limit);
 
-    default List<UUID> findMediaPublicIds(long spaceId, UUID albumId, long accountId) {
-        return findMediaPublicIds(spaceId, albumId, accountId, 0, Integer.MAX_VALUE);
+    default List<UUID> findMediaPublicIds(long spaceId, UUID albumId) {
+        return findMediaPublicIds(spaceId, albumId, true, 0, Integer.MAX_VALUE);
     }
 
-    long countMedia(long spaceId, UUID albumId, long accountId);
+    long countMedia(long spaceId, UUID albumId, boolean includeProtected);
 
     long insertGroup(NewGroup group);
 
@@ -44,13 +44,27 @@ public interface AlbumRepository {
 
     void removeFavorite(long spaceId, long accountId, long assetId);
 
-    List<UUID> findFavoritePublicIds(long spaceId, long accountId, int offset, int limit);
+    List<UUID> findFavoritePublicIds(
+            long spaceId, long accountId, boolean includeProtected, int offset, int limit);
 
-    long countFavoriteMedia(long spaceId, long accountId);
+    long countFavoriteMedia(long spaceId, long accountId, boolean includeProtected);
 
-    List<UUID> findLibraryPublicIds(long spaceId, long accountId, int offset, int limit);
+    List<UUID> findLibraryPublicIds(
+            long spaceId, long accountId, boolean includeProtected, int offset, int limit);
 
-    long countLibraryImages(long spaceId, long accountId);
+    long countLibraryImages(long spaceId, long accountId, boolean includeProtected);
+
+    List<YearBucket> findLibraryYears(long spaceId, long accountId, boolean includeProtected);
+
+    List<UUID> findLibraryPublicIdsByYear(
+            long spaceId,
+            long accountId,
+            int year,
+            boolean includeProtected,
+            int offset,
+            int limit);
+
+    long countLibraryImagesByYear(long spaceId, long accountId, int year, boolean includeProtected);
 
     record NewGroup(UUID publicId, long spaceId, String name, int sortOrder, long createdBy) {}
 
@@ -66,6 +80,8 @@ public interface AlbumRepository {
             int sortOrder) {}
 
     record GroupRow(long internalId, UUID id, String name, int sortOrder) {}
+
+    record YearBucket(int year, long mediaCount, UUID coverAssetId) {}
 
     record AlbumRow(
             long internalId,

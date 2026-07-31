@@ -77,7 +77,7 @@ public interface DiaryMapper {
 
     @Select(
             """
-            SELECT d.diary_id,d.public_id,d.space_id,s.public_id AS space_public_id,d.author_id,d.version
+            SELECT d.diary_id,d.public_id,d.space_id,s.public_id AS space_public_id,d.author_id,d.visibility,d.version
             FROM diary d JOIN diary_space s ON s.space_id=d.space_id
             WHERE d.deleted_at IS NOT NULL AND d.deleted_at<#{deletedBefore}
             ORDER BY d.deleted_at,d.diary_id LIMIT #{limit}
@@ -123,8 +123,8 @@ public interface DiaryMapper {
 
     @Insert(
             """
-            INSERT INTO diary_revision(diary_id,version,editor_id,snapshot,created_at)
-            VALUES(#{diaryId},#{version},#{editorId},#{snapshotJson},#{createdAt})
+            INSERT INTO diary_revision(public_id,diary_id,version,editor_id,snapshot,created_at)
+            VALUES(UUID_TO_BIN(UUID()),#{diaryId},#{version},#{editorId},#{snapshotJson},#{createdAt})
             """)
     void insertRevision(
             @Param("diaryId") long diaryId,
@@ -135,18 +135,81 @@ public interface DiaryMapper {
 
     @Select(
             """
-            SELECT revision_id AS id,version,editor_id,snapshot AS snapshot_json,created_at
-            FROM diary_revision WHERE diary_id=#{diaryId} AND revision_id=#{revisionId}
+            SELECT r.public_id,r.version,a.public_id AS editor_public_id,a.username AS editor_name,
+                   r.snapshot AS snapshot_json,r.created_at
+            FROM diary_revision r JOIN account a ON a.account_id=r.editor_id
+            WHERE r.diary_id=#{diaryId} AND r.public_id=#{revisionPublicId}
             """)
-    DiaryRepository.Revision findRevision(
-            @Param("diaryId") long diaryId, @Param("revisionId") long revisionId);
+    RevisionRow findRevision(
+            @Param("diaryId") long diaryId, @Param("revisionPublicId") byte[] revisionPublicId);
 
     @Select(
             """
-            SELECT revision_id AS id,version,editor_id,created_at
-            FROM diary_revision WHERE diary_id=#{diaryId} ORDER BY version DESC,revision_id DESC
+            SELECT r.public_id,r.version,a.public_id AS editor_public_id,a.username AS editor_name,
+                   r.created_at
+            FROM diary_revision r JOIN account a ON a.account_id=r.editor_id
+            WHERE r.diary_id=#{diaryId} ORDER BY r.version DESC,r.revision_id DESC
             """)
-    List<DiaryRepository.RevisionSummary> findRevisions(long diaryId);
+    List<RevisionRow> findRevisions(long diaryId);
+
+    final class RevisionRow {
+        private byte[] publicId;
+        private int version;
+        private byte[] editorPublicId;
+        private String editorName;
+        private String snapshotJson;
+        private LocalDateTime createdAt;
+
+        public RevisionRow() {}
+
+        public byte[] publicId() {
+            return publicId;
+        }
+
+        public int version() {
+            return version;
+        }
+
+        public byte[] editorPublicId() {
+            return editorPublicId;
+        }
+
+        public String editorName() {
+            return editorName;
+        }
+
+        public String snapshotJson() {
+            return snapshotJson;
+        }
+
+        public LocalDateTime createdAt() {
+            return createdAt;
+        }
+
+        public void setPublicId(byte[] publicId) {
+            this.publicId = publicId;
+        }
+
+        public void setVersion(int version) {
+            this.version = version;
+        }
+
+        public void setEditorPublicId(byte[] editorPublicId) {
+            this.editorPublicId = editorPublicId;
+        }
+
+        public void setEditorName(String editorName) {
+            this.editorName = editorName;
+        }
+
+        public void setSnapshotJson(String snapshotJson) {
+            this.snapshotJson = snapshotJson;
+        }
+
+        public void setCreatedAt(LocalDateTime createdAt) {
+            this.createdAt = createdAt;
+        }
+    }
 
     record PurgeRow(
             long diaryId,
@@ -154,6 +217,7 @@ public interface DiaryMapper {
             long spaceId,
             byte[] spacePublicId,
             long authorId,
+            String visibility,
             int version) {}
 
     final class DiaryRow {

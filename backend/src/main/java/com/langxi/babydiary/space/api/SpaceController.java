@@ -2,7 +2,6 @@ package com.langxi.babydiary.space.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.space.application.SpaceService;
-import com.langxi.babydiary.space.domain.SpaceSummary;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -30,20 +29,20 @@ public class SpaceController {
     }
 
     @GetMapping
-    public List<SpaceSummary> list(@AuthenticationPrincipal AccountPrincipal principal) {
+    public List<SpaceService.SpaceView> list(@AuthenticationPrincipal AccountPrincipal principal) {
         return spaces.list(principal.accountId());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public SpaceSummary create(
+    public SpaceService.SpaceView create(
             @AuthenticationPrincipal AccountPrincipal principal,
             @Valid @RequestBody CreateSpaceRequest request) {
         return spaces.create(principal.accountId(), request.name(), request.defaultVisibility());
     }
 
     @PutMapping("/{spaceId}")
-    public SpaceSummary update(
+    public SpaceService.SpaceView update(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @Valid @RequestBody UpdateSpaceRequest request) {

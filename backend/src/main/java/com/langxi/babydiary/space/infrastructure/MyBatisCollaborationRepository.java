@@ -24,10 +24,17 @@ public class MyBatisCollaborationRepository implements CollaborationRepository {
                                 new Member(
                                         BinaryUuid.fromBytes(row.publicId()),
                                         row.username(),
-                                        row.email(),
                                         row.role(),
                                         row.status(),
-                                        row.joinedAt()))
+                                        row.joinedAt(),
+                                        row.avatarPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.avatarPublicId()),
+                                        row.avatarSpacePublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.avatarSpacePublicId()),
+                                        row.avatarVariantType(),
+                                        row.avatarVariantProfile()))
                 .toList();
     }
 

@@ -1,5 +1,6 @@
 package com.langxi.babydiary.album.infrastructure;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -19,28 +20,58 @@ public interface AlbumMapper {
             """
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
                    ca.public_id AS cover_public_id,NULL AS cover_variant_type,
-                   NULL AS cover_variant_profile,COUNT(am.asset_id) AS media_count
+                   NULL AS cover_variant_profile,COUNT(ma.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
+            LEFT JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
+              AND ma.deleted_at IS NULL AND ma.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              ))
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
+              AND ca.deleted_at IS NULL AND ca.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ca.space_id AND lock_dm.asset_id=ca.asset_id AND lock_d.locked=1
+              ))
             WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
             GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
             ORDER BY a.sort_order,a.album_id
             """)
-    List<AlbumRow> findAlbums(long spaceId);
+    List<AlbumRow> findAlbums(
+            @Param("spaceId") long spaceId, @Param("includeProtected") boolean includeProtected);
 
     @Select(
             """
             SELECT a.album_id,a.public_id,a.group_id,g.public_id AS group_public_id,a.type,a.name,a.description,
                    ca.public_id AS cover_public_id,NULL AS cover_variant_type,
-                   NULL AS cover_variant_profile,COUNT(am.asset_id) AS media_count
+                   NULL AS cover_variant_profile,COUNT(ma.asset_id) AS media_count
             FROM album a LEFT JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
+            LEFT JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
+              AND ma.deleted_at IS NULL AND ma.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              ))
             LEFT JOIN album_group g ON g.space_id=a.space_id AND g.group_id=a.group_id
             LEFT JOIN media_asset ca ON ca.space_id=a.space_id AND ca.asset_id=a.cover_asset_id
+              AND ca.deleted_at IS NULL AND ca.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ca.space_id AND lock_dm.asset_id=ca.asset_id AND lock_d.locked=1
+              ))
             WHERE a.space_id=#{spaceId} AND a.public_id=#{publicId} AND a.deleted_at IS NULL
             GROUP BY a.album_id,a.public_id,a.group_id,g.public_id,a.type,a.name,a.description,ca.public_id
             """)
-    AlbumRow findAlbum(@Param("spaceId") long spaceId, @Param("publicId") byte[] publicId);
+    AlbumRow findAlbum(
+            @Param("spaceId") long spaceId,
+            @Param("publicId") byte[] publicId,
+            @Param("includeProtected") boolean includeProtected);
 
     @Select(
             """
@@ -49,25 +80,38 @@ public interface AlbumMapper {
             JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
             WHERE a.space_id=#{spaceId} AND a.public_id=#{albumId} AND a.deleted_at IS NULL
               AND ma.deleted_at IS NULL AND ma.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              ))
             ORDER BY am.position,am.asset_id
             LIMIT #{limit} OFFSET #{offset}
             """)
     List<byte[]> findMediaPublicIds(
             @Param("spaceId") long spaceId,
             @Param("albumId") byte[] albumId,
-            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected,
             @Param("offset") int offset,
             @Param("limit") int limit);
 
     @Select(
-            "SELECT COUNT(*) FROM album a JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id "
-                    + "JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id "
-                    + "WHERE a.space_id=#{spaceId} AND a.public_id=#{albumId} AND a.deleted_at IS NULL "
-                    + "AND ma.deleted_at IS NULL AND ma.status='READY'")
+            """
+            SELECT COUNT(*) FROM album a
+            JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
+            JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
+            WHERE a.space_id=#{spaceId} AND a.public_id=#{albumId} AND a.deleted_at IS NULL
+              AND ma.deleted_at IS NULL AND ma.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              ))
+            """)
     long countMedia(
             @Param("spaceId") long spaceId,
             @Param("albumId") byte[] albumId,
-            @Param("accountId") long accountId);
+            @Param("includeProtected") boolean includeProtected);
 
     @Insert(
             """
@@ -158,20 +202,37 @@ public interface AlbumMapper {
             SELECT a.public_id FROM favorite_media f JOIN media_asset a ON a.space_id=f.space_id AND a.asset_id=f.asset_id
             WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE'
               AND a.deleted_at IS NULL AND a.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
             ORDER BY f.created_at DESC,f.asset_id DESC
             LIMIT #{limit} OFFSET #{offset}
             """)
     List<byte[]> findFavoritePublicIds(
             @Param("spaceId") long spaceId,
             @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected,
             @Param("offset") int offset,
             @Param("limit") int limit);
 
     @Select(
-            "SELECT COUNT(*) FROM favorite_media f JOIN media_asset a ON a.space_id=f.space_id AND a.asset_id=f.asset_id "
-                    + "WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE' "
-                    + "AND a.deleted_at IS NULL AND a.status='READY'")
-    long countFavoriteMedia(@Param("spaceId") long spaceId, @Param("accountId") long accountId);
+            """
+            SELECT COUNT(*) FROM favorite_media f
+            JOIN media_asset a ON a.space_id=f.space_id AND a.asset_id=f.asset_id
+            WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE'
+              AND a.deleted_at IS NULL AND a.status='READY'
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
+            """)
+    long countFavoriteMedia(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected);
 
     @Select(
             """
@@ -179,20 +240,143 @@ public interface AlbumMapper {
             WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
               AND a.deleted_at IS NULL AND a.status='READY'
               AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
             ORDER BY a.created_at DESC,a.asset_id DESC
             LIMIT #{limit} OFFSET #{offset}
             """)
     List<byte[]> findLibraryPublicIds(
             @Param("spaceId") long spaceId,
             @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected,
             @Param("offset") int offset,
             @Param("limit") int limit);
 
     @Select(
-            "SELECT COUNT(*) FROM media_asset a WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' "
-                    + "AND a.library_visible=true AND a.deleted_at IS NULL AND a.status='READY' "
-                    + "AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')")
-    long countLibraryImages(@Param("spaceId") long spaceId, @Param("accountId") long accountId);
+            """
+            SELECT COUNT(*) FROM media_asset a
+            WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
+              AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
+            """)
+    long countLibraryImages(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected);
+
+    @Select(
+            """
+            WITH ranked AS (
+              SELECT YEAR(COALESCE(a.taken_at,a.created_at)) AS media_year,
+                     a.public_id,
+                     COUNT(*) OVER (PARTITION BY YEAR(COALESCE(a.taken_at,a.created_at))) AS media_count,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY YEAR(COALESCE(a.taken_at,a.created_at))
+                       ORDER BY COALESCE(a.taken_at,a.created_at) DESC,a.asset_id DESC
+                     ) AS media_rank
+              FROM media_asset a
+              WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
+                AND a.deleted_at IS NULL AND a.status='READY'
+                AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+                AND (#{includeProtected}=true OR NOT EXISTS (
+                  SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                    ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                  WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+                ))
+            )
+            SELECT media_year,media_count,public_id AS cover_public_id
+            FROM ranked WHERE media_rank=1 ORDER BY media_year DESC
+            """)
+    List<YearRow> findLibraryYears(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected);
+
+    @Select(
+            """
+            SELECT a.public_id FROM media_asset a
+            WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
+              AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
+              AND ((a.taken_at>=#{start} AND a.taken_at<#{end})
+                OR (a.taken_at IS NULL AND a.created_at>=#{start} AND a.created_at<#{end}))
+            ORDER BY COALESCE(a.taken_at,a.created_at) DESC,a.asset_id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            """)
+    List<byte[]> findLibraryPublicIdsByRange(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    @Select(
+            """
+            SELECT COUNT(*) FROM media_asset a
+            WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
+              AND a.deleted_at IS NULL AND a.status='READY'
+              AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+              AND (#{includeProtected}=true OR NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+              ))
+              AND ((a.taken_at>=#{start} AND a.taken_at<#{end})
+                OR (a.taken_at IS NULL AND a.created_at>=#{start} AND a.created_at<#{end}))
+            """)
+    long countLibraryImagesByRange(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    final class YearRow {
+        private int mediaYear;
+        private long mediaCount;
+        private byte[] coverPublicId;
+
+        public YearRow() {}
+
+        public int mediaYear() {
+            return mediaYear;
+        }
+
+        public long mediaCount() {
+            return mediaCount;
+        }
+
+        public byte[] coverPublicId() {
+            return coverPublicId;
+        }
+
+        public void setMediaYear(int mediaYear) {
+            this.mediaYear = mediaYear;
+        }
+
+        public void setMediaCount(long mediaCount) {
+            this.mediaCount = mediaCount;
+        }
+
+        public void setCoverPublicId(byte[] coverPublicId) {
+            this.coverPublicId = coverPublicId;
+        }
+    }
 
     final class GroupInsert {
         private Long groupId;

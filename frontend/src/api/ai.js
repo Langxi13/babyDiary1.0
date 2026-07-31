@@ -31,18 +31,8 @@ export const aiApi = {
     })
   },
 
-  async listReports(spaceId, params = {}) {
-    const reports = await request.get(`/api/v3/spaces/${spaceId}/ai-reports`) || []
-    const filtered = reports.filter(report => !params.type || report.periodType === params.type)
-    const pageNumber = Math.max(0, Number(params.page) || 0)
-    const pageSize = Math.max(1, Number(params.size) || 10)
-    return {
-      content: filtered.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize),
-      pageNumber,
-      pageSize,
-      totalElements: filtered.length,
-      totalPages: Math.ceil(filtered.length / pageSize)
-    }
+  listReports(spaceId, params = {}) {
+    return request.get(`/api/v3/spaces/${spaceId}/ai-reports`, { params })
   },
 
   getReport(spaceId, reportId) {

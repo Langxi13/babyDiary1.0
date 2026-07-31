@@ -1,7 +1,21 @@
 # Changelog
 
+## 2026-07-31
+
+- Closed cross-relation protected-media leaks: shares, portable archives, media ZIP exports, album catalogs, avatars, comments and AI album proposals now re-evaluate whether an asset is referenced by any locked diary before every sensitive read or state transition.
+- Made diary revision restore validate both the current diary and target snapshot lock state, and made saved AI album proposals discard diaries or media that later became locked, private, deleted or inaccessible.
+- Prevented elevated diary, album, anniversary and media responses from entering browser or Redis caches; locked diary records persisted for offline reading are reduced to metadata-only placeholders.
+- Bounded large UUID lookups to 500 items per SQL batch, preserved caller order, and capped portable exports at 9,999 media entries plus the manifest.
+- Removed API dependencies on repository projection types, split album reads from writes and portable archive format/export/import responsibilities, and eliminated redundant read-after-write list scans.
+- Standardized malformed request handling with RFC 9457 responses for missing multipart fields, unsupported methods/media types, unacceptable response types, upload limits and uncaught unique-key races instead of accidental 500 responses.
+- Added MySQL 8.4 V3-to-V4 migration coverage and verified V4 against an isolated copy of the current production V3 data without changing row counts.
+
 ## 2026-07-30
 
+- Added Flyway V4 UUID diary revisions, private sync visibility projections, AI report history indexes and creator-scoped server pagination while preserving existing V3 data.
+- Unified embedded media responses across diaries, shares, avatars, members, comments and AI album proposals; removed active frontend aliases for retired media fields and unsupported IndexedDB v1 data.
+- Restored generated year albums with existing-photo covers and bounded details, added diary image ZIP export, completed timeline cursor traversal and removed repeated total-count queries.
+- Split profile credentials from public projections, archive import/export/format responsibilities and album query/write services; added API governance, migration, privacy and offline-media regressions.
 - Added account/space-scoped Redis read caching for tags, diary aggregates and sanitized album metadata, with post-commit version invalidation, database fallback, a short circuit breaker and deferred invalidation replay.
 - Added bounded Outbox delivery, idempotent shared-diary notifications, optional VAPID Web Push, timezone-aware writing reminders, scheduled weekly/monthly/annual AI reports and catch-up for missed period boundaries.
 - Added Flyway V3 retention infrastructure, 30-day diary trash purging, explicit permanent deletion, 90-day sync baselines/reset responses, expired operational-data cleanup and media ownership transfer between active space members.

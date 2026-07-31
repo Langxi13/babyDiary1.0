@@ -26,7 +26,7 @@ public interface SyncRepository {
             UUID entityId,
             String operation,
             int revision,
-            long actorId,
+            UUID actorId,
             LocalDateTime createdAt) {}
 
     record OperationResult(String resultCode, String entityType, UUID entityId) {}

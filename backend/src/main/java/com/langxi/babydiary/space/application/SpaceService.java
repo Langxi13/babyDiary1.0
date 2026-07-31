@@ -16,12 +16,12 @@ public class SpaceService implements SpaceAccess {
         this.spaces = spaces;
     }
 
-    public List<SpaceSummary> list(long accountId) {
-        return spaces.findForAccount(accountId);
+    public List<SpaceView> list(long accountId) {
+        return spaces.findForAccount(accountId).stream().map(this::toView).toList();
     }
 
     @Transactional
-    public SpaceSummary create(long accountId, String name, String defaultVisibility) {
+    public SpaceView create(long accountId, String name, String defaultVisibility) {
         String normalizedName = name == null ? "" : name.trim();
         if (normalizedName.isBlank())
             throw ApiException.badRequest("SPACE_NAME_REQUIRED", "空间名称不能为空");
@@ -31,13 +31,12 @@ public class SpaceService implements SpaceAccess {
                 spaces.insert(publicId, normalizedName, accountId, visibility, DEFAULT_QUOTA);
         spaces.insertOwner(spaceId, accountId);
         spaces.insertStorageUsage(spaceId);
-        return new SpaceSummary(
+        return new SpaceView(
                 publicId, normalizedName, "SHARED", "OWNER", visibility, DEFAULT_QUOTA, 0);
     }
 
     @Transactional
-    public SpaceSummary update(
-            UUID spaceId, long accountId, String name, String defaultVisibility) {
+    public SpaceView update(UUID spaceId, long accountId, String name, String defaultVisibility) {
         SpaceContext context = requireMember(spaceId, accountId);
         if (!("OWNER".equals(context.role()) || "ADMIN".equals(context.role()))) {
             throw ApiException.forbidden("SPACE_MANAGE_FORBIDDEN", "只有空间管理员可以修改空间设置");
@@ -49,7 +48,7 @@ public class SpaceService implements SpaceAccess {
         if (!spaces.update(context.internalId(), normalizedName, visibility)) {
             throw ApiException.notFound("SPACE_NOT_FOUND", "空间不存在或无权访问");
         }
-        return new SpaceSummary(
+        return new SpaceView(
                 spaceId,
                 normalizedName,
                 context.type(),
@@ -73,4 +72,24 @@ public class SpaceService implements SpaceAccess {
         }
         return context;
     }
+
+    private SpaceView toView(SpaceSummary space) {
+        return new SpaceView(
+                space.id(),
+                space.name(),
+                space.type(),
+                space.role(),
+                space.defaultVisibility(),
+                space.storageQuotaBytes(),
+                space.storageUsedBytes());
+    }
+
+    public record SpaceView(
+            UUID id,
+            String name,
+            String type,
+            String role,
+            String defaultVisibility,
+            long storageQuotaBytes,
+            long storageUsedBytes) {}
 }

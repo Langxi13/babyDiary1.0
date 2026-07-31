@@ -96,7 +96,7 @@ export const useDiaryStore = defineStore('diary', () => {
   }
 
   async function exportImages(startDate, endDate) {
-    return diaryApi.exportImages(startDate, endDate)
+    return diaryApi.exportImages(await requireSpaceId(), startDate, endDate)
   }
 
   async function fetchTimeline(params = {}) {

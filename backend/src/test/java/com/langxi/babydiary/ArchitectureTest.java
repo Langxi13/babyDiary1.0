@@ -23,6 +23,15 @@ class ArchitectureTest {
                     .resideInAPackage("..infrastructure..");
 
     @ArchTest
+    static final ArchRule API_MUST_NOT_DEPEND_ON_REPOSITORIES =
+            noClasses()
+                    .that()
+                    .resideInAPackage("..api..")
+                    .should()
+                    .dependOnClassesThat()
+                    .haveNameMatching(".*Repository(\\$.*)?");
+
+    @ArchTest
     static final ArchRule APPLICATION_MUST_NOT_DEPEND_ON_INFRASTRUCTURE =
             noClasses()
                     .that()

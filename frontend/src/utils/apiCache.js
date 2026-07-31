@@ -46,7 +46,8 @@ export function cachedRequest(key, loader, options = {}) {
   const request = Promise.resolve()
     .then(loader)
     .then(value => {
-      if (requestGlobalGeneration === globalGeneration && requestGeneration === (generationStore.get(requestKey) || 0)) {
+      const cacheable = options.cacheIf ? options.cacheIf(value) : true
+      if (cacheable && requestGlobalGeneration === globalGeneration && requestGeneration === (generationStore.get(requestKey) || 0)) {
         cacheStore.set(requestKey, {
           value,
           expiresAt: Date.now() + ttl

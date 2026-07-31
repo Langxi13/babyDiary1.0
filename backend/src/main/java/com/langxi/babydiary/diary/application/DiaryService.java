@@ -91,21 +91,23 @@ public class DiaryService {
                         cursor == null ? null : cursor.id(),
                         size + 1);
         List<DiaryEntry> rows = new ArrayList<>(diaries.findPage(repositoryQuery));
-        long totalElements =
-                diaries.count(
-                        new DiaryRepository.Query(
-                                repositoryQuery.spaceId(),
-                                repositoryQuery.accountId(),
-                                repositoryQuery.startDate(),
-                                repositoryQuery.endDate(),
-                                repositoryQuery.keyword(),
-                                repositoryQuery.mood(),
-                                repositoryQuery.tagId(),
-                                repositoryQuery.trash(),
-                                repositoryQuery.elevated(),
-                                null,
-                                null,
-                                1));
+        Long totalElements =
+                query.includeTotal()
+                        ? diaries.count(
+                                new DiaryRepository.Query(
+                                        repositoryQuery.spaceId(),
+                                        repositoryQuery.accountId(),
+                                        repositoryQuery.startDate(),
+                                        repositoryQuery.endDate(),
+                                        repositoryQuery.keyword(),
+                                        repositoryQuery.mood(),
+                                        repositoryQuery.tagId(),
+                                        repositoryQuery.trash(),
+                                        repositoryQuery.elevated(),
+                                        null,
+                                        null,
+                                        1))
+                        : null;
         String nextCursor = null;
         if (rows.size() > size) {
             rows.remove(rows.size() - 1);
@@ -167,6 +169,7 @@ public class DiaryService {
                 publicId,
                 "DIARY_CREATED",
                 created.version(),
+                ChangeRecorder.Scope.diary(created.visibility(), created.authorId()),
                 Map.of("visibility", created.visibility()));
         cacheInvalidator.diary(spaceId);
         return created;
@@ -214,6 +217,7 @@ public class DiaryService {
                 diaryId,
                 "DIARY_UPDATED",
                 result.version(),
+                ChangeRecorder.Scope.diary(result.visibility(), result.authorId()),
                 Map.of("visibility", result.visibility()));
         cacheInvalidator.diary(spaceId);
         return result;
@@ -235,6 +239,7 @@ public class DiaryService {
                 diaryId,
                 "DIARY_DELETED",
                 expectedVersion + 1,
+                ChangeRecorder.Scope.diary(current.visibility(), current.authorId()),
                 Map.of("visibility", current.visibility()));
         cacheInvalidator.diary(spaceId);
     }
@@ -257,6 +262,7 @@ public class DiaryService {
                 diaryId,
                 "DIARY_RESTORED",
                 result.version(),
+                ChangeRecorder.Scope.diary(result.visibility(), result.authorId()),
                 Map.of("visibility", result.visibility()));
         cacheInvalidator.diary(spaceId);
         return result;
@@ -282,23 +288,33 @@ public class DiaryService {
                 diaryId,
                 "DIARY_PURGED",
                 expectedVersion + 1,
+                ChangeRecorder.Scope.diary(current.visibility(), current.authorId()),
                 Map.of("visibility", current.visibility()));
         cacheInvalidator.diary(spaceId);
     }
 
-    public List<DiaryRepository.RevisionSummary> revisions(
+    public List<RevisionView> revisions(
             UUID spaceId, UUID diaryId, long accountId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         DiaryEntry diary = requireDiary(space.internalId(), diaryId, accountId, true);
         requireProtection(diary, elevated);
-        return diaries.findRevisions(diary.internalId());
+        return diaries.findRevisions(diary.internalId()).stream()
+                .map(
+                        revision ->
+                                new RevisionView(
+                                        revision.id(),
+                                        revision.version(),
+                                        revision.editorId(),
+                                        revision.editorName(),
+                                        revision.createdAt()))
+                .toList();
     }
 
     @Transactional
     public DiaryEntry restoreRevision(
             UUID spaceId,
             UUID diaryId,
-            long revisionId,
+            UUID revisionId,
             long accountId,
             int expectedVersion,
             boolean elevated) {
@@ -310,6 +326,10 @@ public class DiaryService {
                         .orElseThrow(() -> ApiException.notFound("REVISION_NOT_FOUND", "历史版本不存在"));
         try {
             JsonNode snapshot = json.readTree(revision.snapshotJson());
+            boolean snapshotLocked = snapshot.path("locked").asBoolean(false);
+            if (snapshotLocked && !elevated) {
+                throw new ApiException(HttpStatus.LOCKED, "STEP_UP_REQUIRED", "请先完成二次验证");
+            }
             Command command =
                     new Command(
                             null,
@@ -318,7 +338,7 @@ public class DiaryService {
                             snapshot.path("contentHtml").asText(),
                             textOrNull(snapshot, "mood"),
                             snapshot.path("visibility").asText("PRIVATE"),
-                            snapshot.path("locked").asBoolean(false),
+                            snapshotLocked,
                             uuids(snapshot.path("tagIds")),
                             uuids(snapshot.path("mediaIds")));
             return update(spaceId, diaryId, accountId, expectedVersion, command, elevated);
@@ -504,7 +524,11 @@ public class DiaryService {
             UUID tagId,
             boolean trash,
             String cursor,
-            int size) {}
+            int size,
+            boolean includeTotal) {}
+
+    public record RevisionView(
+            UUID id, int version, UUID editorId, String editorName, LocalDateTime createdAt) {}
 
     private record Validated(
             String title,

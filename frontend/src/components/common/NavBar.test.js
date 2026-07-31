@@ -47,6 +47,7 @@ test('profile entries use direct router links instead of dropdown command naviga
 })
 
 test('navbar avatar uses the signed media asset url', () => {
-  assert.match(source, /const avatarUrl = computed\(\(\) => authStore\.userInfo\?\.avatarMedia\?\.contentUrl \|\| ''\)/)
+  assert.match(source, /const avatarUrl = computed\(\(\) => mediaThumbnailUrl\(authStore\.userInfo\?\.avatarMedia\)\)/)
+  assert.match(source, /import\s*\{\s*mediaThumbnailUrl\s*\}/)
   assert.doesNotMatch(source, /avatarPath|\/images\//)
 })

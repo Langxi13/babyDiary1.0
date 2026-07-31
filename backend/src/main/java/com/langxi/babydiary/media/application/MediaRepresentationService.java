@@ -1,6 +1,7 @@
 package com.langxi.babydiary.media.application;
 
 import com.langxi.babydiary.media.domain.MediaAsset;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -31,9 +32,9 @@ public class MediaRepresentationService {
                 asset.id(),
                 asset.spaceId(),
                 asset.mediaType(),
-                asset.originalFilename(),
-                asset.caption(),
-                asset.takenAt(),
+                reveal ? asset.originalFilename() : null,
+                reveal ? asset.caption() : null,
+                reveal ? asset.takenAt() : null,
                 asset.accessScope(),
                 asset.libraryVisible(),
                 asset.status(),
@@ -54,12 +55,75 @@ public class MediaRepresentationService {
     public List<MediaView> views(
             List<MediaAsset> assets, Function<MediaAsset, MediaAccessContext> contexts) {
         if (assets == null || assets.isEmpty()) return List.of();
-        Set<UUID> protectedIds =
-                access.protectedAssets(
-                        assets.get(0).spaceId(), assets.stream().map(MediaAsset::id).toList());
+        Set<UUID> protectedIds = new HashSet<>();
+        assets.stream()
+                .collect(java.util.stream.Collectors.groupingBy(MediaAsset::spaceId))
+                .forEach(
+                        (spaceId, spaceAssets) ->
+                                protectedIds.addAll(
+                                        access.protectedAssets(
+                                                spaceId,
+                                                spaceAssets.stream()
+                                                        .map(MediaAsset::id)
+                                                        .toList())));
         return assets.stream()
                 .map(asset -> view(asset, contexts.apply(asset), protectedIds.contains(asset.id())))
                 .toList();
+    }
+
+    public MediaLinkView link(
+            UUID spaceId,
+            UUID assetId,
+            String variantType,
+            String profile,
+            MediaAccessContext context) {
+        MediaView.Representation value =
+                link(spaceId, assetId, variantType, profile, context, true);
+        return new MediaLinkView(
+                assetId,
+                new MediaView.Representations(
+                        "ORIGINAL".equals(variantType) ? value : null,
+                        "THUMBNAIL".equals(variantType) ? value : null,
+                        "POSTER".equals(variantType) ? value : null,
+                        "WAVEFORM".equals(variantType) ? value : null,
+                        "TRANSCODED".equals(variantType) ? value : null));
+    }
+
+    public MediaView.Representations links(
+            UUID spaceId,
+            UUID assetId,
+            String originalProfile,
+            String thumbnailProfile,
+            MediaAccessContext context,
+            boolean reveal) {
+        return new MediaView.Representations(
+                link(spaceId, assetId, "ORIGINAL", originalProfile, context, reveal),
+                link(spaceId, assetId, "THUMBNAIL", thumbnailProfile, context, reveal),
+                null,
+                null,
+                null);
+    }
+
+    private MediaView.Representation link(
+            UUID spaceId,
+            UUID assetId,
+            String variantType,
+            String profile,
+            MediaAccessContext context,
+            boolean reveal) {
+        if (profile == null) return null;
+        MediaUrlSigner.SignedUrl signed =
+                reveal ? urls.url(spaceId, assetId, variantType, profile, context) : null;
+        return new MediaView.Representation(
+                variantType,
+                profile,
+                signed == null ? null : signed.url(),
+                signed == null ? null : signed.expiresAt(),
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private MediaView.Representation representation(
@@ -76,10 +140,10 @@ public class MediaRepresentationService {
                 value.profile(),
                 signed == null ? null : signed.url(),
                 signed == null ? null : signed.expiresAt(),
-                value.contentType(),
-                value.sizeBytes(),
-                value.width(),
-                value.height(),
-                value.durationMillis());
+                reveal ? value.contentType() : null,
+                reveal ? value.sizeBytes() : null,
+                reveal ? value.width() : null,
+                reveal ? value.height() : null,
+                reveal ? value.durationMillis() : null);
     }
 }

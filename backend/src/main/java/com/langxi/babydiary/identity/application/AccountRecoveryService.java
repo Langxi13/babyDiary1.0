@@ -21,18 +21,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountRecoveryService {
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private final AccountRecoveryRepository mapper;
-    private final ProfileRepository profiles;
+    private final ProfileService profiles;
+    private final CredentialRepository credentials;
     private final PasswordEncoder passwords;
     private final AccountMailService mail;
     private final SecureRandom random = new SecureRandom();
 
     public AccountRecoveryService(
             AccountRecoveryRepository mapper,
-            ProfileRepository profiles,
+            ProfileService profiles,
+            CredentialRepository credentials,
             PasswordEncoder passwords,
             AccountMailService mail) {
         this.mapper = mapper;
         this.profiles = profiles;
+        this.credentials = credentials;
         this.passwords = passwords;
         this.mail = mail;
     }
@@ -51,7 +54,7 @@ public class AccountRecoveryService {
         String token = token();
         mapper.insertToken(accountId, "EMAIL_VERIFY", hash(token), now().plusHours(24));
         mail.verification(value, token);
-        return new EmailUpdate(profiles.find(accountId).orElseThrow(), mail.enabled());
+        return new EmailUpdate(profiles.profile(accountId), mail.enabled());
     }
 
     @Transactional
@@ -85,10 +88,11 @@ public class AccountRecoveryService {
 
     @Transactional
     public List<String> recoveryCodes(long accountId, String password) {
-        ProfileRepository.Profile profile =
-                profiles.find(accountId)
+        String passwordHash =
+                credentials
+                        .findPasswordHash(accountId)
                         .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
-        if (!passwords.matches(password, profile.passwordHash())) {
+        if (!passwords.matches(password, passwordHash)) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "PASSWORD_INVALID", "当前密码错误");
         }
         List<String> values = new ArrayList<>();
@@ -178,5 +182,5 @@ public class AccountRecoveryService {
         return new ApiException(HttpStatus.UNAUTHORIZED, "RECOVERY_TOKEN_INVALID", "验证链接无效或已过期");
     }
 
-    public record EmailUpdate(ProfileRepository.Profile profile, boolean mailSent) {}
+    public record EmailUpdate(ProfileService.ProfileView profile, boolean mailSent) {}
 }

@@ -2,7 +2,6 @@ package com.langxi.babydiary.identity.infrastructure;
 
 import com.langxi.babydiary.identity.application.ProfileRepository;
 import com.langxi.babydiary.platform.application.BinaryUuid;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
@@ -23,11 +22,11 @@ public class MyBatisProfileRepository implements ProfileRepository {
                                         row.accountId(),
                                         BinaryUuid.fromBytes(row.publicId()),
                                         row.username(),
-                                        row.passwordHash(),
                                         row.email(),
                                         row.emailVerified(),
                                         row.systemRole(),
                                         row.timezone(),
+                                        row.createdAt(),
                                         row.avatarPublicId() == null
                                                 ? null
                                                 : BinaryUuid.fromBytes(row.avatarPublicId()),
@@ -51,11 +50,5 @@ public class MyBatisProfileRepository implements ProfileRepository {
     @Override
     public void clearAvatar(long accountId) {
         mapper.clearAvatar(accountId);
-    }
-
-    @Override
-    public void changePassword(long accountId, String passwordHash, LocalDateTime now) {
-        mapper.updatePassword(accountId, passwordHash, now);
-        mapper.revokeSessions(accountId, now);
     }
 }

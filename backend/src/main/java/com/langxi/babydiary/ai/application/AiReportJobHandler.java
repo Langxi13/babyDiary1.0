@@ -33,7 +33,7 @@ public class AiReportJobHandler implements BackgroundJobHandler {
             throw new IllegalArgumentException("AI report job payload is invalid");
         }
         try {
-            AiReportRepository.Report report =
+            AiReportService.ReportView report =
                     reports.findExisting(spaceId, accountId, type, period)
                             .orElseGet(() -> reports.generate(spaceId, accountId, type, period));
             return json.valueToTree(Map.of("reportId", report.id().toString()));

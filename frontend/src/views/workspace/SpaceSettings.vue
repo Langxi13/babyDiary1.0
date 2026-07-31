@@ -16,7 +16,7 @@
         <header><div><h2>成员</h2><p>共同空间的访问成员</p></div><el-button v-if="isOwner && !isPersonal" type="primary" @click="inviteOpen = true"><el-icon><Plus /></el-icon>邀请</el-button></header>
         <div class="member-list">
           <article v-for="member in members" :key="member.id">
-            <el-avatar :size="42" :src="member.avatarMedia?.contentUrl">{{ member.username?.slice(0, 1) }}</el-avatar>
+            <el-avatar :size="42" :src="mediaThumbnailUrl(member.avatarMedia)">{{ member.username?.slice(0, 1) }}</el-avatar>
             <div><strong>{{ member.username }}</strong><span>{{ member.role === 'OWNER' ? '所有者' : '成员' }}</span></div>
             <el-dropdown v-if="isOwner && !isPersonal && member.id !== authStore.userInfo?.id" @command="command => memberCommand(command, member)">
               <el-button :icon="MoreFilled" circle text aria-label="成员操作" />
@@ -79,7 +79,7 @@
         <div class="data-actions">
           <article><el-icon><Download /></el-icon><div><strong>完整归档</strong><span>Baby Diary ZIP</span></div><el-button :loading="exporting" @click="exportArchive">导出</el-button></article>
           <article><el-icon><Document /></el-icon><div><strong>日记书</strong><span>PDF 或 EPUB</span></div><el-dropdown @command="exportBook"><el-button>导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="pdf">PDF</el-dropdown-item><el-dropdown-item command="epub">EPUB</el-dropdown-item></el-dropdown-menu></template></el-dropdown></article>
-          <article><el-icon><Upload /></el-icon><div><strong>导入归档</strong><span>兼容 Baby Diary ZIP</span></div><label class="file-button"><span>{{ importing ? '导入中' : '选择文件' }}</span><input type="file" accept=".zip,application/zip" :disabled="importing" @change="importArchive" /></label></article>
+          <article><el-icon><Upload /></el-icon><div><strong>导入归档</strong><span>Baby Diary 便携 ZIP</span></div><label class="file-button"><span>{{ importing ? '导入中' : '选择文件' }}</span><input type="file" accept=".zip,application/zip" :disabled="importing" @change="importArchive" /></label></article>
         </div>
       </section>
     </main>
@@ -122,6 +122,7 @@ import { ElSwitch } from 'element-plus/es/components/switch/index.mjs'
 import { ArrowDown, Connection, CopyDocument, Document, Download, Edit, MagicStick, MoreFilled, Notebook, Plus, PriceTag, Upload } from '@element-plus/icons-vue'
 import SpaceSwitcher from '@/components/common/SpaceSwitcher.vue'
 import { workspaceApi } from '@/api/workspace'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 import { tagApi } from '@/api/experience'
 import { aiApi } from '@/api/ai'
 import { useAuthStore } from '@/stores/auth'

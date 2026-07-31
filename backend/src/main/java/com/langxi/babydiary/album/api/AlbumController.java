@@ -1,5 +1,6 @@
 package com.langxi.babydiary.album.api;
 
+import com.langxi.babydiary.album.application.AlbumQueryService;
 import com.langxi.babydiary.album.application.AlbumService;
 import com.langxi.babydiary.album.domain.AlbumCatalog;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
@@ -29,12 +30,17 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v3/spaces/{spaceId}")
 public class AlbumController {
+    private final AlbumQueryService queries;
     private final AlbumService albums;
     private final MediaRepresentationService media;
     private final StepUpService stepUp;
 
     public AlbumController(
-            AlbumService albums, MediaRepresentationService media, StepUpService stepUp) {
+            AlbumQueryService queries,
+            AlbumService albums,
+            MediaRepresentationService media,
+            StepUpService stepUp) {
+        this.queries = queries;
         this.albums = albums;
         this.media = media;
         this.stepUp = stepUp;
@@ -47,7 +53,7 @@ public class AlbumController {
             @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
         boolean elevated = stepUp.valid(principal, token);
         return AlbumCatalogResponse.from(
-                albums.catalog(spaceId, principal.accountId()),
+                queries.catalog(spaceId, principal.accountId(), elevated),
                 media,
                 principal.accountId(),
                 elevated);
@@ -63,7 +69,7 @@ public class AlbumController {
             @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
         boolean elevated = stepUp.valid(principal, token);
         return AlbumDetailResponse.from(
-                albums.systemDetail(spaceId, key, principal.accountId(), page, size),
+                queries.systemDetail(spaceId, key, principal.accountId(), page, size, elevated),
                 media,
                 MediaAccessContext.direct(principal.accountId(), elevated),
                 page,
@@ -80,7 +86,7 @@ public class AlbumController {
             @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
         boolean elevated = stepUp.valid(principal, token);
         return AlbumDetailResponse.from(
-                albums.detail(spaceId, albumId, principal.accountId(), page, size),
+                queries.detail(spaceId, albumId, principal.accountId(), page, size, elevated),
                 media,
                 MediaAccessContext.album(principal.accountId(), albumId, elevated),
                 page,
@@ -150,17 +156,20 @@ public class AlbumController {
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable UUID albumId,
-            @Valid @RequestBody AlbumRequest request) {
+            @Valid @RequestBody AlbumRequest request,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+        boolean elevated = stepUp.valid(principal, token);
+        albums.updateAlbum(
+                spaceId,
+                albumId,
+                principal.accountId(),
+                request.groupId(),
+                request.name(),
+                request.description());
         return AlbumResponse.from(
-                albums.updateAlbum(
-                        spaceId,
-                        albumId,
-                        principal.accountId(),
-                        request.groupId(),
-                        request.name(),
-                        request.description()),
+                queries.detail(spaceId, albumId, principal.accountId(), 0, 1, elevated).album(),
                 media,
-                MediaAccessContext.album(principal.accountId(), albumId, false));
+                MediaAccessContext.album(principal.accountId(), albumId, elevated));
     }
 
     @DeleteMapping("/albums/{albumId}")

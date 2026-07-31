@@ -26,28 +26,29 @@ public class ProfileService {
     private final MediaRepository media;
     private final PasswordEncoder passwords;
     private final MediaAccessPolicy mediaAccess;
+    private final CredentialRepository credentials;
 
     public ProfileService(
             ProfileRepository profiles,
             SpaceAccess spaces,
             MediaRepository media,
             PasswordEncoder passwords,
-            MediaAccessPolicy mediaAccess) {
+            MediaAccessPolicy mediaAccess,
+            CredentialRepository credentials) {
         this.profiles = profiles;
         this.spaces = spaces;
         this.media = media;
         this.passwords = passwords;
         this.mediaAccess = mediaAccess;
+        this.credentials = credentials;
     }
 
-    public ProfileRepository.Profile profile(long accountId) {
-        return profiles.find(accountId)
-                .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
+    public ProfileView profile(long accountId) {
+        return toView(requireProfile(accountId));
     }
 
     @Transactional
-    public ProfileRepository.Profile update(
-            long accountId, String username, String email, String timezone) {
+    public ProfileView update(long accountId, String username, String email, String timezone) {
         String normalizedUsername = username == null ? "" : username.trim();
         if (!USERNAME.matcher(normalizedUsername).matches()) {
             throw ApiException.badRequest("USERNAME_INVALID", "用户名仅支持字母、数字、点、下划线和短横线，长度为2至100个字符");
@@ -76,10 +77,12 @@ public class ProfileService {
     }
 
     @Transactional
-    public ProfileRepository.Profile setAvatar(
-            long accountId, UUID spaceId, UUID assetId, boolean elevated) {
+    public ProfileView setAvatar(long accountId, UUID spaceId, UUID assetId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        mediaAccess.require(spaceId, assetId, MediaAccessContext.direct(accountId, elevated));
+        if (mediaAccess.isProtected(spaceId, assetId)) {
+            throw ApiException.badRequest("AVATAR_MEDIA_PROTECTED", "锁定日记中的图片不能设为头像");
+        }
+        mediaAccess.require(spaceId, assetId, MediaAccessContext.direct(accountId, false));
         MediaAsset asset =
                 media.findByPublicIds(space.internalId(), List.of(assetId), accountId).stream()
                         .findFirst()
@@ -102,15 +105,51 @@ public class ProfileService {
 
     @Transactional
     public void changePassword(long accountId, String currentPassword, String nextPassword) {
-        ProfileRepository.Profile profile = profile(accountId);
-        if (!passwords.matches(currentPassword, profile.passwordHash())) {
+        String passwordHash =
+                credentials
+                        .findPasswordHash(accountId)
+                        .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
+        if (!passwords.matches(currentPassword, passwordHash)) {
             throw new ApiException(
                     org.springframework.http.HttpStatus.UNAUTHORIZED, "PASSWORD_INVALID", "当前密码错误");
         }
         if (nextPassword == null || nextPassword.length() < 8 || nextPassword.length() > 200) {
             throw ApiException.badRequest("PASSWORD_WEAK", "新密码长度需为8至200个字符");
         }
-        profiles.changePassword(
+        credentials.changePassword(
                 accountId, passwords.encode(nextPassword), LocalDateTime.now(ZoneOffset.UTC));
     }
+
+    private ProfileRepository.Profile requireProfile(long accountId) {
+        return profiles.find(accountId)
+                .orElseThrow(() -> ApiException.notFound("ACCOUNT_NOT_FOUND", "账户不存在"));
+    }
+
+    private ProfileView toView(ProfileRepository.Profile profile) {
+        return new ProfileView(
+                profile.id(),
+                profile.username(),
+                profile.email(),
+                profile.emailVerified(),
+                profile.role(),
+                profile.timezone(),
+                profile.createdAt(),
+                profile.avatarAssetId(),
+                profile.avatarSpaceId(),
+                profile.avatarVariantType(),
+                profile.avatarVariantProfile());
+    }
+
+    public record ProfileView(
+            UUID id,
+            String username,
+            String email,
+            boolean emailVerified,
+            String role,
+            String timezone,
+            LocalDateTime createdAt,
+            UUID avatarAssetId,
+            UUID avatarSpaceId,
+            String avatarVariantType,
+            String avatarVariantProfile) {}
 }

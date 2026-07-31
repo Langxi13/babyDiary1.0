@@ -37,13 +37,15 @@ public class ReminderService {
         this.scheduleCalculator = scheduleCalculator;
     }
 
-    public List<ReminderRepository.Row> list(UUID spaceId, long accountId) {
+    public List<ReminderView> list(UUID spaceId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        return reminders.findForAccount(space.internalId(), accountId);
+        return reminders.findForAccount(space.internalId(), accountId).stream()
+                .map(this::toView)
+                .toList();
     }
 
     @Transactional
-    public ReminderRepository.Row save(
+    public ReminderView save(
             UUID spaceId,
             long accountId,
             String type,
@@ -93,6 +95,25 @@ public class ReminderService {
         return reminders.findForAccount(space.internalId(), accountId).stream()
                 .filter(row -> normalized.equals(row.type()))
                 .findFirst()
+                .map(this::toView)
                 .orElseThrow(() -> new IllegalStateException("Reminder was not saved"));
     }
+
+    private ReminderView toView(ReminderRepository.Row row) {
+        return new ReminderView(
+                row.id(),
+                row.type(),
+                row.enabled(),
+                row.schedule() == null ? null : row.schedule().deepCopy(),
+                row.nextRunAt(),
+                row.lastRunAt());
+    }
+
+    public record ReminderView(
+            UUID id,
+            String type,
+            boolean enabled,
+            com.fasterxml.jackson.databind.JsonNode schedule,
+            LocalDateTime nextRunAt,
+            LocalDateTime lastRunAt) {}
 }

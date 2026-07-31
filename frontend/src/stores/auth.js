@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 
 const persistedUserInfo = user => user ? {
   ...user,
-  avatarMedia: user.avatarMedia ? { ...user.avatarMedia, contentUrl: undefined } : null
+  avatarMedia: user.avatarMedia ? { id: user.avatarMedia.id } : null
 } : null
 
 const persistUserInfo = user => localStorage.setItem('userInfo', JSON.stringify(persistedUserInfo(user)))

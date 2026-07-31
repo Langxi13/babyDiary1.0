@@ -47,14 +47,14 @@ test('mobile pagination uses compact layout and stays inside the viewport', () =
 
 test('diary list displays dates with Chinese formatting helpers', () => {
   assert.match(source, /import\s*\{\s*formatChineseDate,\s*formatChineseDateTime\s*\}/)
-  assert.match(source, /formatChineseDate\(diary\.date\)/)
+  assert.match(source, /formatChineseDate\(diary\.diaryDate\)/)
   assert.match(source, /formatChineseDateTime\(diary\.createdAt\)/)
   assert.match(source, /format="YYYY年MM月DD日"/)
 })
 
 test('web diary cards expose detail navigation while preserving card click entry', () => {
-  assert.match(source, /class="diary-card"\s+@click="openDiary\(diary\.diaryId\)"/)
-  assert.match(source, /<el-button\s+class="view-action"\s+type="primary"\s+size="small"\s+text\s+@click\.stop="openDiary\(diary\.diaryId\)"[\s\S]*?查看详情[\s\S]*?<\/el-button>/)
+  assert.match(source, /class="diary-card"\s+@click="openDiary\(diary\.id\)"/)
+  assert.match(source, /<el-button\s+class="view-action"\s+type="primary"\s+size="small"\s+text\s+@click\.stop="openDiary\(diary\.id\)"[\s\S]*?查看详情[\s\S]*?<\/el-button>/)
   assert.match(source, /\.diary-actions\s*\{[\s\S]*?display:\s*flex;/)
   assert.match(source, /\.diary-actions\s*\{[\s\S]*?flex-wrap:\s*nowrap;/)
 })
@@ -74,5 +74,5 @@ test('keyword filtering is debounced and stale list responses cannot overwrite c
   assert.match(source, /window\.clearTimeout\(keywordDebounceTimer\)/)
   assert.match(storeSource, /let diaryListRequestId = 0/)
   assert.match(storeSource, /const requestId = \+\+diaryListRequestId/)
-  assert.match(storeSource, /response\.code === 200 && requestId === diaryListRequestId/)
+  assert.match(storeSource, /if \(requestId === diaryListRequestId\)/)
 })

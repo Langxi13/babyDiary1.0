@@ -1,12 +1,12 @@
 package com.langxi.babydiary.diary.api;
 
-import com.langxi.babydiary.diary.application.DiaryRepository;
 import com.langxi.babydiary.diary.application.DiaryService;
 import com.langxi.babydiary.diary.domain.DiaryEntry;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
-import com.langxi.babydiary.media.application.MediaUrlSigner;
+import com.langxi.babydiary.media.application.MediaRepresentationService;
+import com.langxi.babydiary.media.application.MediaView;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.domain.CursorPage;
 import jakarta.validation.Valid;
@@ -37,12 +37,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v3/spaces/{spaceId}/diaries")
 public class DiaryController {
     private final DiaryService diaries;
-    private final MediaUrlSigner urls;
+    private final MediaRepresentationService media;
     private final StepUpService stepUp;
 
-    public DiaryController(DiaryService diaries, MediaUrlSigner urls, StepUpService stepUp) {
+    public DiaryController(
+            DiaryService diaries, MediaRepresentationService media, StepUpService stepUp) {
         this.diaries = diaries;
-        this.urls = urls;
+        this.media = media;
         this.stepUp = stepUp;
     }
 
@@ -57,6 +58,7 @@ public class DiaryController {
             @RequestParam(required = false) UUID tagId,
             @RequestParam(defaultValue = "false") boolean trash,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "true") boolean includeTotal,
             @RequestParam(required = false) String cursor,
             @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
         boolean elevated = stepUp.valid(principal, stepToken);
@@ -65,14 +67,22 @@ public class DiaryController {
                         spaceId,
                         principal.accountId(),
                         new DiaryService.ListQuery(
-                                startDate, endDate, keyword, mood, tagId, trash, cursor, size),
+                                startDate,
+                                endDate,
+                                keyword,
+                                mood,
+                                tagId,
+                                trash,
+                                cursor,
+                                size,
+                                includeTotal),
                         elevated);
         return new CursorResponse<>(
                 page.items().stream()
                         .map(
                                 diary ->
                                         DiaryResponse.from(
-                                                diary, urls, principal.accountId(), elevated))
+                                                diary, media, principal.accountId(), elevated))
                         .toList(),
                 page.nextCursor(),
                 page.totalElements());
@@ -89,7 +99,7 @@ public class DiaryController {
         DiaryEntry diary = diaries.detail(spaceId, diaryId, principal.accountId(), trash, elevated);
         return ResponseEntity.ok()
                 .eTag(etag(diary.version()))
-                .body(DiaryResponse.from(diary, urls, principal.accountId(), elevated));
+                .body(DiaryResponse.from(diary, media, principal.accountId(), elevated));
     }
 
     @PostMapping
@@ -103,7 +113,7 @@ public class DiaryController {
                 .header(
                         HttpHeaders.LOCATION,
                         "/api/v3/spaces/" + spaceId + "/diaries/" + diary.id())
-                .body(DiaryResponse.from(diary, urls, principal.accountId(), false));
+                .body(DiaryResponse.from(diary, media, principal.accountId(), false));
     }
 
     @PutMapping("/{diaryId}")
@@ -126,7 +136,7 @@ public class DiaryController {
                         elevated);
         return ResponseEntity.ok()
                 .eTag(etag(diary.version()))
-                .body(DiaryResponse.from(diary, urls, principal.accountId(), elevated));
+                .body(DiaryResponse.from(diary, media, principal.accountId(), elevated));
     }
 
     @DeleteMapping("/{diaryId}")
@@ -162,7 +172,7 @@ public class DiaryController {
                         elevated);
         return ResponseEntity.ok()
                 .eTag(etag(diary.version()))
-                .body(DiaryResponse.from(diary, urls, principal.accountId(), elevated));
+                .body(DiaryResponse.from(diary, media, principal.accountId(), elevated));
     }
 
     @DeleteMapping("/{diaryId}/permanent")
@@ -182,7 +192,7 @@ public class DiaryController {
     }
 
     @GetMapping("/{diaryId}/revisions")
-    public List<DiaryRepository.RevisionSummary> revisions(
+    public List<DiaryService.RevisionView> revisions(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable UUID diaryId,
@@ -196,7 +206,7 @@ public class DiaryController {
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable UUID diaryId,
-            @PathVariable long revisionId,
+            @PathVariable UUID revisionId,
             @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
         boolean elevated = stepUp.valid(principal, stepToken);
@@ -210,7 +220,7 @@ public class DiaryController {
                         elevated);
         return ResponseEntity.ok()
                 .eTag(etag(diary.version()))
-                .body(DiaryResponse.from(diary, urls, principal.accountId(), elevated));
+                .body(DiaryResponse.from(diary, media, principal.accountId(), elevated));
     }
 
     private int requiredVersion(String ifMatch) {
@@ -253,7 +263,7 @@ public class DiaryController {
         }
     }
 
-    public record CursorResponse<T>(List<T> items, String nextCursor, long totalElements) {}
+    public record CursorResponse<T>(List<T> items, String nextCursor, Long totalElements) {}
 
     public record DiaryResponse(
             UUID id,
@@ -269,10 +279,13 @@ public class DiaryController {
             String createdAt,
             String updatedAt,
             String deletedAt,
-            List<DiaryEntry.TagRef> tags,
+            List<DiaryTagResponse> tags,
             List<DiaryMediaResponse> media) {
         static DiaryResponse from(
-                DiaryEntry diary, MediaUrlSigner urls, long accountId, boolean elevated) {
+                DiaryEntry diary,
+                MediaRepresentationService media,
+                long accountId,
+                boolean elevated) {
             return new DiaryResponse(
                     diary.id(),
                     diary.spaceId(),
@@ -287,7 +300,7 @@ public class DiaryController {
                     diary.createdAt() == null ? null : diary.createdAt().toString(),
                     diary.updatedAt() == null ? null : diary.updatedAt().toString(),
                     diary.deletedAt() == null ? null : diary.deletedAt().toString(),
-                    diary.tags(),
+                    diary.tags().stream().map(DiaryTagResponse::from).toList(),
                     diary.media().stream()
                             .map(
                                     value ->
@@ -295,10 +308,16 @@ public class DiaryController {
                                                     diary.spaceId(),
                                                     diary.id(),
                                                     value,
-                                                    urls,
+                                                    media,
                                                     accountId,
                                                     elevated))
                             .toList());
+        }
+    }
+
+    public record DiaryTagResponse(UUID id, String name, String color) {
+        static DiaryTagResponse from(DiaryEntry.TagRef tag) {
+            return new DiaryTagResponse(tag.id(), tag.name(), tag.color());
         }
     }
 
@@ -310,49 +329,31 @@ public class DiaryController {
             int position,
             String status,
             boolean protectedContent,
-            String contentUrl,
-            String thumbnailUrl) {
+            MediaView.Representations representations) {
         static DiaryMediaResponse from(
                 UUID spaceId,
                 UUID diaryId,
-                DiaryEntry.MediaRef media,
-                MediaUrlSigner urls,
+                DiaryEntry.MediaRef value,
+                MediaRepresentationService media,
                 long accountId,
                 boolean elevated) {
             MediaAccessContext context = MediaAccessContext.diary(accountId, diaryId, elevated);
-            boolean reveal = !media.protectedContent() || elevated;
-            String original =
-                    !reveal || media.originalProfile() == null
-                            ? null
-                            : urls.url(
-                                            spaceId,
-                                            media.id(),
-                                            "ORIGINAL",
-                                            media.originalProfile(),
-                                            context)
-                                    .url();
-            String thumbnail =
-                    !reveal
-                            ? null
-                            : media.thumbnailProfile() == null
-                                    ? original
-                                    : urls.url(
-                                                    spaceId,
-                                                    media.id(),
-                                                    "THUMBNAIL",
-                                                    media.thumbnailProfile(),
-                                                    context)
-                                            .url();
+            boolean reveal = !value.protectedContent() || elevated;
             return new DiaryMediaResponse(
-                    media.id(),
-                    media.mediaType(),
-                    media.caption(),
-                    media.takenAt() == null ? null : media.takenAt().toString(),
-                    media.position(),
-                    media.status(),
-                    media.protectedContent(),
-                    original,
-                    thumbnail);
+                    value.id(),
+                    value.mediaType(),
+                    reveal ? value.caption() : null,
+                    reveal && value.takenAt() != null ? value.takenAt().toString() : null,
+                    value.position(),
+                    value.status(),
+                    value.protectedContent(),
+                    media.links(
+                            spaceId,
+                            value.id(),
+                            value.originalProfile(),
+                            value.thumbnailProfile(),
+                            context,
+                            reveal));
         }
     }
 }

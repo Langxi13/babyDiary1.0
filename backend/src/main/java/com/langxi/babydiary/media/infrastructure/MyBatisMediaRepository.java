@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class MyBatisMediaRepository implements MediaRepository {
+    private static final int ID_BATCH_SIZE = 500;
     private final MediaMapper mapper;
 
     public MyBatisMediaRepository(MediaMapper mapper) {
@@ -35,27 +36,32 @@ public class MyBatisMediaRepository implements MediaRepository {
     @Override
     public List<MediaAsset> findByPublicIds(long spaceId, List<UUID> publicIds, long accountId) {
         if (publicIds == null || publicIds.isEmpty()) return List.of();
-        Map<UUID, MediaAsset> hydrated =
-                hydrate(
-                                mapper.findByPublicIds(
-                                        spaceId,
-                                        publicIds.stream().map(BinaryUuid::toBytes).toList(),
-                                        accountId))
-                        .stream()
-                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        Map<UUID, MediaAsset> hydrated = new LinkedHashMap<>();
+        for (int start = 0; start < publicIds.size(); start += ID_BATCH_SIZE) {
+            List<UUID> batch =
+                    publicIds.subList(start, Math.min(start + ID_BATCH_SIZE, publicIds.size()));
+            hydrate(
+                            mapper.findByPublicIds(
+                                    spaceId,
+                                    batch.stream().map(BinaryUuid::toBytes).toList(),
+                                    accountId))
+                    .forEach(value -> hydrated.put(value.id(), value));
+        }
         return publicIds.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
     }
 
     @Override
     public List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds) {
         if (publicIds == null || publicIds.isEmpty()) return List.of();
-        Map<UUID, MediaAsset> hydrated =
-                hydrate(
-                                mapper.findByPublicIdsInSpace(
-                                        spaceId,
-                                        publicIds.stream().map(BinaryUuid::toBytes).toList()))
-                        .stream()
-                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        Map<UUID, MediaAsset> hydrated = new LinkedHashMap<>();
+        for (int start = 0; start < publicIds.size(); start += ID_BATCH_SIZE) {
+            List<UUID> batch =
+                    publicIds.subList(start, Math.min(start + ID_BATCH_SIZE, publicIds.size()));
+            hydrate(
+                            mapper.findByPublicIdsInSpace(
+                                    spaceId, batch.stream().map(BinaryUuid::toBytes).toList()))
+                    .forEach(value -> hydrated.put(value.id(), value));
+        }
         return publicIds.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
     }
 

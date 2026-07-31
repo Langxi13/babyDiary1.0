@@ -57,7 +57,7 @@
         </div>
         <div class="comment-list">
           <article v-for="comment in comments" :key="comment.id">
-            <el-avatar :size="34" :src="comment.avatarMedia?.contentUrl">{{ comment.username?.slice(0, 1) }}</el-avatar>
+            <el-avatar :size="34" :src="mediaThumbnailUrl(comment.avatarMedia)">{{ comment.username?.slice(0, 1) }}</el-avatar>
             <div class="comment-body">
               <header>
                 <div><strong>{{ comment.username }}</strong><time>{{ formatChineseDateTime(comment.createdAt) }}</time></div>
@@ -153,6 +153,7 @@ import { ArrowLeft, Clock, CopyDocument, Delete, EditPen, Lock, Share } from '@e
 import SpaceDiaryEditor from '@/components/workspace/SpaceDiaryEditor.vue'
 import { workspaceApi } from '@/api/workspace'
 import { diaryApi } from '@/api/diary'
+import { mediaThumbnailUrl } from '@/api/v3Adapters'
 import { tagApi } from '@/api/experience'
 import DiaryMediaGallery from '@/components/diary/DiaryMediaGallery.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -336,13 +337,6 @@ onMounted(async () => {
 .article-content { padding: 26px 0; color: #3e3835; font-size: 16px; line-height: 1.9; }
 .article-content > p { white-space: pre-wrap; }
 .article-content :deep(p) { margin: 0 0 13px; }.article-content :deep(blockquote) { margin: 14px 0; padding-left: 14px; border-left: 3px solid #419689; color: #65716d; }
-.legacy-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.legacy-images :deep(.el-image) { width: 100%; aspect-ratio: 1; border-radius: 8px; }
-.rich-media { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.rich-media figure { min-width: 0; margin: 0; border: 1px solid #e8dfda; border-radius: 8px; overflow: hidden; background: #faf8f6; }
-.rich-media :deep(.el-image), .rich-media video { width: 100%; aspect-ratio: 16/10; display: block; object-fit: cover; }
-.rich-media audio { width: calc(100% - 24px); margin: 18px 12px; }
-.rich-media figcaption { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }.rich-media figcaption small { color: #8d827c; }
 .article-footer { margin-top: 24px; padding-top: 14px; border-top: 1px solid #eee5e0; display: flex; justify-content: space-between; color: #8b807a; font-size: 12px; }
 .interaction-band { margin-top: 14px; padding: 20px; }
 .reaction-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -379,7 +373,6 @@ onMounted(async () => {
   .space-detail-article { padding: 17px 15px; }
   .article-head h1 { font-size: 25px; }
   .article-content { padding: 20px 0; font-size: 16px; line-height: 1.8; }
-  .legacy-images, .rich-media { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .interaction-band { padding: 15px; }
   .comment-composer { grid-template-columns: 1fr; }.comment-composer :deep(.el-button) { width: 100%; }
   .comment-actions { opacity: 1; }

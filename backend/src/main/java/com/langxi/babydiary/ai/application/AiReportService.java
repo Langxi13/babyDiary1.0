@@ -35,14 +35,33 @@ public class AiReportService {
         this.persistence = persistence;
     }
 
-    public List<AiReportRepository.Report> list(UUID spaceId, long accountId) {
+    public ReportPage list(UUID spaceId, long accountId, String periodType, int page, int size) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
-        return reports.findForCreator(space.internalId(), accountId);
+        String normalizedType = normalizeListType(periodType);
+        int normalizedPage = Math.max(0, page);
+        int normalizedSize = Math.max(1, Math.min(size, 50));
+        long total = reports.count(space.internalId(), accountId, normalizedType);
+        long rawOffset = (long) normalizedPage * normalizedSize;
+        List<ReportView> content =
+                rawOffset >= total || rawOffset > Integer.MAX_VALUE
+                        ? List.of()
+                        : reports
+                                .findPage(
+                                        space.internalId(),
+                                        accountId,
+                                        normalizedType,
+                                        (int) rawOffset,
+                                        normalizedSize)
+                                .stream()
+                                .map(this::toView)
+                                .toList();
+        return new ReportPage(content, normalizedPage, normalizedSize, total);
     }
 
-    public AiReportRepository.Report detail(UUID spaceId, UUID reportId, long accountId) {
+    public ReportView detail(UUID spaceId, UUID reportId, long accountId) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         return reports.findByPublicId(space.internalId(), accountId, reportId)
+                .map(this::toView)
                 .orElseThrow(() -> ApiException.notFound("AI_REPORT_NOT_FOUND", "AI 报告不存在或无权访问"));
     }
 
@@ -54,8 +73,7 @@ public class AiReportService {
         }
     }
 
-    public AiReportRepository.Report generate(
-            UUID spaceId, long accountId, String type, String period) {
+    public ReportView generate(UUID spaceId, long accountId, String type, String period) {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         Period value = resolve(type, period);
         List<AiReportRepository.DiaryInput> diaries =
@@ -71,27 +89,29 @@ public class AiReportService {
                                 new AiClient.Message("user", userPrompt(value, diaries))));
         UUID publicId = UUID.randomUUID();
         String title = value.label() + " " + reportName(value.type());
-        return persistence.save(
-                new AiReportRepository.NewReport(
-                        publicId,
-                        space.internalId(),
-                        accountId,
-                        value.type(),
-                        value.start(),
-                        value.end(),
-                        title,
-                        markdown,
-                        diaries.size(),
-                        config.model()),
-                diaries);
+        return toView(
+                persistence.save(
+                        new AiReportRepository.NewReport(
+                                publicId,
+                                space.internalId(),
+                                accountId,
+                                value.type(),
+                                value.start(),
+                                value.end(),
+                                title,
+                                markdown,
+                                diaries.size(),
+                                config.model()),
+                        diaries));
     }
 
-    public java.util.Optional<AiReportRepository.Report> findExisting(
+    public java.util.Optional<ReportView> findExisting(
             UUID spaceId, long accountId, String type, String period) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         Period value = resolve(type, period);
         return reports.findByPeriod(
-                space.internalId(), accountId, value.type(), value.start(), value.end());
+                        space.internalId(), accountId, value.type(), value.start(), value.end())
+                .map(this::toView);
     }
 
     private Period resolve(String type, String period) {
@@ -162,6 +182,15 @@ public class AiReportService {
         };
     }
 
+    private String normalizeListType(String type) {
+        if (type == null || type.isBlank()) return null;
+        String normalized = type.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("WEEKLY", "MONTHLY", "ANNUAL").contains(normalized)) {
+            throw ApiException.badRequest("AI_REPORT_TYPE_INVALID", "报告类型无效");
+        }
+        return normalized;
+    }
+
     private String safe(String value) {
         return value == null ? "" : value;
     }
@@ -170,5 +199,38 @@ public class AiReportService {
         return value.length() <= max ? value : value.substring(0, max) + "...";
     }
 
+    private ReportView toView(AiReportRepository.Report report) {
+        return new ReportView(
+                report.id(),
+                report.spaceId(),
+                report.periodType(),
+                report.start(),
+                report.end(),
+                report.title(),
+                report.markdown(),
+                report.diaryCount(),
+                report.model(),
+                report.createdAt());
+    }
+
     private record Period(String type, String label, LocalDate start, LocalDate end) {}
+
+    public record ReportPage(
+            List<ReportView> content, int pageNumber, int pageSize, long totalElements) {
+        public long totalPages() {
+            return totalElements == 0 ? 0 : (totalElements + pageSize - 1) / pageSize;
+        }
+    }
+
+    public record ReportView(
+            UUID id,
+            UUID spaceId,
+            String periodType,
+            LocalDate start,
+            LocalDate end,
+            String title,
+            String markdown,
+            int diaryCount,
+            String model,
+            java.time.LocalDateTime createdAt) {}
 }

@@ -11,10 +11,11 @@ import org.apache.ibatis.annotations.Select;
 public interface SyncMapper {
     @Select(
             """
-            SELECT c.change_seq,c.entity_type,c.entity_public_id,c.operation,c.revision,c.actor_id,c.created_at
-            FROM sync_change c LEFT JOIN diary d ON c.entity_type='DIARY' AND d.public_id=c.entity_public_id
+            SELECT c.change_seq,c.entity_type,c.entity_public_id,c.operation,c.revision,
+                   a.public_id AS actor_public_id,c.created_at
+            FROM sync_change c JOIN account a ON a.account_id=c.actor_id
             WHERE c.space_id=#{spaceId} AND c.change_seq>#{cursor}
-              AND (c.entity_type<>'DIARY' OR d.diary_id IS NULL OR d.visibility='SHARED' OR d.author_id=#{accountId})
+              AND (c.entity_type<>'DIARY' OR c.visibility='SHARED' OR c.owner_id=#{accountId})
             ORDER BY c.change_seq LIMIT #{limit}
             """)
     List<Row> findChanges(
@@ -52,7 +53,7 @@ public interface SyncMapper {
         private byte[] entityPublicId;
         private String operation;
         private int revision;
-        private long actorId;
+        private byte[] actorPublicId;
         private LocalDateTime createdAt;
 
         public Row() {}
@@ -77,8 +78,8 @@ public interface SyncMapper {
             return revision;
         }
 
-        public long actorId() {
-            return actorId;
+        public byte[] actorPublicId() {
+            return actorPublicId;
         }
 
         public LocalDateTime createdAt() {
@@ -105,8 +106,8 @@ public interface SyncMapper {
             this.revision = revision;
         }
 
-        public void setActorId(long actorId) {
-            this.actorId = actorId;
+        public void setActorPublicId(byte[] actorPublicId) {
+            this.actorPublicId = actorPublicId;
         }
 
         public void setCreatedAt(LocalDateTime createdAt) {

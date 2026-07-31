@@ -23,7 +23,7 @@ test('anniversary editor uses cover upload instead of filename input', () => {
   assert.match(source, /const coverFile = ref\(null\)/)
   assert.match(source, /const coverPreviewUrl = ref\(''\)/)
   assert.match(source, /URL\.createObjectURL\(file\)/)
-  assert.match(source, /await anniversaryApi\.uploadCover\(coverFile\.value\)/)
+  assert.match(source, /await anniversaryApi\.uploadCover\(spaceId, coverFile\.value\)/)
   assert.doesNotMatch(source, /封面图片文件名/)
 })
 
@@ -43,9 +43,9 @@ test('new anniversaries default to the local calendar day', () => {
 })
 
 test('anniversary api exposes multipart cover upload endpoint', () => {
-  assert.match(apiSource, /uploadCover\(file\)/)
+  assert.match(apiSource, /uploadCover\(spaceId, file\)/)
   assert.match(apiSource, /const formData = new FormData\(\)/)
   assert.match(apiSource, /formData\.append\('file', file\)/)
   assert.match(apiSource, /request\.post\(`\/api\/v3\/spaces\/\$\{spaceId\}\/media`, formData/)
-  assert.match(apiSource, /coverAssetId: media\.assetId/)
+  assert.match(apiSource, /coverAssetId: value\.coverAssetId \|\| null/)
 })

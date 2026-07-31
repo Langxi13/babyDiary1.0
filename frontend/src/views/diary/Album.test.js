@@ -31,7 +31,7 @@ test('album page exposes an inline retry state when group loading fails', () => 
 test('album cards use photo covers instead of text initials', () => {
   assert.match(source, /album\.coverMedia/)
   assert.match(source, /class="\{ empty: !album\.coverMedia \}"/)
-  assert.match(source, /album\.coverMedia\.thumbnailUrl\s*\|\|\s*album\.coverMedia\.contentUrl/)
+  assert.match(source, /mediaThumbnailUrl\(album\.coverMedia\)/)
   assert.match(source, /<Picture/)
   assert.doesNotMatch(source, /album\.name\.slice/)
 })
@@ -53,7 +53,7 @@ test('album supports a default favorites system album', () => {
   assert.match(detailSource, /'favorites'/)
   assert.match(detailSource, /route\.params\.systemKey === 'favorites'/)
   assert.match(detailSource, /await loadAlbumPhotos\(\{ force: true \}\)/)
-  assert.match(apiSource, /systemKey !== 'all' && systemKey !== 'favorites'/)
+  assert.match(apiSource, /!\['all', 'favorites'\]\.includes\(systemKey\)[\s\S]*?\^year:/)
   assert.match(apiSource, /albums\/system\/\$\{systemKey\}/)
 })
 
@@ -80,7 +80,7 @@ test('AI album proposal flow supports date range prompt and review editing', () 
 })
 
 test('album API exposes group, photo, and AI proposal endpoints', () => {
-  assert.match(apiSource, /getGroups\(options = \{\}\)/)
+  assert.match(apiSource, /getGroups\(spaceId, options = \{\}\)/)
   assert.match(apiSource, /getSystemPhotoPage/)
   assert.match(apiSource, /getAlbumPhotoPage/)
   assert.match(apiSource, /createGroup/)
@@ -99,8 +99,8 @@ test('album details load photos in bounded pages with progressive image states',
   assert.match(detailSource, /#placeholder/)
   assert.match(detailSource, /#error/)
   assert.match(detailStyle, /\.image-loading/)
-  assert.match(apiSource, /request\.get\(path, \{ params: \{ page, size \} \}\)/)
-  assert.match(apiSource, /response\.data\.totalMedia/)
+  assert.match(apiSource, /request\.get\(path, \{[\s\S]*?params: \{ page, size \}/)
+  assert.match(apiSource, /result\.totalMedia \?\? result\.album\?\.mediaCount/)
 })
 
 test('album pages display dates with Chinese formatting helpers', () => {
@@ -108,5 +108,5 @@ test('album pages display dates with Chinese formatting helpers', () => {
   assert.match(source, /formatChineseDateRange\(currentProposal\.startDate,\s*currentProposal\.endDate\)/)
   assert.match(source, /format="YYYY年MM月DD日"/)
   assert.match(detailSource, /import\s*\{\s*formatChineseDate\s*\}/)
-  assert.match(detailSource, /formatChineseDate\(photo\.diaryDate\)/)
+  assert.match(detailSource, /formatChineseDate\(photo\.date\)/)
 })

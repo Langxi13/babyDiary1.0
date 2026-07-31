@@ -13,7 +13,7 @@ const diary = (id, date, imageCount = 0) => ({
   media: Array.from({ length: imageCount }, (_, index) => ({
     id: `asset-${id}-${index}`,
     mediaType: 'IMAGE',
-    contentUrl: `/api/media/asset-${id}-${index}/content`
+    representations: { original: { url: `/api/media/asset-${id}-${index}/content` } }
   }))
 })
 

@@ -38,9 +38,9 @@ public interface AiAlbumProposalRepository {
 
     void insertCandidateMedia(long spaceId, long candidateId, long assetId, int position);
 
-    List<byte[]> findCandidateDiaries(long candidateId);
+    List<byte[]> findCandidateDiaries(long candidateId, long accountId);
 
-    List<byte[]> findCandidateMedia(long candidateId);
+    List<byte[]> findCandidateMedia(long candidateId, long accountId);
 
     List<DiaryMedia> findDiaryMedia(
             long spaceId, long accountId, LocalDate startDate, LocalDate endDate);

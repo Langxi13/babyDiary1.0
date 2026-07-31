@@ -16,6 +16,9 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
+          if (id.includes('/node_modules/@tiptap/') || id.includes('/node_modules/prosemirror-')) {
+            return 'editor-vendor'
+          }
           if (id.includes('/node_modules/vue/') || id.includes('/node_modules/vue-router/') || id.includes('/node_modules/pinia/')) {
             return 'vue-vendor'
           }
@@ -60,10 +63,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: apiTarget,
-        changeOrigin: true
-      },
-      '/images': {
         target: apiTarget,
         changeOrigin: true
       }

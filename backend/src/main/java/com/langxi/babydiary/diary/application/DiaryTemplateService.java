@@ -43,11 +43,7 @@ public class DiaryTemplateService {
                         values.icon,
                         values.promptText,
                         values.contentHtml));
-        return mapper.findAll(space.internalId()).stream()
-                .filter(row -> java.util.Arrays.equals(row.publicId(), BinaryUuid.toBytes(id)))
-                .findFirst()
-                .map(row -> response(row, accountId))
-                .orElseThrow();
+        return response(id, values);
     }
 
     @Transactional
@@ -64,14 +60,7 @@ public class DiaryTemplateService {
                         values.promptText,
                         values.contentHtml)
                 != 1) throw ApiException.notFound("TEMPLATE_NOT_FOUND", "模板不存在或无权修改");
-        return mapper.findAll(space.internalId()).stream()
-                .filter(
-                        row ->
-                                java.util.Arrays.equals(
-                                        row.publicId(), BinaryUuid.toBytes(templateId)))
-                .findFirst()
-                .map(row -> response(row, accountId))
-                .orElseThrow();
+        return response(templateId, values);
     }
 
     @Transactional
@@ -105,6 +94,18 @@ public class DiaryTemplateService {
                 row.contentHtml(),
                 row.builtin(),
                 !row.builtin() && row.ownerId() != null && row.ownerId() == accountId);
+    }
+
+    private Template response(UUID id, Values values) {
+        return new Template(
+                id,
+                values.name,
+                values.description,
+                values.icon,
+                values.promptText,
+                values.contentHtml,
+                false,
+                true);
     }
 
     private String trim(String value, int max) {

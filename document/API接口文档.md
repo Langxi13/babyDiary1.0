@@ -1,6 +1,6 @@
 # V3 API 接口文档
 
-本文档描述当前运行时的 `/api/v3` 接口。V3 是当前唯一业务 API，使用 UUID 公共标识、空间边界和统一媒体资产模型。旧版 `/api`、`/api/v2` 以及旧图片路径不属于当前运行时；历史数据迁移请参阅 [V3 统一架构与迁移运行手册](统一架构运行手册.md)。
+本文档描述当前运行时的 `/api/v3` 接口。V3 是当前唯一业务 API，使用 UUID 公共标识、空间边界和统一媒体资产模型。旧版 `/api`、`/api/v2` 以及旧图片路径不属于当前运行时；数据不变量和发布约束参阅 [统一架构运行手册](统一架构运行手册.md)。
 
 ## 基本约定
 
@@ -11,7 +11,7 @@
 - 修改密码、退出和刷新令牌轮换会使相应旧会话失效。
 - 涉及锁定日记、导出、私密分享和管理员邀请码的接口，可要求 `X-Step-Up-Token`。
 - 所有时间戳使用 ISO-8601；日期字段使用 `YYYY-MM-DD`，由客户端按用户时区展示。
-- `204 No Content` 接口没有响应体。分页接口使用 `items`、`nextCursor` 和 `totalElements`。
+- `204 No Content` 接口没有响应体。日记使用 `items/nextCursor/totalElements` 游标分页；时间轴批量读取可传 `includeTotal=false` 跳过重复计数。相册和 AI 报告使用 `content/pageNumber/pageSize/totalElements/totalPages` 服务端页码分页。
 - 资源主标识统一为 `id`；日记使用 `diaryDate`、`contentHtml`、`mood`，媒体使用 `id` 和命名的 `representations`。关系请求中的 `diaryId`、`tagId`、`mediaIds` 等字段仅表示外键关系，不是资源响应别名。
 
 ## 响应与错误
@@ -20,9 +20,12 @@
 
 ```json
 {
+  "type": "urn:baby-diary:problem:diary-not-found",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "日记不存在或无权访问",
   "code": "DIARY_NOT_FOUND",
-  "message": "日记不存在或无权访问",
-  "requestId": "request-id"
+  "traceId": "trace-id"
 }
 ```
 
@@ -34,8 +37,11 @@
 | `401` | 缺少、过期或无效访问令牌 |
 | `403` | 当前账户或空间成员无权操作 |
 | `404` | 资源不存在，或为避免泄露而隐藏资源存在性 |
+| `405` | HTTP 方法不受该接口支持 |
+| `406` | 无法生成客户端要求的响应媒体类型 |
 | `409` | 唯一键、版本或幂等操作冲突 |
 | `413` | 上传或导入超过体积限制 |
+| `415` | 请求媒体类型不受支持 |
 | `423` | 需要二次验证或资源已锁定 |
 | `429` | 触发登录、刷新、恢复或分享限流 |
 | `500` | 服务端错误；不会向客户端返回下游密钥或堆栈 |
@@ -59,7 +65,6 @@
 | `POST` | `/api/v3/auth/step-up` | 使用当前密码取得短期二次验证令牌 |
 | `GET` | `/api/v3/auth/sessions` | 查看当前账户有效设备会话 |
 | `DELETE` | `/api/v3/auth/sessions/{sessionId}` | 撤销指定会话 |
-| `DELETE` | `/api/v3/auth/sessions` | 撤销当前账户全部会话 |
 
 登录和刷新成功体固定为 `{ token, expiresAt, userInfo }`，`userInfo` 使用账户 `id` 和 `role`，不重复返回 `accessToken`、顶层账户字段或旧角色别名。
 
@@ -123,7 +128,9 @@
 | `GET` | `/api/v3/spaces/{spaceId}/search?query=&limit=` | 空间全文搜索 |
 | `GET` | `/api/v3/spaces/{spaceId}/insights/yearly?year=` | 年度洞察和心情统计 |
 
-创建或更新日记的媒体顺序由请求中的 `mediaIds` 决定；服务端在一次事务中更新关系，删除旧媒体关系不会延迟到下一次编辑。回收站默认保留30天，永久删除只移除日记及其关系，媒体资产仍保留在媒体库，避免误删仍被其他内容引用的文件。
+创建或更新日记的媒体顺序由请求中的 `mediaIds` 决定；服务端在一次事务中完整替换关系，移除已有媒体关系不会延迟到下一次编辑。回收站默认保留30天，永久删除只移除日记及其关系，媒体资产仍保留在媒体库，避免误删仍被其他内容引用的文件。
+
+修订响应使用 UUID `id`，并返回编辑者 UUID `editorId`、`editorName`、版本和创建时间；恢复路径不接受数据库 `revision_id` 自增值。
 
 ### 互动、草稿与模板
 
@@ -151,7 +158,7 @@
 | `DELETE` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 删除媒体资产 |
 | `GET` | `/api/v3/public/media/{spaceId}/{assetId}/{variant}` | 使用短时签名 URL 读取媒体 |
 
-媒体变体由 `variant + profile` 共同确定。资产、相册、封面、头像等媒体响应使用命名的 `representations`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`。每个 representation 返回实际 `variantType`、`profile`、短时 `url`、`expiresAt`、MIME、大小和技术元数据；缺少的派生 representation 为 `null`。日记媒体为了保持列表响应紧凑，返回原图 `contentUrl` 和缩略图 `thumbnailUrl`，但 URL 同样绑定实际 profile。锁定媒体仍可在列表中显示不含 URL 的技术占位，直接详情和内容读取需要 `X-Step-Up-Token`。
+媒体变体由 `variant + profile` 共同确定。资产、日记、公开分享、相册、封面、头像、评论头像和成员头像统一使用命名的 `representations`：`original`、`thumbnail`、`poster`、`waveform`、`transcoded`。每个 representation 返回实际 `variantType`、`profile`、短时 `url` 和 `expiresAt`；完整媒体响应还返回 MIME、大小和技术元数据，紧凑嵌入响应的这些技术字段可为 `null`。缺少的派生 representation 为 `null`，不再返回 `contentUrl`、`thumbnailUrl` 或 `assetId` 响应别名。同一资产只要被任意锁定日记引用，就按受保护媒体处理；未 step-up 时还会隐藏文件名、说明、拍摄时间、MIME、大小和尺寸，且不能设为头像。
 
 公开媒体 URL 的查询参数为 `profile`、`ticket`、`expires` 和 `signature`，其中 profile 与 HMAC 保护的访问上下文都纳入签名，客户端不得修改。旧的无上下文签名不再接受。内容读取支持 `GET`、`HEAD`、单段 `Range`、`ETag/If-None-Match`；无效 Range 返回 `416`。锁定或分享上下文使用 `Cache-Control: no-store`。
 
@@ -163,7 +170,7 @@
 | --- | --- | --- |
 | `GET` | `/api/v3/spaces/{spaceId}/album-groups` | 相册分组首页，只返回相册卡片和封面 |
 | `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/album-groups[/{groupId}]` | 管理相册分组 |
-| `GET` | `/api/v3/spaces/{spaceId}/albums/system/{key}?page=&size=` | 查看所有图片或收藏相册详情，服务端分页 |
+| `GET` | `/api/v3/spaces/{spaceId}/albums/system/{key}?page=&size=` | 查看所有图片、收藏或 `year:YYYY` 年份相册详情，服务端分页 |
 | `GET` | `/api/v3/spaces/{spaceId}/albums/{albumId}?page=&size=` | 查看自建相册详情和分页媒体 |
 | `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/albums[/{albumId}]` | 管理自建相册 |
 | `POST` | `/api/v3/spaces/{spaceId}/albums/{albumId}/media` | 加入媒体到相册 |
@@ -172,15 +179,18 @@
 | `POST` / `GET` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/ai-album-proposals[/{proposalId}]` | AI 相册提案及确认 |
 | `GET` / `POST` / `PUT` / `DELETE` | `/api/v3/spaces/{spaceId}/anniversaries[/{anniversaryId}]` | 纪念日及封面资产 |
 
+相册目录、计数、年份封面和分页查询在普通访问下统一排除受保护媒体；带有效 step-up 的查询直接读取数据库且不写入 Redis。AI 相册提案在读取、更新和确认时都会重新校验日记可见性、锁定状态及媒体关系，保存提案后发生的权限或状态变化不会成为旁路。
+
 ### 导入导出
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | `GET` | `/api/v3/spaces/{spaceId}/transfer/export` | 导出 V3 便携 ZIP 归档 |
 | `POST` | `/api/v3/spaces/{spaceId}/transfer/import` | 校验并导入 V3 ZIP 归档 |
+| `GET` | `/api/v3/spaces/{spaceId}/transfer/media?startDate=&endDate=` | 导出日期范围内可见日记的原图 ZIP |
 | `GET` | `/api/v3/spaces/{spaceId}/books?format=PDF|EPUB` | 导出 PDF 或 EPUB 日记书 |
 
-ZIP 导出按同一确定性顺序读取可用原图，因此迁移保留的 `ORIGINAL/source` 与新上传的 `ORIGINAL/default` 都会进入归档。ZIP 导入会拒绝路径穿越、重复路径、未知版本、超大条目、超大总量和媒体校验失败；临时文件在完成后清理。
+ZIP 导出按同一确定性顺序读取可用原图，因此 `ORIGINAL/source` 与 `ORIGINAL/default` 都会进入归档。便携归档最多包含 9,999 个媒体文件和一个清单；ZIP 导入会拒绝路径穿越、重复路径、未知版本、超大条目、超大总量和媒体校验失败，临时文件在完成后清理。便携归档和原图 ZIP 都按资产的全局锁定关系重新要求 step-up，不以当前导出日记是否锁定作为唯一判断。
 
 ## AI、通知与同步
 
@@ -189,7 +199,7 @@ ZIP 导出按同一确定性顺序读取可用原图，因此迁移保留的 `OR
 | `GET` / `POST` | `/api/v3/admin/ai` | 管理员读取脱敏配置或保存 OpenAI 兼容配置 |
 | `POST` | `/api/v3/admin/ai/test` | 测试当前 AI 连接 |
 | `GET` | `/api/v3/admin/ai/models` | 加载模型列表 |
-| `GET` / `POST` / `DELETE` | `/api/v3/spaces/{spaceId}/ai-reports[/{reportId}]` | 生成、查看、删除周报/月报/年报 |
+| `GET` / `POST` / `DELETE` | `/api/v3/spaces/{spaceId}/ai-reports[/{reportId}]` | 按 `type/page/size` 分页，或生成、查看、删除周报/月报/年报 |
 | `GET` / `PUT` | `/api/v3/spaces/{spaceId}/ai/schedule` | 查询或设置 AI 定时任务 |
 | `GET` / `PUT` | `/api/v3/notifications`、`/api/v3/notifications/{id}/read` | 通知和已读状态 |
 | `GET` / `POST` / `DELETE` | `/api/v3/notifications/push/*` | Web Push 公钥、订阅和取消订阅 |
@@ -198,9 +208,9 @@ ZIP 导出按同一确定性顺序读取可用原图，因此迁移保留的 `OR
 | `POST` / `GET` / `DELETE` | `/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares`、`/api/v3/shares/{shareId}` | 私密分享 |
 | `POST` | `/api/v3/public/shares/{token}/open` | 打开公开分享 |
 
-AI 报告从第三方观察视角生成，可使用“你”或“你们”，不会以模型第一人称冒充用户；锁定日记不会进入 AI 输入，API Key 永不回显。
+AI 报告从第三方观察视角生成，可使用“你”或“你们”，不会以模型第一人称冒充用户；锁定日记不会进入 AI 输入，API Key 永不回显。创建公开分享时会拒绝任何受全局锁定关系保护的媒体，打开已存在分享时还会实时复验日记和媒体状态，因此日后加锁不会使旧分享继续暴露内容。
 
-`sync/pull` 返回 `changes`、`nextCursor`、`hasMore`、`resetRequired` 和 `baselineCursor`。服务端清理超过保留期的增量日志后，过旧游标会收到 `resetRequired=true`；客户端必须清理该账户的离线读缓存，以 `baselineCursor` 重建游标，但不得丢弃仍待上传的离线操作。
+`sync/pull` 返回 `changes`、`nextCursor`、`hasMore`、`resetRequired` 和 `baselineCursor`。每条 change 使用资源 UUID `entityId` 和操作者 UUID `actorId`，不返回账户或实体内部自增键。私人日记的可见性与所有者在写入变更时固化，日记永久删除后也不会向其他空间成员泄露变更。服务端清理超过保留期的增量日志后，过旧游标会收到 `resetRequired=true`；客户端必须清理该账户的离线读缓存，以 `baselineCursor` 重建游标，但不得丢弃仍待上传的离线操作。
 
 ## OpenAPI 与调试
 

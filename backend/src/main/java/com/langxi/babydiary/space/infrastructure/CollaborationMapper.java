@@ -13,8 +13,28 @@ import org.apache.ibatis.annotations.Update;
 public interface CollaborationMapper {
     @Select(
             """
-            SELECT a.public_id,a.username,a.email,m.role,m.status,m.joined_at
+            SELECT a.public_id,a.username,m.role,m.status,m.joined_at,
+                   ma.public_id AS avatar_public_id,avs.public_id AS avatar_space_public_id,
+                   av.variant_type AS avatar_variant_type,av.profile AS avatar_variant_profile
             FROM space_member m JOIN account a ON a.account_id=m.account_id
+            LEFT JOIN user_avatar ua ON ua.account_id=a.account_id
+            LEFT JOIN media_asset ma ON ma.space_id=ua.space_id AND ma.asset_id=ua.asset_id
+              AND ma.status='READY' AND ma.deleted_at IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                  ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+              )
+            LEFT JOIN diary_space avs ON avs.space_id=ma.space_id
+            LEFT JOIN media_variant av ON av.variant_id=(
+                SELECT candidate.variant_id FROM media_variant candidate
+                WHERE candidate.asset_id=ma.asset_id AND candidate.status='READY'
+                  AND candidate.deleted_at IS NULL
+                  AND candidate.variant_type IN ('THUMBNAIL','ORIGINAL')
+                ORDER BY CASE candidate.variant_type WHEN 'THUMBNAIL' THEN 0 ELSE 1 END,
+                         CASE candidate.profile WHEN 'default' THEN 0 WHEN 'source' THEN 1 ELSE 2 END,
+                         candidate.variant_id LIMIT 1
+            )
             WHERE m.space_id=#{spaceId} AND m.status='ACTIVE' AND a.deleted_at IS NULL
             ORDER BY CASE m.role WHEN 'OWNER' THEN 0 WHEN 'ADMIN' THEN 1 ELSE 2 END,a.username
             """)
@@ -142,10 +162,13 @@ public interface CollaborationMapper {
     final class MemberRow {
         private byte[] publicId;
         private String username;
-        private String email;
         private String role;
         private String status;
         private LocalDateTime joinedAt;
+        private byte[] avatarPublicId;
+        private byte[] avatarSpacePublicId;
+        private String avatarVariantType;
+        private String avatarVariantProfile;
 
         public MemberRow() {}
 
@@ -155,10 +178,6 @@ public interface CollaborationMapper {
 
         public String username() {
             return username;
-        }
-
-        public String email() {
-            return email;
         }
 
         public String role() {
@@ -173,16 +192,28 @@ public interface CollaborationMapper {
             return joinedAt;
         }
 
+        public byte[] avatarPublicId() {
+            return avatarPublicId;
+        }
+
+        public byte[] avatarSpacePublicId() {
+            return avatarSpacePublicId;
+        }
+
+        public String avatarVariantType() {
+            return avatarVariantType;
+        }
+
+        public String avatarVariantProfile() {
+            return avatarVariantProfile;
+        }
+
         public void setPublicId(byte[] publicId) {
             this.publicId = publicId;
         }
 
         public void setUsername(String username) {
             this.username = username;
-        }
-
-        public void setEmail(String email) {
-            this.email = email;
         }
 
         public void setRole(String role) {
@@ -195,6 +226,22 @@ public interface CollaborationMapper {
 
         public void setJoinedAt(LocalDateTime joinedAt) {
             this.joinedAt = joinedAt;
+        }
+
+        public void setAvatarPublicId(byte[] avatarPublicId) {
+            this.avatarPublicId = avatarPublicId;
+        }
+
+        public void setAvatarSpacePublicId(byte[] avatarSpacePublicId) {
+            this.avatarSpacePublicId = avatarSpacePublicId;
+        }
+
+        public void setAvatarVariantType(String avatarVariantType) {
+            this.avatarVariantType = avatarVariantType;
+        }
+
+        public void setAvatarVariantProfile(String avatarVariantProfile) {
+            this.avatarVariantProfile = avatarVariantProfile;
         }
     }
 

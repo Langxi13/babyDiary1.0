@@ -58,6 +58,7 @@ class CleanSchemaMigrationTest {
             assertThat(columnType(statement, "account", "public_id")).isEqualTo("binary(16)");
             assertThat(columnType(statement, "diary", "content_html")).isEqualTo("mediumtext");
             assertThat(columnType(statement, "diary_draft", "payload")).isEqualTo("json");
+            assertThat(columnType(statement, "sync_change", "visibility")).isEqualTo("varchar(16)");
 
             try (ResultSet result =
                     statement.executeQuery(
@@ -128,6 +129,84 @@ class CleanSchemaMigrationTest {
                                 "SELECT processed_at FROM outbox_event WHERE space_id=10")) {
             assertThat(result.next()).isTrue();
             assertThat(result.getTimestamp(1)).isNotNull();
+        }
+    }
+
+    @Test
+    void v4BackfillsPublicRevisionIdsWithoutChangingRevisionData() throws Exception {
+        clean();
+        flyway("3").migrate();
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO account (account_id,public_id,username,password_hash) "
+                            + "VALUES (1,UUID_TO_BIN(UUID()),'owner','hash')");
+            statement.execute(
+                    "INSERT INTO diary_space (space_id,public_id,name,type,created_by,personal_owner_id,default_visibility) "
+                            + "VALUES (10,UUID_TO_BIN(UUID()),'Owner space','PERSONAL',1,1,'PRIVATE')");
+            statement.execute(
+                    "INSERT INTO diary (diary_id,public_id,space_id,author_id,title,diary_date,content_html,content_text) "
+                            + "VALUES (100,UUID_TO_BIN(UUID()),10,1,'Diary','2026-07-30','<p>Body</p>','Body')");
+            statement.execute(
+                    "INSERT INTO diary (diary_id,public_id,space_id,author_id,title,diary_date,content_html,content_text,visibility) "
+                            + "VALUES (101,UUID_TO_BIN(UUID()),10,1,'Shared','2026-07-30','<p>Body</p>','Body','SHARED')");
+            statement.execute(
+                    "INSERT INTO diary_revision (revision_id,diary_id,version,editor_id,snapshot) "
+                            + "VALUES (1000,100,1,1,JSON_OBJECT('title','Diary'))");
+            statement.execute(
+                    "INSERT INTO sync_change (change_seq,space_id,entity_type,entity_public_id,operation,revision,actor_id) "
+                            + "VALUES (2000,10,'DIARY',UUID_TO_BIN(UUID()),'DELETE',2,1)");
+            statement.execute(
+                    "INSERT INTO sync_change (change_seq,space_id,entity_type,entity_public_id,operation,revision,actor_id) "
+                            + "SELECT 2001,10,'DIARY',public_id,'UPSERT',1,1 FROM diary WHERE diary_id=101");
+        }
+
+        flyway(null).migrate();
+
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT revision_id,public_id,version,JSON_UNQUOTE(JSON_EXTRACT(snapshot,'$.title')) "
+                                        + "FROM diary_revision WHERE revision_id=1000")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getLong(1)).isEqualTo(1000);
+            assertThat(result.getBytes(2)).hasSize(16);
+            assertThat(result.getInt(3)).isEqualTo(1);
+            assertThat(result.getString(4)).isEqualTo("Diary");
+        }
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT visibility,owner_id FROM sync_change WHERE change_seq=2000")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString(1)).isEqualTo("PRIVATE");
+            assertThat(result.getLong(2)).isEqualTo(1);
+        }
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT visibility,owner_id FROM sync_change WHERE change_seq=2001")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString(1)).isEqualTo("SHARED");
+            assertThat(result.getObject(2)).isNull();
+        }
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement()) {
+            assertThatThrownBy(
+                            () ->
+                                    statement.execute(
+                                            "INSERT INTO sync_change(space_id,entity_type,entity_public_id,operation,revision,visibility,owner_id,actor_id) "
+                                                    + "VALUES(10,'DIARY',UUID_TO_BIN(UUID()),'UPSERT',1,'PRIVATE',NULL,1)"))
+                    .isInstanceOf(SQLException.class);
+            assertThatThrownBy(
+                            () ->
+                                    statement.execute(
+                                            "INSERT INTO sync_change(space_id,entity_type,entity_public_id,operation,revision,visibility,owner_id,actor_id) "
+                                                    + "VALUES(10,'DIARY',UUID_TO_BIN(UUID()),'UPSERT',1,'SHARED',1,1)"))
+                    .isInstanceOf(SQLException.class);
         }
     }
 

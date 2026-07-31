@@ -52,12 +52,12 @@ export async function syncWorkspace(spaceId) {
     for (const [diaryId, items] of mediaByDiary) {
       const uploaded = []
       try {
-        for (const media of items) {
+        for (const pendingMedia of items) {
           const formData = new FormData()
-          formData.append('file', media.file, media.filename || 'media')
-          if (media.caption) formData.append('caption', media.caption)
-          const media = await mediaApi.upload(spaceId, formData)
-          uploaded.push(media.id)
+          formData.append('file', pendingMedia.file, pendingMedia.filename || 'media')
+          if (pendingMedia.caption) formData.append('caption', pendingMedia.caption)
+          const uploadedMedia = await mediaApi.upload(spaceId, formData)
+          uploaded.push(uploadedMedia.id)
         }
         const stepUpToken = getStepUpToken()
         const current = await diaryApi.getDiary(spaceId, diaryId, { force: true })

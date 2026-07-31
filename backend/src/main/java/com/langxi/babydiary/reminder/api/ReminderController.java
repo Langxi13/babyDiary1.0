@@ -1,7 +1,6 @@
 package com.langxi.babydiary.reminder.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
-import com.langxi.babydiary.reminder.application.ReminderRepository;
 import com.langxi.babydiary.reminder.application.ReminderService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -26,13 +25,13 @@ public class ReminderController {
     }
 
     @GetMapping
-    public List<ReminderRepository.Row> list(
+    public List<ReminderService.ReminderView> list(
             @AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID spaceId) {
         return reminders.list(spaceId, principal.accountId());
     }
 
     @PutMapping("/{type}")
-    public ReminderRepository.Row save(
+    public ReminderService.ReminderView save(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
             @PathVariable String type,
