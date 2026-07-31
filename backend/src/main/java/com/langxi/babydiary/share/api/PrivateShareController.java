@@ -1,6 +1,7 @@
 package com.langxi.babydiary.share.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.share.application.PrivateShareService;
 import com.langxi.babydiary.share.application.PublicShareRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +23,7 @@ public class PrivateShareController {
         this.limiter = limiter;
     }
 
-    @PostMapping("/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares")
+    @PostMapping(ApiContract.ROOT + "/spaces/{spaceId}/diaries/{diaryId}/shares")
     @ResponseStatus(HttpStatus.CREATED)
     public PrivateShareService.Created create(
             @AuthenticationPrincipal AccountPrincipal p,
@@ -33,7 +34,7 @@ public class PrivateShareController {
         return shares.create(spaceId, diaryId, p, step, r.expiresInHours, r.password, r.maxViews);
     }
 
-    @GetMapping("/api/v3/spaces/{spaceId}/diaries/{diaryId}/shares")
+    @GetMapping(ApiContract.ROOT + "/spaces/{spaceId}/diaries/{diaryId}/shares")
     public List<PrivateShareService.Summary> list(
             @AuthenticationPrincipal AccountPrincipal p,
             @PathVariable UUID spaceId,
@@ -42,13 +43,13 @@ public class PrivateShareController {
         return shares.list(spaceId, diaryId, p, step);
     }
 
-    @DeleteMapping("/api/v3/shares/{shareId}")
+    @DeleteMapping(ApiContract.ROOT + "/shares/{shareId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revoke(@AuthenticationPrincipal AccountPrincipal p, @PathVariable UUID shareId) {
         shares.revoke(shareId, p.accountId());
     }
 
-    @PostMapping("/api/v3/public/shares/{token}/open")
+    @PostMapping(ApiContract.ROOT + "/public/shares/{token}/open")
     public PrivateShareService.SharedDiary open(
             @PathVariable String token,
             @RequestBody(required = false) OpenRequest r,

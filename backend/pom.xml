@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.langxi</groupId>
     <artifactId>Baby-Diary</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0-beta.5</version>
     <name>Baby-Diary</name>
     <description>Baby-Diary</description>
     <properties>
@@ -236,6 +236,18 @@
     </dependencyManagement>
 
     <build>
+        <finalName>Baby-Diary</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>../config</directory>
+                <includes>
+                    <include>release-version.properties</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

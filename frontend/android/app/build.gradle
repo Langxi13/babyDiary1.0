@@ -5,11 +5,17 @@ def releaseKeystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
 def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
 def releaseSigningConfigured = releaseKeystoreFile && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
-def appVersionCode = Integer.parseInt(System.getenv('ANDROID_VERSION_CODE') ?: '1')
-def appVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.0'
+def releaseProperties = new Properties()
+def releasePropertiesFile = file('../../../config/release-version.properties')
+if (!releasePropertiesFile.isFile()) {
+    throw new GradleException('config/release-version.properties is missing')
+}
+releasePropertiesFile.withInputStream { releaseProperties.load(it) }
+def appVersionCode = Integer.parseInt(releaseProperties.getProperty('ANDROID_VERSION_CODE', '0'))
+def appVersionName = releaseProperties.getProperty('PRODUCT_VERSION', '')
 
 if (appVersionCode < 1 || !appVersionName.matches('[0-9]+(\\.[0-9]+){1,3}([.-][A-Za-z0-9]+)*')) {
-    throw new GradleException('ANDROID_VERSION_CODE and ANDROID_VERSION_NAME are invalid')
+    throw new GradleException('PRODUCT_VERSION and ANDROID_VERSION_CODE are invalid')
 }
 
 android {

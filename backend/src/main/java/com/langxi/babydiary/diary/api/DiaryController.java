@@ -7,6 +7,7 @@ import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaView;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.platform.domain.CursorPage;
 import jakarta.validation.Valid;
@@ -34,7 +35,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/diaries")
+@RequestMapping(ApiContract.ROOT + "/spaces/{spaceId}/diaries")
 public class DiaryController {
     private final DiaryService diaries;
     private final MediaRepresentationService media;
@@ -112,7 +113,7 @@ public class DiaryController {
                 .eTag(etag(diary.version()))
                 .header(
                         HttpHeaders.LOCATION,
-                        "/api/v3/spaces/" + spaceId + "/diaries/" + diary.id())
+                        ApiContract.ROOT + "/spaces/" + spaceId + "/diaries/" + diary.id())
                 .body(DiaryResponse.from(diary, media, principal.accountId(), false));
     }
 

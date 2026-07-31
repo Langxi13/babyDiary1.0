@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 import { Preferences } from '@capacitor/preferences'
+import { API_ROOT, API_VERSION } from '@/api/contract'
 
 const SERVER_ORIGIN_KEY = 'babyDiaryServerOrigin'
 const HTTP_DEBUG_HOSTS = new Set(['localhost', '127.0.0.1', '10.0.2.2'])
@@ -72,7 +73,7 @@ export const testServerConnection = async (value) => {
   let response
   try {
     response = await CapacitorHttp.get({
-      url: `${origin}/api/v3/client/bootstrap`,
+      url: `${origin}${API_ROOT}/client/bootstrap`,
       connectTimeout: 10000,
       readTimeout: 10000,
       headers: { Accept: 'application/json' }
@@ -86,7 +87,7 @@ export const testServerConnection = async (value) => {
   } catch {
     throw new Error('该地址没有返回兼容的 Baby Diary 服务信息')
   }
-  if (response.status !== 200 || payload?.apiVersion !== 3) {
+  if (response.status !== 200 || payload?.apiVersion !== API_VERSION) {
     throw new Error('该地址不是兼容的 Baby Diary 服务')
   }
   if (payload.nativeSessionMode !== 'BEARER_REFRESH_COOKIE') {

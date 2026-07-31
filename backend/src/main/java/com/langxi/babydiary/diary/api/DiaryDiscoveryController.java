@@ -2,13 +2,14 @@ package com.langxi.babydiary.diary.api;
 
 import com.langxi.babydiary.diary.application.DiaryDiscoveryService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}"))
 public class DiaryDiscoveryController {
     private final DiaryDiscoveryService discovery;
 

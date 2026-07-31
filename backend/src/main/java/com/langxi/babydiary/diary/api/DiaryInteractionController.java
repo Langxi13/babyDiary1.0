@@ -3,6 +3,7 @@ package com.langxi.babydiary.diary.api;
 import com.langxi.babydiary.diary.application.DiaryInteractionService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -13,7 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/diaries/{diaryId}")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/diaries/{diaryId}"))
 public class DiaryInteractionController {
     private final DiaryInteractionService interactions;
     private final StepUpService stepUp;

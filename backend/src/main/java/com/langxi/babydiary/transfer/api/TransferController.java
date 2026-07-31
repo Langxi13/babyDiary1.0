@@ -1,6 +1,7 @@
 package com.langxi.babydiary.transfer.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.transfer.application.DiaryBookService;
 import com.langxi.babydiary.transfer.application.DiaryMediaExportService;
 import com.langxi.babydiary.transfer.application.PortableArchiveService;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}"))
 public class TransferController {
     private final PortableArchiveService archives;
     private final DiaryBookService books;

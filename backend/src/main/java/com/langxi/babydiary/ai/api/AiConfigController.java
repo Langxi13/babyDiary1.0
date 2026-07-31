@@ -2,6 +2,7 @@ package com.langxi.babydiary.ai.api;
 
 import com.langxi.babydiary.ai.application.AiConfigService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/admin/ai")
+@RequestMapping((ApiContract.ROOT + "/admin/ai"))
 public class AiConfigController {
     private final AiConfigService ai;
 

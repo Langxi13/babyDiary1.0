@@ -9,7 +9,6 @@ DB_APP_USER="${DB_APP_USER:-baby_diary_app}"
 SYSTEMD_SERVICE_FILE="${SYSTEMD_SERVICE_FILE:-/etc/systemd/system/diary-backend.service}"
 SYSTEMD_HARDENING_FILE="${SYSTEMD_HARDENING_FILE:-/etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
-IMAGE_DIR_OVERRIDE="${IMAGE_DIR:-}"
 OBJECT_DIR_OVERRIDE="${OBJECT_DIR:-}"
 NGINX_USER="${NGINX_USER:-www-data}"
 NGINX_GROUP="${NGINX_GROUP:-www-data}"
@@ -64,7 +63,6 @@ set -a
 . "$BACKEND_ENV_FILE"
 set +a
 
-IMAGE_DIR="${IMAGE_DIR_OVERRIDE:-${DIARY_FILE_PATH:-$PROJECT_ROOT/data/images}}"
 OBJECT_DIR="${OBJECT_DIR_OVERRIDE:-${DIARY_OBJECT_PATH:-$PROJECT_ROOT/data/objects}}"
 
 if [ "${DB_USERNAME:-}" != "$DB_APP_USER" ]; then
@@ -95,7 +93,7 @@ reject_placeholder_value() {
 
 require_env_value DB_URL
 require_env_value DB_PASSWORD
-require_env_value DIARY_FILE_PATH
+require_env_value DIARY_OBJECT_PATH
 require_env_value JWT_SECRET
 require_env_value CORS_ALLOWED_ORIGINS
 require_env_value AI_CONFIG_ENCRYPTION_KEY
@@ -107,12 +105,23 @@ reject_placeholder_value INVITATION_CODE
 reject_placeholder_value AI_CONFIG_ENCRYPTION_KEY
 reject_placeholder_value INVITATION_CODE_ENCRYPTION_KEY
 
-if [[ "$DB_URL" != *"connectionTimeZone=%2B08:00"* ]] \
-  || [[ "$DB_URL" != *"forceConnectionTimeZoneToSession=true"* ]]; then
-  echo "DB_URL must force the MySQL session timezone to the encoded +08:00 offset" >&2
+if [[ "$DB_URL" != *"/baby_diary?"* ]] \
+  || [[ "$DB_URL" != *"connectionTimeZone=UTC"* ]] \
+  || [[ "$DB_URL" != *"forceConnectionTimeZoneToSession=true"* ]] \
+  || [[ "$DB_URL" != *"preserveInstants=true"* ]]; then
+  echo "DB_URL must target baby_diary and enforce the UTC JDBC contract" >&2
   exit 1
 fi
 echo "database timezone configured"
+
+for retired in V3_DB_URL V3_DB_USERNAME V3_DB_PASSWORD DIARY_FILE_PATH DIARY_PAGE_SIZE \
+  JWT_EXPIRATION MEDIA_PROCESSING_ENABLED FFMPEG_BIN FFPROBE_BIN TESSERACT_BIN \
+  APP_RELEASE_VERSION MYSQL_DATABASE; do
+  if [ -n "${!retired:-}" ]; then
+    echo "retired environment variable is still configured: $retired" >&2
+    exit 1
+  fi
+done
 
 if [ "${#JWT_SECRET}" -lt 32 ]; then
   echo "JWT_SECRET should contain at least 32 characters" >&2
@@ -172,53 +181,12 @@ if [ -f "$NGINX_SITE_FILE" ]; then
   echo "nginx backend health proxy included"
 fi
 
-if [ ! -d "$IMAGE_DIR" ]; then
-  echo "missing image directory $IMAGE_DIR" >&2
-  exit 1
-fi
-
-DATA_DIR="$(dirname "$IMAGE_DIR")"
-data_path="$(readlink -m "$DATA_DIR")"
-case "$data_path" in
-  /|/tmp|/var|/home|/usr|/usr/local)
-    echo "image data directory must not be a shared system directory: $data_path" >&2
-    exit 1
-    ;;
-esac
-image_owner="$(stat -c '%U' "$IMAGE_DIR")"
-image_group="$(stat -c '%G' "$IMAGE_DIR")"
-image_mode="$(stat -c '%a' "$IMAGE_DIR")"
-data_owner="$(stat -c '%U' "$DATA_DIR")"
-data_group="$(stat -c '%G' "$DATA_DIR")"
-data_mode="$(stat -c '%a' "$DATA_DIR")"
-
-if [ "$CHECK_OS_USER" = "true" ] \
-  && { [ "$image_owner" != "$SERVICE_USER" ] || [ "$data_owner" != "$SERVICE_USER" ] \
-    || [ "$image_group" != "$SERVICE_GROUP" ] || [ "$data_group" != "$SERVICE_GROUP" ]; }; then
-  echo "legacy image tree should belong to $SERVICE_USER:$SERVICE_GROUP" >&2
-  exit 1
-fi
-
-if [ "$image_mode" != "700" ] || [ "$data_mode" != "700" ]; then
-  echo "legacy image tree mode should be 700, got data=$data_mode images=$image_mode" >&2
-  exit 1
-fi
-echo "legacy image directory quarantined"
-
 if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
   require_env_value DIARY_OBJECT_PATH
   if [ ! -d "$OBJECT_DIR" ]; then
     echo "missing private object directory $OBJECT_DIR" >&2
     exit 1
   fi
-  image_path="$(readlink -m "$IMAGE_DIR")"
-  object_path="$(readlink -m "$OBJECT_DIR")"
-  case "$object_path/" in
-    "$image_path/"*)
-      echo "DIARY_OBJECT_PATH must not be inside DIARY_FILE_PATH" >&2
-      exit 1
-      ;;
-  esac
   object_mode="$(stat -c '%a' "$OBJECT_DIR")"
   if [ "$object_mode" != "700" ]; then
     echo "private object directory mode should be 700, got $object_mode" >&2
@@ -231,12 +199,7 @@ if [ "$CHECK_OS_USER" = "true" ]; then
   id "$SERVICE_USER" >/dev/null
   if command -v runuser >/dev/null 2>&1; then
     runuser -u "$SERVICE_USER" -- test -w "$TMP_ROOT"
-    runuser -u "$SERVICE_USER" -- test -w "$IMAGE_DIR"
     id "$NGINX_USER" >/dev/null
-    if runuser -u "$NGINX_USER" -- test -x "$DATA_DIR"; then
-      echo "nginx user must not traverse the legacy image directory" >&2
-      exit 1
-    fi
     if [ "${OBJECT_STORAGE_PROVIDER:-local}" = "local" ]; then
       runuser -u "$SERVICE_USER" -- test -w "$OBJECT_DIR"
       if runuser -u "$NGINX_USER" -- test -r "$OBJECT_DIR"; then
@@ -244,15 +207,8 @@ if [ "$CHECK_OS_USER" = "true" ]; then
         exit 1
       fi
     fi
-    first_image="$(find "$IMAGE_DIR" -maxdepth 1 -type f | head -n 1 || true)"
-    if [ -n "$first_image" ]; then
-      if runuser -u "$NGINX_USER" -- test -r "$first_image"; then
-        echo "nginx user must not read quarantined legacy images" >&2
-        exit 1
-      fi
-    fi
   else
-    test -w "$IMAGE_DIR"
+    test -w "$OBJECT_DIR"
   fi
 fi
-echo "image directory writable"
+echo "object directory writable"

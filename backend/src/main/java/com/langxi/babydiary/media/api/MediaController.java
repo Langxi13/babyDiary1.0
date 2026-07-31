@@ -6,6 +6,7 @@ import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.media.application.MediaView;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -35,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/media")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/media"))
 public class MediaController {
     private final MediaService media;
     private final MediaRepresentationService representations;

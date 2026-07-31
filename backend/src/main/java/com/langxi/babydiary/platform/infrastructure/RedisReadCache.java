@@ -38,11 +38,11 @@ public class RedisReadCache implements ReadCache {
             ObjectProvider<StringRedisTemplate> redis,
             ObjectMapper json,
             @Value("${app.cache.enabled:true}") boolean enabled,
-            @Value("${app.cache.prefix:baby-diary:v3:cache:}") String prefix) {
+            @Value("${app.cache.prefix:baby-diary:cache:}") String prefix) {
         this.redis = redis.getIfAvailable();
         this.json = json;
         this.enabled = enabled;
-        this.prefix = prefix == null || prefix.isBlank() ? "baby-diary:v3:cache:" : prefix;
+        this.prefix = prefix == null || prefix.isBlank() ? "baby-diary:cache:" : prefix;
     }
 
     @Override

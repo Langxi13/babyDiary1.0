@@ -1,6 +1,7 @@
 package com.langxi.babydiary.space.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.space.application.SpaceService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces")
+@RequestMapping((ApiContract.ROOT + "/spaces"))
 public class SpaceController {
     private final SpaceService spaces;
 

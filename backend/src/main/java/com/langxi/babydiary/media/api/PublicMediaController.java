@@ -3,6 +3,7 @@ package com.langxi.babydiary.media.api;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.media.application.MediaUrlSigner;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
-@RequestMapping("/api/v3/public/media")
+@RequestMapping((ApiContract.ROOT + "/public/media"))
 public class PublicMediaController {
     private final MediaService media;
     private final MediaUrlSigner signer;

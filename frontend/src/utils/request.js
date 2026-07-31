@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { API_ROOT } from '@/api/contract'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import router from '@/router'
 import { nativeAuthRawRequest } from '@/platform/nativeAuth'
@@ -39,9 +40,9 @@ const getRefreshRequest = () => {
     cancelRefreshRequest()
     const controller = new AbortController()
     const pendingRequest = isNativeApp()
-      ? nativeAuthRawRequest('POST', '/api/v3/auth/refresh', null)
+      ? nativeAuthRawRequest('POST', `${API_ROOT}/auth/refresh`, null)
       : axios.post(
-          `${request.defaults.baseURL || ''}/api/v3/auth/refresh`,
+          `${request.defaults.baseURL || ''}${API_ROOT}/auth/refresh`,
           null,
           { withCredentials: true, timeout: 15000, signal: controller.signal }
         )
@@ -146,9 +147,9 @@ request.interceptors.response.use(
         if (originalRequest.__skipAuthRecovery) {
           return Promise.reject(error)
         }
-        const isRefreshRequest = originalRequest.url?.includes('/api/v3/auth/refresh')
-        const isPublicAuthRequest = /\/api\/v3\/auth\/login/.test(originalRequest.url || '')
-        const isPublicShareRequest = originalRequest.url?.includes('/api/v3/public/shares/')
+        const isRefreshRequest = originalRequest.url?.includes(`${API_ROOT}/auth/refresh`)
+        const isPublicAuthRequest = originalRequest.url?.includes(`${API_ROOT}/auth/login`)
+        const isPublicShareRequest = originalRequest.url?.includes(`${API_ROOT}/public/shares/`)
         if (isPublicShareRequest) {
           ElMessage.error(await parseMessage(data, '访问密码不正确'))
           return Promise.reject(error)

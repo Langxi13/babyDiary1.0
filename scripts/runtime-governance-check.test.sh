@@ -8,7 +8,6 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 SERVICE_FILE="$TMP_DIR/diary-backend.service"
 HARDENING_FILE="$TMP_DIR/10-baby-diary-hardening.conf"
 ENV_FILE="$TMP_DIR/backend.env"
-IMAGE_DIR="$TMP_DIR/images"
 OBJECT_DIR="$TMP_DIR/objects"
 HOST_TMP="$TMP_DIR/host-tmp"
 NGINX_SITE_FILE="$TMP_DIR/diary.nginx"
@@ -47,10 +46,9 @@ map $request_uri $baby_diary_resource_policy {
 NGINX
 
 cat > "$ENV_FILE" <<'ENV'
-DB_URL='jdbc:mysql://127.0.0.1:3306/baby-diary?connectionTimeZone=%2B08:00&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true'
+DB_URL='jdbc:mysql://127.0.0.1:3306/baby_diary?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true'
 DB_USERNAME=baby_diary_app
 DB_PASSWORD=test-database-password
-DIARY_FILE_PATH=/tmp/test-images
 DIARY_OBJECT_PATH=/tmp/test-objects
 JWT_SECRET=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 INVITATION_CODE=test-invitation
@@ -60,11 +58,10 @@ INVITATION_CODE_ENCRYPTION_KEY=cccccccccccccccccccccccccccccccc
 SERVER_ADDRESS=127.0.0.1
 ENV
 
-mkdir -p "$IMAGE_DIR"
 mkdir -p "$OBJECT_DIR"
 mkdir -p "$HOST_TMP"
 chmod 600 "$ENV_FILE"
-chmod 700 "$TMP_DIR" "$IMAGE_DIR"
+chmod 700 "$TMP_DIR"
 chmod 700 "$OBJECT_DIR"
 chmod 1777 "$HOST_TMP"
 
@@ -72,7 +69,6 @@ OUTPUT="$(
   SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
   SYSTEMD_HARDENING_FILE="$HARDENING_FILE" \
   BACKEND_ENV_FILE="$ENV_FILE" \
-  IMAGE_DIR="$IMAGE_DIR" \
   OBJECT_DIR="$OBJECT_DIR" \
   SERVICE_USER="baby-diary" \
   NGINX_GROUP="$(id -gn)" \
@@ -96,14 +92,13 @@ grep -q "security environment configured" <<<"$OUTPUT"
 grep -q "backend bound to loopback" <<<"$OUTPUT"
 grep -q "nginx native resource policy included" <<<"$OUTPUT"
 grep -q "nginx backend health proxy included" <<<"$OUTPUT"
-grep -q "legacy image directory quarantined" <<<"$OUTPUT"
 grep -q "private object directory isolated" <<<"$OUTPUT"
+grep -q "object directory writable" <<<"$OUTPUT"
 
 printf '%s\n' 'SERVER_ADDRESS=0.0.0.0' >> "$ENV_FILE"
 if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
   SYSTEMD_HARDENING_FILE="$HARDENING_FILE" \
   BACKEND_ENV_FILE="$ENV_FILE" \
-  IMAGE_DIR="$IMAGE_DIR" \
   OBJECT_DIR="$OBJECT_DIR" \
   SERVICE_USER="baby-diary" \
   NGINX_GROUP="$(id -gn)" \
@@ -122,7 +117,6 @@ sed -i 's/PrivateTmp=true/PrivateTmp=false/' "$HARDENING_FILE"
 if SYSTEMD_SERVICE_FILE="$SERVICE_FILE" \
   SYSTEMD_HARDENING_FILE="$HARDENING_FILE" \
   BACKEND_ENV_FILE="$ENV_FILE" \
-  IMAGE_DIR="$IMAGE_DIR" \
   OBJECT_DIR="$OBJECT_DIR" \
   SERVICE_USER="baby-diary" \
   NGINX_GROUP="$(id -gn)" \

@@ -1,6 +1,7 @@
 package com.langxi.babydiary.platform.api;
 
 import com.langxi.babydiary.platform.application.ClientReleaseProperties;
+import com.langxi.babydiary.platform.application.ProductVersion;
 import java.util.List;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -9,17 +10,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/client")
+@RequestMapping(ApiContract.ROOT + "/client")
 public class ClientBootstrapController {
     private final String serverVersion;
     private final AndroidUpdate android;
 
-    public ClientBootstrapController(ClientReleaseProperties releases) {
-        String configuredVersion = releases.getVersion();
-        this.serverVersion =
-                configuredVersion == null || configuredVersion.isBlank()
-                        ? "3.0.0"
-                        : configuredVersion.trim();
+    public ClientBootstrapController(
+            ClientReleaseProperties releases, ProductVersion productVersion) {
+        this.serverVersion = productVersion.value();
         ClientReleaseProperties.Android configured = releases.getAndroid();
         this.android =
                 configured.isUsable()
@@ -42,7 +40,7 @@ public class ClientBootstrapController {
                 .cacheControl(CacheControl.noStore())
                 .body(
                         new Bootstrap(
-                                3,
+                                ApiContract.VERSION,
                                 "BEARER_REFRESH_COOKIE",
                                 serverVersion,
                                 new UploadPolicy(

@@ -2,6 +2,7 @@ package com.langxi.babydiary.diary.api;
 
 import com.langxi.babydiary.diary.application.DiaryTemplateService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,7 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/templates")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/templates"))
 public class DiaryTemplateController {
     private final DiaryTemplateService templates;
 

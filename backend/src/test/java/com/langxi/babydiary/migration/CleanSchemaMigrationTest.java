@@ -21,7 +21,7 @@ class CleanSchemaMigrationTest {
     @Container
     private static final MySQLContainer<?> MYSQL =
             new MySQLContainer<>("mysql:8.4")
-                    .withDatabaseName("baby_diary_v3")
+                    .withDatabaseName("baby_diary")
                     .withUsername("baby_diary_test")
                     .withPassword("baby_diary_test");
 

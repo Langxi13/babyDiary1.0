@@ -2,12 +2,13 @@ package com.langxi.babydiary.ai.api;
 
 import com.langxi.babydiary.ai.application.AiScheduleService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/ai/schedule")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/ai/schedule"))
 public class AiScheduleController {
     private final AiScheduleService schedules;
 

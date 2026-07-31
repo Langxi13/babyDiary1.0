@@ -3,6 +3,7 @@ package com.langxi.babydiary.sync.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.sync.application.SyncService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/sync")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/sync"))
 public class SyncController {
     private final SyncService sync;
     private final StepUpService stepUp;

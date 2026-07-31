@@ -3,6 +3,7 @@ package com.langxi.babydiary.identity.api;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.AccountRecoveryService;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.platform.application.RequestRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -14,7 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v3")
+@RequestMapping(ApiContract.ROOT)
 public class AccountRecoveryController {
     private final AccountRecoveryService recovery;
     private final MediaRepresentationService media;

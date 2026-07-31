@@ -153,7 +153,7 @@ import { ArrowLeft, Clock, CopyDocument, Delete, EditPen, Lock, Share } from '@e
 import SpaceDiaryEditor from '@/components/workspace/SpaceDiaryEditor.vue'
 import { workspaceApi } from '@/api/workspace'
 import { diaryApi } from '@/api/diary'
-import { mediaThumbnailUrl } from '@/api/v3Adapters'
+import { mediaThumbnailUrl } from '@/api/models'
 import { tagApi } from '@/api/experience'
 import DiaryMediaGallery from '@/components/diary/DiaryMediaGallery.vue'
 import { useAuthStore } from '@/stores/auth'

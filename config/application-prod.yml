@@ -7,12 +7,12 @@ server:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${V3_DB_URL}
-    username: ${V3_DB_USERNAME:${DB_USERNAME}}
-    password: ${V3_DB_PASSWORD:${DB_PASSWORD}}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: ${V3_DB_POOL_MAX:8}
-      minimum-idle: ${V3_DB_POOL_MIN:2}
+      maximum-pool-size: ${DB_POOL_MAX:8}
+      minimum-idle: ${DB_POOL_MIN:2}
       connection-timeout: 5000
       validation-timeout: 2000
   data:
@@ -52,7 +52,6 @@ cors:
 
 app:
   release:
-    version: ${APP_RELEASE_VERSION:3.0.0}
     android:
       enabled: ${ANDROID_UPDATE_ENABLED:false}
       distribution: ${ANDROID_UPDATE_DISTRIBUTION:DIRECT}
@@ -88,41 +87,41 @@ app:
   export:
     pdf-font-path: ${PDF_FONT_PATH:/usr/share/fonts/truetype/unifont/unifont.ttf}
   media:
-    url-signing-key: ${V3_MEDIA_URL_SIGNING_KEY:${JWT_SECRET}}
-    url-lifetime-seconds: ${V3_MEDIA_URL_LIFETIME_SECONDS:1800}
-    protected-url-lifetime-seconds: ${V3_MEDIA_PROTECTED_URL_LIFETIME_SECONDS:300}
-    processing-min-free-bytes: ${V3_MEDIA_PROCESSING_MIN_FREE_BYTES:3221225472}
+    url-signing-key: ${MEDIA_URL_SIGNING_KEY:${JWT_SECRET}}
+    url-lifetime-seconds: ${MEDIA_URL_LIFETIME_SECONDS:1800}
+    protected-url-lifetime-seconds: ${MEDIA_PROTECTED_URL_LIFETIME_SECONDS:300}
+    processing-min-free-bytes: ${MEDIA_PROCESSING_MIN_FREE_BYTES:3221225472}
     ffmpeg: ${FFMPEG_PATH:ffmpeg}
     ffprobe: ${FFPROBE_PATH:ffprobe}
   jobs:
-    enabled: ${V3_JOBS_ENABLED:true}
-    worker-id: ${V3_WORKER_ID:${HOSTNAME:single-node}}
-    poll-delay-ms: ${V3_JOB_POLL_DELAY_MS:2000}
-    stale-after-minutes: ${V3_JOB_STALE_MINUTES:30}
-    recovery-delay-ms: ${V3_JOB_RECOVERY_DELAY_MS:300000}
+    enabled: ${JOBS_ENABLED:true}
+    worker-id: ${WORKER_ID:${HOSTNAME:single-node}}
+    poll-delay-ms: ${JOB_POLL_DELAY_MS:2000}
+    stale-after-minutes: ${JOB_STALE_MINUTES:30}
+    recovery-delay-ms: ${JOB_RECOVERY_DELAY_MS:300000}
   cache:
-    enabled: ${V3_CACHE_ENABLED:true}
-    prefix: ${CACHE_PREFIX:baby-diary:v3:cache:}
+    enabled: ${CACHE_ENABLED:true}
+    prefix: ${CACHE_PREFIX:baby-diary:cache:}
   outbox:
-    enabled: ${V3_OUTBOX_ENABLED:true}
-    poll-delay-ms: ${V3_OUTBOX_POLL_DELAY_MS:2000}
-    stale-after-minutes: ${V3_OUTBOX_STALE_MINUTES:10}
-    recovery-delay-ms: ${V3_OUTBOX_RECOVERY_DELAY_MS:300000}
+    enabled: ${OUTBOX_ENABLED:true}
+    poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}
+    stale-after-minutes: ${OUTBOX_STALE_MINUTES:10}
+    recovery-delay-ms: ${OUTBOX_RECOVERY_DELAY_MS:300000}
   reminders:
-    enabled: ${V3_REMINDERS_ENABLED:true}
+    enabled: ${REMINDERS_ENABLED:true}
     delivery-delay-ms: ${REMINDER_DELIVERY_DELAY_MS:60000}
   ai-schedules:
-    enabled: ${V3_AI_SCHEDULES_ENABLED:true}
-    poll-delay-ms: ${V3_AI_SCHEDULE_POLL_DELAY_MS:60000}
+    enabled: ${AI_SCHEDULES_ENABLED:true}
+    poll-delay-ms: ${AI_SCHEDULE_POLL_DELAY_MS:60000}
   retention:
-    enabled: ${V3_RETENTION_ENABLED:true}
-    diary-trash-days: ${V3_DIARY_TRASH_DAYS:30}
-    sync-days: ${V3_SYNC_RETENTION_DAYS:90}
-    diary-purge-cron: ${V3_DIARY_PURGE_CRON:0 25 4 * * *}
-    data-cleanup-cron: ${V3_DATA_CLEANUP_CRON:0 45 4 * * *}
+    enabled: ${RETENTION_ENABLED:true}
+    diary-trash-days: ${DIARY_TRASH_DAYS:30}
+    sync-days: ${SYNC_RETENTION_DAYS:90}
+    diary-purge-cron: ${DIARY_PURGE_CRON:0 25 4 * * *}
+    data-cleanup-cron: ${DATA_CLEANUP_CRON:0 45 4 * * *}
   rate-limit:
-    enabled: ${V3_RATE_LIMIT_ENABLED:true}
-    redis-enabled: ${V3_RATE_LIMIT_REDIS_ENABLED:true}
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
   http:
     slow-request-threshold-ms: ${SLOW_REQUEST_THRESHOLD_MS:1000}
 

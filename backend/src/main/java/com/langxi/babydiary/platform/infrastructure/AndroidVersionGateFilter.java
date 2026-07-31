@@ -1,6 +1,7 @@
 package com.langxi.babydiary.platform.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.platform.application.ClientReleaseProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -35,9 +36,9 @@ public class AndroidVersionGateFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return HttpMethod.OPTIONS.matches(request.getMethod())
-                || !path.startsWith("/api/v3/")
-                || path.equals("/api/v3/client/bootstrap")
-                || path.startsWith("/api/v3/public/")
+                || !path.startsWith(ApiContract.ROOT + "/")
+                || path.equals(ApiContract.ROOT + "/client/bootstrap")
+                || path.startsWith(ApiContract.ROOT + "/public/")
                 || !"android".equalsIgnoreCase(request.getHeader(PLATFORM_HEADER));
     }
 

@@ -1,6 +1,7 @@
 package com.langxi.babydiary.identity.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.langxi.babydiary.platform.api.ApiContract;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -37,17 +38,17 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         auth ->
                                 auth.requestMatchers(
-                                                "/api/v3/auth/login",
-                                                "/api/v3/auth/register",
-                                                "/api/v3/auth/refresh",
-                                                "/api/v3/auth/logout",
-                                                "/api/v3/auth/email/confirm",
-                                                "/api/v3/auth/password/reset-request",
-                                                "/api/v3/auth/password/reset",
-                                                "/api/v3/auth/password/recover",
-                                                "/api/v3/public/media/**",
-                                                "/api/v3/client/bootstrap",
-                                                "/api/v3/public/**",
+                                                ApiContract.ROOT + "/auth/login",
+                                                ApiContract.ROOT + "/auth/register",
+                                                ApiContract.ROOT + "/auth/refresh",
+                                                ApiContract.ROOT + "/auth/logout",
+                                                ApiContract.ROOT + "/auth/email/confirm",
+                                                ApiContract.ROOT + "/auth/password/reset-request",
+                                                ApiContract.ROOT + "/auth/password/reset",
+                                                ApiContract.ROOT + "/auth/password/recover",
+                                                ApiContract.ROOT + "/public/media/**",
+                                                ApiContract.ROOT + "/client/bootstrap",
+                                                ApiContract.ROOT + "/public/**",
                                                 "/actuator/health",
                                                 "/v3/api-docs/**",
                                                 "/swagger-ui/**",
@@ -120,7 +121,7 @@ public class SecurityConfig {
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/v3/**", configuration);
+        source.registerCorsConfiguration(ApiContract.ROOT + "/**", configuration);
         return source;
     }
 }

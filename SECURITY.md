@@ -17,7 +17,7 @@ Include the affected component, reproduction steps, expected impact, and any sug
 - Use a dedicated database account instead of `root`.
 - Restrict CORS to trusted origins and keep Redis/MySQL bound to private interfaces.
 - Rotate a credential immediately if it is ever committed, logged, or otherwise exposed.
-- Back up and protect uploaded images and database dumps as personal data.
+- Encrypt uploaded media, database dumps, runtime configuration, and signing material in backups; store the decryption passphrase separately.
 
 ## Security Boundaries
 

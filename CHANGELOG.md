@@ -2,6 +2,9 @@
 
 ## 2026-07-31
 
+- Unified the current runtime naming around `/api/v3`, database `baby_diary`, neutral environment variables, `Baby-Diary.jar`, canonical frontend model modules, and product version `1.0.0-beta.5` from one tracked release file.
+- Added encrypted format-3 backups for database, media objects, private runtime configuration and Android signing material, with wrong-passphrase and tamper regressions; used separately verified encrypted archives during the one-time runtime cutover.
+- Completed a rollback-safe one-time cutover that verified row counts, deterministic data hashes, Flyway state, media representations and space boundaries before retiring historical databases, files and narrowly matched Redis keys; removed the migration utility after completion.
 - Closed cross-relation protected-media leaks: shares, portable archives, media ZIP exports, album catalogs, avatars, comments and AI album proposals now re-evaluate whether an asset is referenced by any locked diary before every sensitive read or state transition.
 - Made diary revision restore validate both the current diary and target snapshot lock state, and made saved AI album proposals discard diaries or media that later became locked, private, deleted or inaccessible.
 - Prevented elevated diary, album, anniversary and media responses from entering browser or Redis caches; locked diary records persisted for offline reading are reduced to metadata-only placeholders.

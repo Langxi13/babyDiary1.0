@@ -2,6 +2,7 @@ package com.langxi.babydiary.ai.api;
 
 import com.langxi.babydiary.ai.application.AiReportService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/ai-reports")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/ai-reports"))
 public class AiReportController {
     private final AiReportService reports;
 

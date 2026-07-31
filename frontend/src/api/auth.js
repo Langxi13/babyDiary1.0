@@ -1,7 +1,8 @@
+import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
 import { nativeAuthResultRequest } from '@/platform/nativeAuth'
 import { isNativeApp } from '@/platform/runtimeConfig'
-import { normalizeMedia } from '@/api/v3Adapters'
+import { normalizeMedia } from '@/api/models'
 
 const normalizeUser = user => user ? {
   ...user,
@@ -16,21 +17,21 @@ const normalizeSession = session => ({
 export const authApi = {
   async login(data) {
     const session = isNativeApp()
-      ? await nativeAuthResultRequest('POST', '/api/v3/auth/login', data)
-      : await request.post('/api/v3/auth/login', data)
+      ? await nativeAuthResultRequest('POST', `${API_ROOT}/auth/login`, data)
+      : await request.post(`${API_ROOT}/auth/login`, data)
     return normalizeSession(session)
   },
 
   register(data) {
-    return request.post('/api/v3/auth/register', data)
+    return request.post(`${API_ROOT}/auth/register`, data)
   },
 
   logout(accessToken) {
     if (isNativeApp()) {
-      return nativeAuthResultRequest('POST', '/api/v3/auth/logout', null,
+      return nativeAuthResultRequest('POST', `${API_ROOT}/auth/logout`, null,
         accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
     }
-    return request.post('/api/v3/auth/logout', null, {
+    return request.post(`${API_ROOT}/auth/logout`, null, {
       __skipAuthRecovery: true,
       headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
       timeout: 10000
@@ -38,40 +39,40 @@ export const authApi = {
   },
 
   async getUserInfo() {
-    return normalizeUser(await request.get('/api/v3/account/profile'))
+    return normalizeUser(await request.get(`${API_ROOT}/account/profile`))
   },
 
   async uploadAvatar(spaceId, file) {
     const mediaBody = new FormData()
     mediaBody.append('file', file)
-    const media = normalizeMedia(await request.post(`/api/v3/spaces/${spaceId}/media`, mediaBody, {
+    const media = normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, mediaBody, {
       timeout: 10 * 60 * 1000
     }))
     try {
-      return normalizeUser(await request.put('/api/v3/account/avatar', { spaceId, assetId: media.id }))
+      return normalizeUser(await request.put(`${API_ROOT}/account/avatar`, { spaceId, assetId: media.id }))
     } catch (error) {
-      await request.delete(`/api/v3/spaces/${spaceId}/media/${media.id}`, { __silentError: true }).catch(() => {})
+      await request.delete(`${API_ROOT}/spaces/${spaceId}/media/${media.id}`, { __silentError: true }).catch(() => {})
       throw error
     }
   },
 
   changePassword(data) {
-    return request.post('/api/v3/account/password', {
+    return request.post(`${API_ROOT}/account/password`, {
       currentPassword: data.currentPassword,
       newPassword: data.newPassword
     })
   },
 
   getSessions() {
-    return request.get('/api/v3/auth/sessions')
+    return request.get(`${API_ROOT}/auth/sessions`)
   },
 
   revokeSession(sessionId) {
-    return request.delete(`/api/v3/auth/sessions/${sessionId}`)
+    return request.delete(`${API_ROOT}/auth/sessions/${sessionId}`)
   },
 
   async updateEmail(data) {
-    const result = await request.put('/api/v3/account/email', { email: data.email })
+    const result = await request.put(`${API_ROOT}/account/email`, { email: data.email })
     return {
       ...result,
       profile: normalizeUser(result.profile)
@@ -79,29 +80,29 @@ export const authApi = {
   },
 
   confirmEmail(token) {
-    return request.post('/api/v3/auth/email/confirm', { token })
+    return request.post(`${API_ROOT}/auth/email/confirm`, { token })
   },
 
   stepUp(password) {
-    return request.post('/api/v3/auth/step-up', { password }, {
+    return request.post(`${API_ROOT}/auth/step-up`, { password }, {
       __silentError: true,
       __skipAuthRecovery: true
     })
   },
 
   recoveryCodes(password) {
-    return request.post('/api/v3/auth/recovery-codes', { password })
+    return request.post(`${API_ROOT}/auth/recovery-codes`, { password })
   },
 
   requestPasswordReset(email) {
-    return request.post('/api/v3/auth/password/reset-request', { email })
+    return request.post(`${API_ROOT}/auth/password/reset-request`, { email })
   },
 
   resetPassword(token, newPassword) {
-    return request.post('/api/v3/auth/password/reset', { token, newPassword })
+    return request.post(`${API_ROOT}/auth/password/reset`, { token, newPassword })
   },
 
   recoverPassword(username, recoveryCode, newPassword) {
-    return request.post('/api/v3/auth/password/recover', { username, recoveryCode, newPassword })
+    return request.post(`${API_ROOT}/auth/password/recover`, { username, recoveryCode, newPassword })
   }
 }

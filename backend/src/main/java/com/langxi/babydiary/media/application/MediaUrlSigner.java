@@ -1,5 +1,6 @@
 package com.langxi.babydiary.media.application;
 
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.platform.application.ApiException;
 import jakarta.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
@@ -78,7 +79,8 @@ public class MediaUrlSigner {
         String signature =
                 sign(payload(spaceId, assetId, normalized, normalizedProfile, ticket, expires));
         String value =
-                "/api/v3/public/media/"
+                ApiContract.ROOT
+                        + "/public/media/"
                         + spaceId
                         + "/"
                         + assetId

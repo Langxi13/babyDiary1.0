@@ -1,5 +1,6 @@
 package com.langxi.babydiary.platform.infrastructure;
 
+import com.langxi.babydiary.platform.api.ApiContract;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -14,6 +15,6 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(slowRequests).addPathPatterns("/api/v3/**");
+        registry.addInterceptor(slowRequests).addPathPatterns(ApiContract.ROOT + "/**");
     }
 }

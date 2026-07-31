@@ -1,5 +1,6 @@
+import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
-import { diaryPayload, normalizeDiary, normalizeMedia } from '@/api/v3Adapters'
+import { diaryPayload, normalizeDiary, normalizeMedia } from '@/api/models'
 import { cachedRequest, invalidateApiCache, stableStringify } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
 
@@ -44,7 +45,7 @@ async function cursorForPage(spaceId, params, targetPage, stepUpToken) {
     listCursors.set(key, state)
   }
   for (let page = state.cursors.length - 1; page < targetPage; page += 1) {
-    const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+    const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
       params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined },
       headers: stepHeader(stepUpToken)
     })
@@ -60,7 +61,7 @@ const uploadFiles = async (spaceId, files) => {
     for (const file of files) {
       const body = new FormData()
       body.append('file', file)
-      uploaded.push(normalizeMedia(await request.post(`/api/v3/spaces/${spaceId}/media`, body, {
+      uploaded.push(normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, body, {
         timeout: 10 * 60 * 1000
       })))
     }
@@ -72,7 +73,7 @@ const uploadFiles = async (spaceId, files) => {
 }
 
 const cleanupUploads = (spaceId, uploaded) => Promise.allSettled(
-  uploaded.map(media => request.delete(`/api/v3/spaces/${spaceId}/media/${media.id}`, { __silentError: true }))
+  uploaded.map(media => request.delete(`${API_ROOT}/spaces/${spaceId}/media/${media.id}`, { __silentError: true }))
 )
 
 const formDataCommand = async (spaceId, formData, editing) => {
@@ -109,7 +110,7 @@ const formDataCommand = async (spaceId, formData, editing) => {
 async function requiredVersion(spaceId, diaryId) {
   if (diaryVersions.has(diaryId)) return diaryVersions.get(diaryId)
   const diary = normalizeDiary(await withStepUpRetry(token => request.get(
-    `/api/v3/spaces/${spaceId}/diaries/${diaryId}`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${diaryId}`,
     { headers: stepHeader(token) }
   )))
   rememberVersion(diary)
@@ -124,7 +125,7 @@ export const diaryApi = {
       async () => {
         const page = Math.max(0, Number(params.page) || 0)
         const cursor = await cursorForPage(spaceId, params, page, stepUpToken)
-        const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+        const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
           params: { ...normalizeListParams(params), cursor: cursor || undefined },
           headers: stepHeader(stepUpToken)
         })
@@ -149,7 +150,7 @@ export const diaryApi = {
     return cachedRequest(
       `spaces:${spaceId}:diaries:detail:${id}:access:${accessMode(stepUpToken)}`,
       async () => rememberVersion(normalizeDiary(await withStepUpRetry(token => request.get(
-        `/api/v3/spaces/${spaceId}/diaries/${id}`,
+        `${API_ROOT}/spaces/${spaceId}/diaries/${id}`,
         { headers: stepHeader(token || stepUpToken) }
       )))),
       { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => false }
@@ -182,7 +183,7 @@ export const diaryApi = {
 
   async create(spaceId, command) {
     const diary = rememberVersion(normalizeDiary(await request.post(
-      `/api/v3/spaces/${spaceId}/diaries`, diaryPayload(command)
+      `${API_ROOT}/spaces/${spaceId}/diaries`, diaryPayload(command)
     )))
     invalidateDiaryReads(spaceId)
     return diary
@@ -190,7 +191,7 @@ export const diaryApi = {
 
   async update(spaceId, id, command, version, stepUpToken) {
     const diary = rememberVersion(normalizeDiary(await withStepUpRetry(token => request.put(
-      `/api/v3/spaces/${spaceId}/diaries/${id}`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}`,
       diaryPayload(command),
       { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
     ))))
@@ -200,7 +201,7 @@ export const diaryApi = {
   },
 
   async moveToTrash(spaceId, id, version, stepUpToken) {
-    await withStepUpRetry(token => request.delete(`/api/v3/spaces/${spaceId}/diaries/${id}`, {
+    await withStepUpRetry(token => request.delete(`${API_ROOT}/spaces/${spaceId}/diaries/${id}`, {
       headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` }
     }))
     diaryVersions.delete(id)
@@ -210,7 +211,7 @@ export const diaryApi = {
 
   async permanentlyDelete(spaceId, id, version, stepUpToken) {
     await withStepUpRetry(token => request.delete(
-      `/api/v3/spaces/${spaceId}/diaries/${id}/permanent`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}/permanent`,
       { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
     ))
     diaryVersions.delete(id)
@@ -220,7 +221,7 @@ export const diaryApi = {
 
   async restore(spaceId, id, version, stepUpToken) {
     const diary = rememberVersion(normalizeDiary(await withStepUpRetry(token => request.post(
-      `/api/v3/spaces/${spaceId}/diaries/${id}/restore`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}/restore`,
       null,
       { headers: { ...stepHeader(token || stepUpToken), 'If-Match': `"${version}"` } }
     ))))
@@ -229,13 +230,13 @@ export const diaryApi = {
   },
 
   revisions: (spaceId, id, stepUpToken) => request.get(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/revisions`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${id}/revisions`,
     { headers: stepHeader(stepUpToken) }
   ),
 
   async restoreRevision(spaceId, id, revisionId, version, stepUpToken) {
     const diary = rememberVersion(normalizeDiary(await request.post(
-      `/api/v3/spaces/${spaceId}/diaries/${id}/revisions/${revisionId}/restore`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}/revisions/${revisionId}/restore`,
       null,
       { headers: { ...stepHeader(stepUpToken), 'If-Match': `"${version}"` } }
     )))
@@ -245,44 +246,44 @@ export const diaryApi = {
 
   async comments(spaceId, id, stepUpToken) {
     return (await request.get(
-      `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}/comments`,
       { headers: stepHeader(stepUpToken) }
     ) || []).map(normalizeComment)
   },
 
   async addComment(spaceId, id, content, stepUpToken) {
     return normalizeComment(await request.post(
-      `/api/v3/spaces/${spaceId}/diaries/${id}/comments`,
+      `${API_ROOT}/spaces/${spaceId}/diaries/${id}/comments`,
       { content },
       { headers: stepHeader(stepUpToken) }
     ))
   },
 
   updateComment: (spaceId, id, commentId, content, stepUpToken) => request.put(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
     { content },
     { headers: stepHeader(stepUpToken) }
   ),
 
   removeComment: (spaceId, id, commentId, stepUpToken) => request.delete(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${id}/comments/${commentId}`,
     { headers: stepHeader(stepUpToken) }
   ),
 
   reactions: (spaceId, id, stepUpToken) => request.get(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/reactions`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${id}/reactions`,
     { headers: stepHeader(stepUpToken) }
   ),
 
   setReaction: (spaceId, id, emoji, active, stepUpToken) => request.put(
-    `/api/v3/spaces/${spaceId}/diaries/${id}/reactions`,
+    `${API_ROOT}/spaces/${spaceId}/diaries/${id}/reactions`,
     { emoji, active },
     { headers: stepHeader(stepUpToken) }
   ),
 
   exportImages(spaceId, startDate, endDate) {
     return withStepUpRetry(token => request.get(
-      `/api/v3/spaces/${spaceId}/transfer/media`,
+      `${API_ROOT}/spaces/${spaceId}/transfer/media`,
       {
         params: { startDate, endDate },
         responseType: 'blob',
@@ -310,7 +311,7 @@ export const diaryApi = {
       const seenCursors = new Set()
       let cursor
       do {
-        const result = await request.get(`/api/v3/spaces/${spaceId}/diaries`, {
+        const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
           params: { ...query, cursor },
           headers: stepHeader(stepUpToken)
         })
@@ -337,7 +338,7 @@ export const diaryApi = {
     const stepUpToken = getStepUpToken()
     return cachedRequest(`spaces:${spaceId}:diaries:calendar:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, async () => {
       const month = `${params.year}-${String(params.month).padStart(2, '0')}`
-      const result = await request.get(`/api/v3/spaces/${spaceId}/diaries/calendar`, {
+      const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries/calendar`, {
         params: { month }, headers: stepHeader(stepUpToken)
       })
       return (result.days || []).map(day => ({

@@ -4,6 +4,7 @@ WORKDIR /workspace/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
+COPY config/release-version.properties /workspace/config/release-version.properties
 RUN npm run build
 
 FROM nginx:1.27-alpine

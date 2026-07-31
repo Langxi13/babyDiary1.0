@@ -46,6 +46,6 @@ test('anniversary api exposes multipart cover upload endpoint', () => {
   assert.match(apiSource, /uploadCover\(spaceId, file\)/)
   assert.match(apiSource, /const formData = new FormData\(\)/)
   assert.match(apiSource, /formData\.append\('file', file\)/)
-  assert.match(apiSource, /request\.post\(`\/api\/v3\/spaces\/\$\{spaceId\}\/media`, formData/)
+  assert.ok(apiSource.includes('$' + '{API_ROOT}/spaces/$' + '{spaceId}/media'))
   assert.match(apiSource, /coverAssetId: value\.coverAssetId \|\| null/)
 })

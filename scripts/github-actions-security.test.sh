@@ -30,6 +30,7 @@ grep -q -- '--log-opts=--all' "$ROOT/.github/workflows/ci.yml"
 grep -q 'fetch-public-refs.sh' "$ROOT/scripts/security-scan.sh"
 grep -q 'ghcr.io/gitleaks/gitleaks@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854' \
   "$ROOT/scripts/security-scan.sh"
+grep -q 'GITLEAKS_BIN=' "$ROOT/scripts/security-scan.sh"
 grep -q -- '--log-opts=--all' "$ROOT/scripts/security-scan.sh"
 awk '
   /^  supply-chain:/ { in_supply_chain = 1 }

@@ -81,7 +81,7 @@ class ApiIntegrationTest {
     @Container
     static final MySQLContainer<?> MYSQL =
             new MySQLContainer<>("mysql:8.4")
-                    .withDatabaseName("baby_diary_v3_api")
+                    .withDatabaseName("baby_diary_api")
                     .withUsername("test")
                     .withPassword("test");
 
@@ -223,6 +223,14 @@ class ApiIntegrationTest {
 
         mvc.perform(post("/api/v3/auth/refresh").cookie(secondRefresh))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void clientBootstrapPublishesUnifiedApiAndProductVersions() throws Exception {
+        mvc.perform(get("/api/v3/client/bootstrap"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.apiVersion").value(3))
+                .andExpect(jsonPath("$.serverVersion").value("1.0.0-beta.5"));
     }
 
     @Test

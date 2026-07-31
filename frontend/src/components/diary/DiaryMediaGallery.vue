@@ -37,7 +37,7 @@ import {
   mediaPlaybackUrl,
   mediaPosterUrl,
   mediaThumbnailUrl
-} from '@/api/v3Adapters'
+} from '@/api/models'
 import 'element-plus/es/components/image/style/css.mjs'
 
 const props = defineProps({

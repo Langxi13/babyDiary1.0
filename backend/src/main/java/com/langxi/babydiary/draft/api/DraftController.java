@@ -3,6 +3,7 @@ package com.langxi.babydiary.draft.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.langxi.babydiary.draft.application.DraftService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/drafts")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/drafts"))
 public class DraftController {
     private final DraftService drafts;
 

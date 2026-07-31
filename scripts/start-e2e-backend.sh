@@ -33,9 +33,7 @@ done
 curl -fsS http://127.0.0.1:8090/health >/dev/null
 
 export SERVER_PORT=11002
-export V3_DB_URL='jdbc:mysql://127.0.0.1:3307/baby_diary_v3?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true'
-export V3_DB_USERNAME=baby_diary_e2e
-export V3_DB_PASSWORD=baby_diary_e2e
+export DB_URL='jdbc:mysql://127.0.0.1:3307/baby_diary?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&preserveInstants=true&useSSL=false&allowPublicKeyRetrieval=true'
 export DB_USERNAME=baby_diary_e2e
 export DB_PASSWORD=baby_diary_e2e
 export REDIS_HOST=127.0.0.1
@@ -45,23 +43,20 @@ export CACHE_PREFIX=baby-diary:e2e:
 export INVITATION_CODE=e2e-invitation-code
 export INVITATION_CODE_ENCRYPTION_KEY=test-only-invitation-key-000000000000000000000000
 export JWT_SECRET=e2e-jwt-secret-that-is-longer-than-thirty-two-characters
-export V3_MEDIA_URL_SIGNING_KEY=e2e-media-signing-key-that-is-longer-than-thirty-two-characters
+export MEDIA_URL_SIGNING_KEY=e2e-media-signing-key-that-is-longer-than-thirty-two-characters
 export JWT_ACCESS_EXPIRATION=900000
-export JWT_EXPIRATION=2592000000
 export AUTH_SECURE_COOKIE=false
 export CORS_ALLOWED_ORIGINS=http://127.0.0.1:4173
 export AI_CONFIG_ENCRYPTION_KEY=test-only-key-00000000000000000000000000000000
-export DIARY_FILE_PATH=/tmp/baby-diary-e2e/images/
 export DIARY_OBJECT_PATH=/tmp/baby-diary-e2e/objects/
-export MEDIA_PROCESSING_ENABLED=false
 export MAIL_ENABLED=false
 export SPRINGDOC_ENABLED=true
 export REMINDER_DELIVERY_DELAY_MS=3600000
-export V3_RATE_LIMIT_ENABLED=false
-export V3_JOBS_ENABLED=false
+export RATE_LIMIT_ENABLED=false
+export JOBS_ENABLED=false
 
 cd "$PROJECT_ROOT"
 source scripts/java-env.sh
 mvn "${MAVEN_SETTINGS_ARGS[@]}" -q -f backend/pom.xml \
   -Dspring-boot.run.main-class=com.langxi.babydiary.BabyDiaryApplication \
-  -Dspring-boot.run.profiles=v3 spring-boot:run
+  spring-boot:run

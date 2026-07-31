@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { copyText } from '@/utils/copyText'
-import { mediaThumbnailUrl } from '@/api/v3Adapters'
+import { mediaThumbnailUrl } from '@/api/models'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024

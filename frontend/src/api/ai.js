@@ -1,3 +1,4 @@
+import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
 
 const aiRequestTimeout = timeoutSeconds => (
@@ -6,48 +7,48 @@ const aiRequestTimeout = timeoutSeconds => (
 
 export const aiApi = {
   getConfig() {
-    return request.get('/api/v3/admin/ai')
+    return request.get(`${API_ROOT}/admin/ai`)
   },
 
   saveConfig(payload) {
-    return request.post('/api/v3/admin/ai', payload)
+    return request.post(`${API_ROOT}/admin/ai`, payload)
   },
 
   testConfig(timeoutSeconds) {
-    return request.post('/api/v3/admin/ai/test', null, {
+    return request.post(`${API_ROOT}/admin/ai/test`, null, {
       timeout: aiRequestTimeout(timeoutSeconds)
     })
   },
 
   listModels(timeoutSeconds) {
-    return request.get('/api/v3/admin/ai/models', {
+    return request.get(`${API_ROOT}/admin/ai/models`, {
       timeout: aiRequestTimeout(timeoutSeconds)
     })
   },
 
   generateReport(spaceId, payload, timeoutSeconds) {
-    return request.post(`/api/v3/spaces/${spaceId}/ai-reports`, payload, {
+    return request.post(`${API_ROOT}/spaces/${spaceId}/ai-reports`, payload, {
       timeout: aiRequestTimeout(timeoutSeconds)
     })
   },
 
   listReports(spaceId, params = {}) {
-    return request.get(`/api/v3/spaces/${spaceId}/ai-reports`, { params })
+    return request.get(`${API_ROOT}/spaces/${spaceId}/ai-reports`, { params })
   },
 
   getReport(spaceId, reportId) {
-    return request.get(`/api/v3/spaces/${spaceId}/ai-reports/${reportId}`)
+    return request.get(`${API_ROOT}/spaces/${spaceId}/ai-reports/${reportId}`)
   },
 
   deleteReport(spaceId, reportId) {
-    return request.delete(`/api/v3/spaces/${spaceId}/ai-reports/${reportId}`)
+    return request.delete(`${API_ROOT}/spaces/${spaceId}/ai-reports/${reportId}`)
   },
 
   getSchedule(spaceId) {
-    return request.get(`/api/v3/spaces/${spaceId}/ai/schedule`)
+    return request.get(`${API_ROOT}/spaces/${spaceId}/ai/schedule`)
   },
 
   updateSchedule(spaceId, data) {
-    return request.put(`/api/v3/spaces/${spaceId}/ai/schedule`, data)
+    return request.put(`${API_ROOT}/spaces/${spaceId}/ai/schedule`, data)
   }
 }

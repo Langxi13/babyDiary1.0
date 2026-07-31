@@ -4,6 +4,7 @@ import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.AuthenticationService;
 import com.langxi.babydiary.identity.application.RegistrationService;
 import com.langxi.babydiary.identity.application.StepUpService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.platform.application.RequestRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/auth")
+@RequestMapping(ApiContract.ROOT + "/auth")
 public class AuthController {
     static final String REFRESH_COOKIE = "baby_diary_refresh";
 
@@ -152,7 +153,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Lax")
-                .path("/api/v3/auth")
+                .path(ApiContract.ROOT + "/auth")
                 .maxAge(Duration.ofDays(refreshDays))
                 .build();
     }
@@ -162,7 +163,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(secureCookie)
                 .sameSite("Lax")
-                .path("/api/v3/auth")
+                .path(ApiContract.ROOT + "/auth")
                 .maxAge(Duration.ZERO)
                 .build();
     }

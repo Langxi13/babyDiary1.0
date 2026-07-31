@@ -4,12 +4,20 @@ import { fileURLToPath, URL } from 'node:url'
 import { readFileSync } from 'node:fs'
 
 const apiTarget = process.env.VITE_DEV_API_TARGET || 'http://localhost:10002'
-const packageInfo = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+const releaseInfo = Object.fromEntries(
+  readFileSync(new URL('../config/release-version.properties', import.meta.url), 'utf8')
+    .split(/\r?\n/)
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => line.split('=', 2))
+)
+if (!/^[0-9]+(\.[0-9]+){1,3}([.-][A-Za-z0-9]+)*$/.test(releaseInfo.PRODUCT_VERSION || '')) {
+  throw new Error('PRODUCT_VERSION is invalid')
+}
 
 export default defineConfig({
   plugins: [vue()],
   define: {
-    __APP_VERSION__: JSON.stringify(packageInfo.version)
+    __APP_VERSION__: JSON.stringify(releaseInfo.PRODUCT_VERSION)
   },
   build: {
     rollupOptions: {

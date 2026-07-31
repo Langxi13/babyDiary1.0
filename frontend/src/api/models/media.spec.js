@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { mediaOriginalUrl, mediaThumbnailUrl, normalizeMedia } from './v3Adapters'
+import { mediaOriginalUrl, mediaThumbnailUrl, normalizeMedia } from './media'
 
-describe('V3 media normalization', () => {
+describe('media model normalization', () => {
   it('resolves canonical representation URLs without creating legacy aliases', () => {
     const media = normalizeMedia({
       id: 'asset-1',

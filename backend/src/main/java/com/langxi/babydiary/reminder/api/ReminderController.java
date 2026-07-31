@@ -1,6 +1,7 @@
 package com.langxi.babydiary.reminder.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.reminder.application.ReminderService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/reminders")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/reminders"))
 public class ReminderController {
     private final ReminderService reminders;
 

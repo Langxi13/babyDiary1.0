@@ -3,6 +3,7 @@ package com.langxi.babydiary.notification.api;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.notification.application.NotificationService;
 import com.langxi.babydiary.notification.application.PushSubscriptionService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -23,7 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/notifications")
+@RequestMapping((ApiContract.ROOT + "/notifications"))
 public class NotificationController {
     private final NotificationService notifications;
     private final PushSubscriptionService push;

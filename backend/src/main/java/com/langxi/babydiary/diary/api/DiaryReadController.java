@@ -3,6 +3,7 @@ package com.langxi.babydiary.diary.api;
 import com.langxi.babydiary.diary.application.DiaryReadService;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/diaries")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/diaries"))
 public class DiaryReadController {
     private final DiaryReadService reads;
     private final StepUpService stepUp;

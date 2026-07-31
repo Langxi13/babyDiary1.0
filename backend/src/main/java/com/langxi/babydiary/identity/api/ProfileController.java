@@ -5,6 +5,7 @@ import com.langxi.babydiary.identity.application.ProfileService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaLinkView;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/account")
+@RequestMapping((ApiContract.ROOT + "/account"))
 public class ProfileController {
     private final ProfileService profiles;
     private final MediaRepresentationService media;

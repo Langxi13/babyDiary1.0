@@ -48,7 +48,7 @@ public class RequestRateLimiter {
 
     public void require(String scope, String identity, int limit, long windowSeconds) {
         if (!enabled) return;
-        String key = "baby-diary:v3:rate:" + safeScope(scope) + ":" + hash(identity);
+        String key = "baby-diary:rate:" + safeScope(scope) + ":" + hash(identity);
         long count = redisCount(key, windowSeconds);
         if (count < 0) count = localCount(key, windowSeconds);
         if (count > limit) {

@@ -1,5 +1,6 @@
+import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
-import { normalizeAnniversary, normalizeDraft, normalizeMedia } from '@/api/v3Adapters'
+import { normalizeAnniversary, normalizeDraft, normalizeMedia } from '@/api/models'
 import { invalidateDiaryReads } from '@/api/diary'
 import { cachedRequest, invalidateApiCache } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
@@ -9,12 +10,12 @@ const stepHeader = token => token ? { 'X-Step-Up-Token': token } : {}
 export const tagApi = {
   list(spaceId, options = {}) {
     return cachedRequest(`spaces:${spaceId}:tags:list`, () => (
-      request.get(`/api/v3/spaces/${spaceId}/tags`)
+      request.get(`${API_ROOT}/spaces/${spaceId}/tags`)
     ), { ttl: options.ttl ?? 600000, force: options.force })
   },
 
   async create(spaceId, payload) {
-    const tag = await request.post(`/api/v3/spaces/${spaceId}/tags`, payload)
+    const tag = await request.post(`${API_ROOT}/spaces/${spaceId}/tags`, payload)
     invalidateApiCache(`spaces:${spaceId}:tags:`)
     invalidateDiaryReads(spaceId)
     return tag
@@ -33,7 +34,7 @@ export const anniversaryApi = {
   list(spaceId, options = {}) {
     const stepUpToken = getStepUpToken()
     return cachedRequest(`spaces:${spaceId}:anniversaries:list:access:${stepUpToken ? 'elevated' : 'standard'}`, async () => {
-      const result = await request.get(`/api/v3/spaces/${spaceId}/anniversaries`, {
+      const result = await request.get(`${API_ROOT}/spaces/${spaceId}/anniversaries`, {
         headers: stepHeader(stepUpToken)
       })
       return (result || []).map(normalizeAnniversary)
@@ -42,7 +43,7 @@ export const anniversaryApi = {
 
   async create(spaceId, payload) {
     const item = await withStepUpRetry(token => request.post(
-      `/api/v3/spaces/${spaceId}/anniversaries`,
+      `${API_ROOT}/spaces/${spaceId}/anniversaries`,
       anniversaryPayload(payload),
       { headers: stepHeader(token) }
     ))
@@ -53,14 +54,14 @@ export const anniversaryApi = {
   async uploadCover(spaceId, file) {
     const formData = new FormData()
     formData.append('file', file)
-    return normalizeMedia(await request.post(`/api/v3/spaces/${spaceId}/media`, formData, {
+    return normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, formData, {
       timeout: 10 * 60 * 1000
     }))
   },
 
   async update(spaceId, id, payload) {
     const item = await withStepUpRetry(token => request.put(
-      `/api/v3/spaces/${spaceId}/anniversaries/${id}`,
+      `${API_ROOT}/spaces/${spaceId}/anniversaries/${id}`,
       anniversaryPayload(payload),
       { headers: stepHeader(token) }
     ))
@@ -69,7 +70,7 @@ export const anniversaryApi = {
   },
 
   async remove(spaceId, id) {
-    await request.delete(`/api/v3/spaces/${spaceId}/anniversaries/${id}`)
+    await request.delete(`${API_ROOT}/spaces/${spaceId}/anniversaries/${id}`)
     invalidateApiCache(`spaces:${spaceId}:anniversaries:`)
   }
 }
@@ -77,19 +78,19 @@ export const anniversaryApi = {
 export const draftApi = {
   list(spaceId, options = {}) {
     return cachedRequest(`spaces:${spaceId}:drafts:list`, async () => (
-      (await request.get(`/api/v3/spaces/${spaceId}/drafts`) || []).map(normalizeDraft)
+      (await request.get(`${API_ROOT}/spaces/${spaceId}/drafts`) || []).map(normalizeDraft)
     ), { ttl: options.ttl ?? 30000, force: options.force })
   },
 
   get(spaceId, draftKey, options = {}) {
     return cachedRequest(`spaces:${spaceId}:drafts:item:${draftKey}`, async () => normalizeDraft(
-      await request.get(`/api/v3/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`)
+      await request.get(`${API_ROOT}/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`)
     ), { ttl: options.ttl ?? 30000, force: options.force })
   },
 
   async save(spaceId, payload) {
     const { draftKey, diaryId, ...draftPayload } = payload
-    const draft = await request.put(`/api/v3/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`, {
+    const draft = await request.put(`${API_ROOT}/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`, {
       diaryId: diaryId || null,
       payload: draftPayload
     })
@@ -98,7 +99,7 @@ export const draftApi = {
   },
 
   async remove(spaceId, draftKey) {
-    await request.delete(`/api/v3/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`)
+    await request.delete(`${API_ROOT}/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`)
     invalidateApiCache(`spaces:${spaceId}:drafts:`)
   }
 }

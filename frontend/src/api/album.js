@@ -1,5 +1,6 @@
+import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
-import { normalizeAlbum, normalizeAlbumGroup, normalizeMedia } from '@/api/v3Adapters'
+import { normalizeAlbum, normalizeAlbumGroup, normalizeMedia } from '@/api/models'
 import { invalidateApiCache, cachedRequest, stableStringify } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
 
@@ -53,7 +54,7 @@ export const albumApi = {
   getGroups(spaceId, options = {}) {
     const stepUpToken = getStepUpToken()
     return cachedRequest(`spaces:${spaceId}:albums:groups:access:${accessMode(stepUpToken)}`, async () => {
-      const result = await request.get(`/api/v3/spaces/${spaceId}/album-groups`, {
+      const result = await request.get(`${API_ROOT}/spaces/${spaceId}/album-groups`, {
         headers: stepHeader(stepUpToken)
       })
       return (result.groups || []).map(normalizeAlbumGroup)
@@ -67,7 +68,7 @@ export const albumApi = {
         return pageResult([], 0, Number(params.size) || 24, 0)
       }
       return albumDetailPage(
-        `/api/v3/spaces/${spaceId}/albums/system/${systemKey}`,
+        `${API_ROOT}/spaces/${spaceId}/albums/system/${systemKey}`,
         params,
         systemKey === 'favorites',
         stepUpToken
@@ -78,29 +79,29 @@ export const albumApi = {
   getAlbumPhotoPage(spaceId, albumId, params = {}, options = {}) {
     const stepUpToken = getStepUpToken()
     return cachedRequest(`spaces:${spaceId}:albums:${albumId}:photos:page:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, () => (
-      albumDetailPage(`/api/v3/spaces/${spaceId}/albums/${albumId}`, params, false, stepUpToken)
+      albumDetailPage(`${API_ROOT}/spaces/${spaceId}/albums/${albumId}`, params, false, stepUpToken)
     ), { ttl: options.ttl ?? 30000, force: options.force, cacheIf: () => !stepUpToken })
   },
 
   async createGroup(spaceId, payload) {
-    const group = await request.post(`/api/v3/spaces/${spaceId}/album-groups`, payload)
+    const group = await request.post(`${API_ROOT}/spaces/${spaceId}/album-groups`, payload)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
     return group
   },
 
   async updateGroup(spaceId, groupId, payload) {
-    const group = await request.put(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`, payload)
+    const group = await request.put(`${API_ROOT}/spaces/${spaceId}/album-groups/${groupId}`, payload)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
     return group
   },
 
   async deleteGroup(spaceId, groupId) {
-    await request.delete(`/api/v3/spaces/${spaceId}/album-groups/${groupId}`)
+    await request.delete(`${API_ROOT}/spaces/${spaceId}/album-groups/${groupId}`)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
 
   async createAlbum(spaceId, payload) {
-    const album = await withStepUpRetry(token => request.post(`/api/v3/spaces/${spaceId}/albums`, {
+    const album = await withStepUpRetry(token => request.post(`${API_ROOT}/spaces/${spaceId}/albums`, {
       ...payload,
       mediaIds: payload.mediaIds || []
     }, { headers: stepHeader(token) }))
@@ -109,19 +110,19 @@ export const albumApi = {
   },
 
   async updateAlbum(spaceId, albumId, payload) {
-    const album = await request.put(`/api/v3/spaces/${spaceId}/albums/${albumId}`, payload)
+    const album = await request.put(`${API_ROOT}/spaces/${spaceId}/albums/${albumId}`, payload)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
     return normalizeAlbum(album)
   },
 
   async deleteAlbum(spaceId, albumId) {
-    await request.delete(`/api/v3/spaces/${spaceId}/albums/${albumId}`)
+    await request.delete(`${API_ROOT}/spaces/${spaceId}/albums/${albumId}`)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
   },
 
   async removeAlbumPhoto(spaceId, albumId, mediaId) {
     await withStepUpRetry(token => request.delete(
-      `/api/v3/spaces/${spaceId}/albums/${albumId}/media/${mediaId}`,
+      `${API_ROOT}/spaces/${spaceId}/albums/${albumId}/media/${mediaId}`,
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:albums:`)
@@ -129,7 +130,7 @@ export const albumApi = {
 
   async favoriteMedia(spaceId, mediaId) {
     await withStepUpRetry(token => request.put(
-      `/api/v3/spaces/${spaceId}/media/${mediaId}/favorite`,
+      `${API_ROOT}/spaces/${spaceId}/media/${mediaId}/favorite`,
       null,
       { headers: stepHeader(token) }
     ))
@@ -139,7 +140,7 @@ export const albumApi = {
 
   async unfavoriteMedia(spaceId, mediaId) {
     await withStepUpRetry(token => request.delete(
-      `/api/v3/spaces/${spaceId}/media/${mediaId}/favorite`,
+      `${API_ROOT}/spaces/${spaceId}/media/${mediaId}/favorite`,
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:albums:`)
@@ -147,29 +148,29 @@ export const albumApi = {
 
   async generateProposal(spaceId, payload) {
     return normalizeProposal(await request.post(
-      `/api/v3/spaces/${spaceId}/ai-album-proposals`, payload, { timeout: 120000 }
+      `${API_ROOT}/spaces/${spaceId}/ai-album-proposals`, payload, { timeout: 120000 }
     ))
   },
 
   async updateProposal(spaceId, proposalId, payload) {
     return normalizeProposal(await request.put(
-      `/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`, payload
+      `${API_ROOT}/spaces/${spaceId}/ai-album-proposals/${proposalId}`, payload
     ))
   },
 
   async confirmProposal(spaceId, proposalId) {
-    const result = await request.post(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}/confirm`)
+    const result = await request.post(`${API_ROOT}/spaces/${spaceId}/ai-album-proposals/${proposalId}/confirm`)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
     return result
   },
 
   discardProposal(spaceId, proposalId) {
-    return request.delete(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
+    return request.delete(`${API_ROOT}/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
   },
 
   getProposal(spaceId, proposalId, options = {}) {
     return cachedRequest(`spaces:${spaceId}:albums:proposal:${proposalId}`, async () => normalizeProposal(
-      await request.get(`/api/v3/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
+      await request.get(`${API_ROOT}/spaces/${spaceId}/ai-album-proposals/${proposalId}`)
     ), { ttl: options.ttl ?? 30000, force: options.force })
   }
 }

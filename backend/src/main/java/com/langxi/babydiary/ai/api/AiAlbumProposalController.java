@@ -5,6 +5,7 @@ import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaView;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/ai-album-proposals")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/ai-album-proposals"))
 public class AiAlbumProposalController {
     private final AiAlbumProposalService proposals;
     private final MediaRepresentationService media;

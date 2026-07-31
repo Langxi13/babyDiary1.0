@@ -6,16 +6,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "app.release")
 public class ClientReleaseProperties {
-    private String version = "3.0.0";
     private Android android = new Android();
-
-    public String getVersion() {
-        return version;
-    }
-
-    public void setVersion(String version) {
-        this.version = version;
-    }
 
     public Android getAndroid() {
         return android;

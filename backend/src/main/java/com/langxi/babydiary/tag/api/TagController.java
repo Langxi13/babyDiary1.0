@@ -1,6 +1,7 @@
 package com.langxi.babydiary.tag.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.tag.application.TagService;
 import com.langxi.babydiary.tag.domain.Tag;
 import jakarta.validation.Valid;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}/tags")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}/tags"))
 public class TagController {
     private final TagService tags;
 

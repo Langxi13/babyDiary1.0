@@ -1,6 +1,7 @@
 package com.langxi.babydiary.space.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
+import com.langxi.babydiary.platform.api.ApiContract;
 import com.langxi.babydiary.space.application.CollaborationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3")
+@RequestMapping(ApiContract.ROOT)
 public class CollaborationController {
     private final CollaborationService collaboration;
 

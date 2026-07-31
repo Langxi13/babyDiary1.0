@@ -2,6 +2,7 @@ package com.langxi.babydiary.identity.api;
 
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.InvitationCodeService;
+import com.langxi.babydiary.platform.api.ApiContract;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/admin/invitation-code")
+@RequestMapping((ApiContract.ROOT + "/admin/invitation-code"))
 public class InvitationCodeController {
     private final InvitationCodeService codes;
 

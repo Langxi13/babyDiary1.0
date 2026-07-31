@@ -8,6 +8,7 @@ import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaView;
+import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v3/spaces/{spaceId}")
+@RequestMapping((ApiContract.ROOT + "/spaces/{spaceId}"))
 public class AlbumController {
     private final AlbumQueryService queries;
     private final AlbumService albums;
