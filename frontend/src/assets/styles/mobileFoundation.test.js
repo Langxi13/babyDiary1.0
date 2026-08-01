@@ -18,3 +18,9 @@ test('mobile controls and overlays stay usable inside safe areas', () => {
   assert.match(foundationSource, /body \.el-dialog__body\s*\{[\s\S]*?overflow-y:\s*auto;/)
   assert.match(foundationSource, /body \.el-picker__popper,[\s\S]*?max-width:\s*calc\(100vw - 16px\);/)
 })
+
+test('Android native controls provide 48px touch targets without widening the page', () => {
+  assert.match(foundationSource, /html\.platform-android\s*\{[\s\S]*?\.el-button:not\(\.is-circle\),[\s\S]*?min-height:\s*48px;/)
+  assert.match(foundationSource, /\.topbar-brand,[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;/)
+  assert.match(foundationSource, /\.sheet-link-list button,[\s\S]*?min-height:\s*48px;/)
+})

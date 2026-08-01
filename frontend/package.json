@@ -1,6 +1,6 @@
 {
   "name": "baby-diary-frontend",
-  "version": "1.0.0-beta.5",
+  "version": "1.0.0-beta.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,8 +23,12 @@
     "@capacitor/browser": "8.0.4",
     "@capacitor/camera": "8.2.1",
     "@capacitor/core": "8.4.1",
+    "@capacitor/file-transfer": "2.0.4",
+    "@capacitor/filesystem": "8.1.2",
     "@capacitor/ios": "8.4.1",
+    "@capacitor/network": "8.0.1",
     "@capacitor/preferences": "8.0.1",
+    "@capacitor/share": "8.0.1",
     "@element-plus/icons-vue": "^2.3.2",
     "@tiptap/pm": "^3.27.3",
     "@tiptap/starter-kit": "^3.27.3",

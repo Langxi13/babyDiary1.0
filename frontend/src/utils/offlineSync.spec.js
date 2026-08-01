@@ -6,8 +6,9 @@ const mocks = vi.hoisted(() => ({
   getDiary: vi.fn(),
   updateDiary: vi.fn(),
   invalidateDiaryReads: vi.fn(),
-  upload: vi.fn(),
+  uploadSource: vi.fn(),
   removeMedia: vi.fn(),
+  releaseNativeImage: vi.fn(),
   listOperations: vi.fn(),
   removeOperations: vi.fn(),
   getMeta: vi.fn(),
@@ -23,7 +24,10 @@ vi.mock('@/api/diary', () => ({
   invalidateDiaryReads: mocks.invalidateDiaryReads
 }))
 vi.mock('@/api/media', () => ({
-  mediaApi: { upload: mocks.upload, remove: mocks.removeMedia }
+  mediaApi: { uploadSource: mocks.uploadSource, remove: mocks.removeMedia }
+}))
+vi.mock('@/platform/nativeImages', () => ({
+  releaseNativeImage: mocks.releaseNativeImage
 }))
 vi.mock('@/utils/offlineDb', () => ({
   getOfflineMeta: mocks.getMeta,
@@ -49,7 +53,7 @@ describe('offline media synchronization', () => {
     mocks.getMeta.mockResolvedValue(0)
     mocks.getDiary.mockResolvedValue({ id: 'diary-1', media: [], version: 1 })
     mocks.updateDiary.mockResolvedValue({ id: 'diary-1', version: 2 })
-    mocks.upload.mockResolvedValue({ id: 'media-1' })
+    mocks.uploadSource.mockResolvedValue({ id: 'media-1' })
   })
 
   it('uploads queued media and links the returned public media id to its diary', async () => {
@@ -69,7 +73,12 @@ describe('offline media synchronization', () => {
       failures: []
     })
 
-    expect(mocks.upload).toHaveBeenCalledWith('space-1', expect.any(FormData))
+    expect(mocks.uploadSource).toHaveBeenCalledWith('space-1', {
+      file: pending.file,
+      uploadId: 'operation-1'
+    }, {
+      caption: 'Memory'
+    })
     expect(mocks.updateDiary).toHaveBeenCalledWith(
       'space-1',
       'diary-1',
@@ -78,5 +87,28 @@ describe('offline media synchronization', () => {
       null
     )
     expect(mocks.removeOperations).toHaveBeenCalledWith(['operation-1'])
+    expect(mocks.releaseNativeImage).toHaveBeenCalledWith(pending.file)
+  })
+
+  it('retains native staging files when linking fails so the queue can retry', async () => {
+    const source = {
+      kind: 'native-uri',
+      uploadId: crypto.randomUUID(),
+      uri: 'file:///pending/memory.heic',
+      stagedPath: 'pending-media/memory.heic'
+    }
+    mocks.listOperations.mockResolvedValue([{
+      id: 'operation-2',
+      kind: 'media',
+      diaryId: 'diary-1',
+      source
+    }])
+    mocks.updateDiary.mockRejectedValueOnce(new Error('network'))
+
+    await syncWorkspace('space-1')
+
+    expect(mocks.removeMedia).toHaveBeenCalledWith('space-1', 'media-1')
+    expect(mocks.removeOperations).not.toHaveBeenCalledWith(['operation-2'])
+    expect(mocks.releaseNativeImage).not.toHaveBeenCalled()
   })
 })

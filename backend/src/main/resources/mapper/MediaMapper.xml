@@ -93,6 +93,15 @@
         ORDER BY FIELD(v.variant_type,'THUMBNAIL','PREVIEW','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
     </select>
 
+    <select id="findByClientUploadId" resultMap="mediaRow">
+        SELECT <include refid="assetColumns"/>
+        FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id
+        LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.deleted_at IS NULL AND v.status='READY'
+        WHERE a.space_id=#{spaceId} AND a.owner_id=#{ownerId} AND a.client_upload_id=#{clientUploadId}
+          AND a.deleted_at IS NULL AND a.status='READY'
+        ORDER BY FIELD(v.variant_type,'THUMBNAIL','PREVIEW','POSTER','ORIGINAL','TRANSCODED','WAVEFORM'),v.variant_id
+    </select>
+
     <select id="findByPublicIds" resultMap="mediaRow">
         SELECT <include refid="assetColumns"/>
         FROM media_asset a JOIN diary_space s ON s.space_id=a.space_id

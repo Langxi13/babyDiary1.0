@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-02
+
+- Released `1.0.0-beta.8` (`versionCode 8`) as the final privacy-scanned Android/Web artifact after normalizing non-production URL placeholders.
+- Released `1.0.0-beta.7` (`versionCode 7`) so installed Beta 6 clients receive the final native staging-file cleanup fix through the immutable upgrade path.
+- Released `1.0.0-beta.6` (`versionCode 6`) with an Android transport split: native HTTP for refresh cookies, Axios/Bearer for JSON, and official File Transfer streaming for media and large exports.
+- Fixed Android post-login failures by allowing every emitted client/version/idempotency header in trusted native CORS preflights and added the same preflight to production health checks.
+- Preserved HEIC/HEIF originals, raised the unified image limit to 25 MB, staged native selections in private app storage, and added UUID media upload idempotency without changing existing assets.
+- Added native network/foreground/back-button/system-bar handling, offline status UI, merged startup requests, retryable initialization, native export save sheets, 48 px Android touch targets, and bounded staging cleanup.
+- Added frontend native transfer/lifecycle/offline/error tests, backend CORS/HEIC/idempotency/migration tests, Android plugin governance, and a disk-gated maintenance script for requeuing only temporary-space media failures.
+
 ## 2026-07-31
 
 - Added Flyway V5 adaptive image derivatives while preserving immutable `ORIGINAL/source` objects and their checksums; image assets now expose `THUMBNAIL/compact` and `PREVIEW/screen` under one media contract.

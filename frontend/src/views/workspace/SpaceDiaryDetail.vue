@@ -160,6 +160,7 @@ import { useAuthStore } from '@/stores/auth'
 import { withStepUpRetry } from '@/utils/stepUp'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
 import { copyText } from '@/utils/copyText'
+import { resolveServerUrl } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/dialog/style/css.mjs'
@@ -279,7 +280,7 @@ const createShare = async () => {
   try {
     const payload = { ...shareForm, password: shareForm.password || null }
     const result = await withStepUpRetry(token => workspaceApi.shares.create(spaceId, diaryId, payload, token))
-    shareUrl.value = `${window.location.origin}${result.sharePath}`
+    shareUrl.value = resolveServerUrl(result.sharePath)
     generatedShareId.value = result.id
     await loadShares()
   } finally { sharing.value = false }

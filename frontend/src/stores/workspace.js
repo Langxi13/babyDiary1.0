@@ -14,27 +14,36 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const unreadNotifications = ref(0)
   let initialized = false
   let storeGeneration = 0
+  let spacesRequest = null
+  let initializeRequest = null
 
   const activeSpace = computed(() => spaces.value.find(space => space.id === activeSpaceId.value) || null)
   const isPersonalSpace = computed(() => activeSpace.value?.type === 'PERSONAL')
 
   async function loadSpaces(force = false) {
-    if (loading.value || (!force && spaces.value.length)) return spaces.value
+    if (!force && spaces.value.length) return spaces.value
+    if (spacesRequest) return spacesRequest
     const generation = storeGeneration
     loading.value = true
+    const pending = (async () => {
+      try {
+        const result = await workspaceApi.spaces.list()
+        if (generation !== storeGeneration) return spaces.value
+        spaces.value = result
+        if (!spaces.value.some(space => space.id === activeSpaceId.value)) {
+          activeSpaceId.value = spaces.value[0]?.id || ''
+        }
+        persistActiveSpace()
+        return spaces.value
+      } finally {
+        if (generation === storeGeneration) loading.value = false
+      }
+    })()
+    spacesRequest = pending
     try {
-      const result = await workspaceApi.spaces.list()
-      if (generation !== storeGeneration) return spaces.value
-      spaces.value = result
-      if (!spaces.value.some(space => space.id === activeSpaceId.value)) {
-        activeSpaceId.value = spaces.value[0]?.id || ''
-      }
-      persistActiveSpace()
-      return spaces.value
+      return await pending
     } finally {
-      if (generation === storeGeneration) {
-        loading.value = false
-      }
+      if (spacesRequest === pending) spacesRequest = null
     }
   }
 
@@ -89,15 +98,33 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return result
   }
 
+  function setOnline(value) {
+    const next = value !== false
+    const restored = !online.value && next
+    online.value = next
+    if (restored) {
+      initialize().then(() => syncActive()).catch(() => {})
+    }
+  }
+
   async function initialize() {
     if (initialized) return
+    if (initializeRequest) return initializeRequest
     const generation = storeGeneration
-    initialized = true
-    await loadSpaces()
-    if (generation !== storeGeneration) return
-    await Promise.all([refreshPendingCount(), refreshUnread()])
-    if (generation !== storeGeneration) return
-    syncActive().catch(() => {})
+    const pending = (async () => {
+      await loadSpaces()
+      if (generation !== storeGeneration) return
+      await Promise.all([refreshPendingCount(), refreshUnread()])
+      if (generation !== storeGeneration) return
+      initialized = true
+      syncActive().catch(() => {})
+    })()
+    initializeRequest = pending
+    try {
+      return await pending
+    } finally {
+      if (initializeRequest === pending) initializeRequest = null
+    }
   }
 
   function persistActiveSpace() {
@@ -108,6 +135,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   function reset() {
     storeGeneration += 1
     initialized = false
+    spacesRequest = null
+    initializeRequest = null
     spaces.value = []
     activeSpaceId.value = ''
     loading.value = false
@@ -119,10 +148,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
-      online.value = true
-      syncActive().catch(() => {})
+      setOnline(true)
     })
-    window.addEventListener('offline', () => { online.value = false })
+    window.addEventListener('offline', () => setOnline(false))
     window.addEventListener('offline-queue:changed', refreshPendingCount)
     window.addEventListener('workspace:sync-issues', event => {
       if (!activeSpaceId.value || event.detail?.spaceId !== activeSpaceId.value) return
@@ -147,6 +175,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     refreshPendingCount,
     refreshUnread,
     syncActive,
+    setOnline,
     initialize,
     reset
   }

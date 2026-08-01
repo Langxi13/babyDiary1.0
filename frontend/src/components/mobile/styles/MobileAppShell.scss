@@ -5,6 +5,7 @@
 .mobile-topbar,
 .mobile-tabbar,
 .mobile-update-banner,
+.mobile-network-banner,
 .mobile-sheet-mask {
   display: none;
 }
@@ -96,7 +97,8 @@
     padding-bottom: calc(var(--mobile-tabbar-height) + 14px + env(safe-area-inset-bottom));
   }
 
-  .mobile-update-banner {
+  .mobile-update-banner,
+  .mobile-network-banner {
     position: fixed;
     top: calc(var(--mobile-topbar-height) + env(safe-area-inset-top));
     right: 0;
@@ -126,7 +128,14 @@
     }
   }
 
-  .app-shell.has-update-banner .mobile-shell-content {
+  .mobile-network-banner {
+    grid-template-columns: 24px minmax(0, 1fr);
+    background: #fff3f1;
+    border-bottom-color: #e8c5bf;
+    color: #8a3d36;
+  }
+
+  .app-shell.has-status-banner .mobile-shell-content {
     padding-top: calc(var(--mobile-topbar-height) + 54px + env(safe-area-inset-top));
   }
 

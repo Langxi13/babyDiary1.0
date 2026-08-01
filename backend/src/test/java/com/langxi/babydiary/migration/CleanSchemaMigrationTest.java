@@ -60,6 +60,8 @@ class CleanSchemaMigrationTest {
             assertThat(columnType(statement, "diary_draft", "payload")).isEqualTo("json");
             assertThat(columnType(statement, "sync_change", "visibility")).isEqualTo("varchar(16)");
             assertThat(columnType(statement, "media_asset", "derivative_version")).isEqualTo("int");
+            assertThat(columnType(statement, "media_asset", "client_upload_id"))
+                    .isEqualTo("binary(16)");
             assertThat(columnType(statement, "media_variant", "quality_score"))
                     .isEqualTo("decimal(7,6)");
 
@@ -71,6 +73,37 @@ class CleanSchemaMigrationTest {
                     assertThat(result.getString(1)).doesNotContain("general_ci", "unicode_ci");
                 }
             }
+        }
+    }
+
+    @Test
+    void v6AddsNullableUploadIdempotencyWithoutChangingExistingMedia() throws Exception {
+        clean();
+        flyway("5").migrate();
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO account(account_id,public_id,username,password_hash) "
+                            + "VALUES(1,UUID_TO_BIN(UUID()),'owner','hash')");
+            statement.execute(
+                    "INSERT INTO diary_space(space_id,public_id,name,type,created_by,personal_owner_id,default_visibility) "
+                            + "VALUES(10,UUID_TO_BIN(UUID()),'Owner space','PERSONAL',1,1,'PRIVATE')");
+            statement.execute(
+                    "INSERT INTO media_asset(asset_id,public_id,space_id,owner_id,media_type,original_filename,status) "
+                            + "VALUES(20,UUID_TO_BIN(UUID()),10,1,'IMAGE','memory.jpg','READY')");
+        }
+
+        flyway(null).migrate();
+
+        try (Connection connection = connection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery(
+                                "SELECT original_filename,status,client_upload_id FROM media_asset WHERE asset_id=20")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString(1)).isEqualTo("memory.jpg");
+            assertThat(result.getString(2)).isEqualTo("READY");
+            assertThat(result.getBytes(3)).isNull();
         }
     }
 

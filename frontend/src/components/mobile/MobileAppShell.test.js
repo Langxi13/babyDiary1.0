@@ -54,6 +54,6 @@ test('mobile app shell includes install affordance for PWA and iOS home screen',
 test('native shell checks for updates without covering page content', () => {
   assert.match(source, /if \(nativeApp\) updateStore\.check\(\)/)
   assert.match(source, /class="mobile-update-banner"/)
-  assert.match(source, /\.app-shell\.has-update-banner \.mobile-shell-content/)
+  assert.match(source, /\.app-shell\.has-status-banner \.mobile-shell-content/)
   assert.match(source, /padding-top:\s*calc\(var\(--mobile-topbar-height\) \+ 54px \+ env\(safe-area-inset-top\)\);/)
 })

@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell" :class="{ 'keyboard-open': keyboardOpen, 'has-update-banner': updateStore.updateAvailable }">
+  <div class="app-shell" :class="{ 'keyboard-open': keyboardOpen, 'has-status-banner': !workspaceStore.online || updateStore.updateAvailable }">
     <nav-bar class="desktop-navbar" />
 
     <header class="mobile-topbar">
@@ -22,7 +22,11 @@
       </button>
     </header>
 
-    <button v-if="updateStore.updateAvailable" type="button" class="mobile-update-banner" @click="router.push('/about')">
+    <div v-if="!workspaceStore.online" class="mobile-network-banner" role="status">
+      <el-icon><WarningFilled /></el-icon>
+      <span>当前设备已离线，联网后将自动同步</span>
+    </div>
+    <button v-else-if="updateStore.updateAvailable" type="button" class="mobile-update-banner" @click="router.push('/about')">
       <el-icon><WarningFilled /></el-icon>
       <span>{{ updateStore.updateRequired ? '当前版本需要更新' : `发现新版本 ${updateStore.manifest.latestVersionName}` }}</span>
       <el-icon><ArrowRight /></el-icon>
@@ -239,6 +243,13 @@ const handleKeydown = (event) => {
   installSheetOpen.value = false
 }
 
+const handleNativeBack = event => {
+  if (!secondarySheetOpen.value && !installSheetOpen.value) return
+  secondarySheetOpen.value = false
+  installSheetOpen.value = false
+  event.preventDefault()
+}
+
 const openInstall = async () => {
   secondarySheetOpen.value = false
   if (deferredInstallPrompt.value) {
@@ -251,10 +262,10 @@ const openInstall = async () => {
 }
 
 onMounted(() => {
-  workspaceStore.initialize().catch(() => {})
   if (nativeApp) updateStore.check().catch(() => {})
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('native:back', handleNativeBack)
   window.visualViewport?.addEventListener('resize', updateKeyboardState)
   updateKeyboardState()
 })
@@ -262,6 +273,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('native:back', handleNativeBack)
   window.visualViewport?.removeEventListener('resize', updateKeyboardState)
   document.body.style.overflow = ''
 })

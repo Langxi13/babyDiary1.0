@@ -5,6 +5,7 @@ import com.langxi.babydiary.identity.application.AuthenticationService;
 import com.langxi.babydiary.identity.application.RegistrationService;
 import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.platform.api.ApiContract;
+import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import com.langxi.babydiary.platform.application.RequestRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -60,7 +61,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<SessionResponse> login(
             @Valid @RequestBody LoginRequest request,
-            @RequestHeader(value = "X-Device-Name", required = false) String deviceName,
+            @RequestHeader(value = ClientRequestHeaders.DEVICE_NAME, required = false)
+                    String deviceName,
             HttpServletRequest servletRequest) {
         rateLimiter.require(
                 "login", rateLimiter.client(servletRequest) + ":" + request.username(), 10, 900);

@@ -19,6 +19,8 @@ HEALTH_CHECK_ATTEMPTS="${HEALTH_CHECK_ATTEMPTS:-1}"
 HEALTH_CHECK_DELAY_SECONDS="${HEALTH_CHECK_DELAY_SECONDS:-2}"
 PWA_MANIFEST_PATH="${PWA_MANIFEST_PATH:-/manifest.webmanifest}"
 PWA_MANIFEST_CONTENT_TYPE="${PWA_MANIFEST_CONTENT_TYPE:-application/manifest+json}"
+DEFAULT_ANDROID_CORS_ORIGIN="https://localhost"
+ANDROID_CORS_ORIGIN="${ANDROID_CORS_ORIGIN:-$DEFAULT_ANDROID_CORS_ORIGIN}"
 
 if [ -z "$BASE_URL" ]; then
   echo "BASE_URL or HEALTH_CHECK_BASE_URL is required" >&2
@@ -132,6 +134,38 @@ check_actuator_health() {
   echo "actuator status UP"
 }
 
+check_android_cors_preflight() {
+  local headers
+  local code
+  local allow_origin
+  local allow_headers
+  local curl_args=(--noproxy '*' -sS -o /dev/null -D - -X OPTIONS --max-time 10
+    -H "Origin: $ANDROID_CORS_ORIGIN"
+    -H 'Access-Control-Request-Method: GET'
+    -H 'Access-Control-Request-Headers: authorization,idempotency-key,x-client-platform,x-client-version-code,x-client-version-name')
+
+  if [[ "$BASE_URL" == https://* ]] && [ -n "$RESOLVE_HOST" ]; then
+    curl_args+=(--resolve "$RESOLVE_HOST")
+  fi
+
+  headers="$("$CURL_BIN" "${curl_args[@]}" "${BASE_URL}/api/v3/client/bootstrap")"
+  code="$(awk 'toupper($1) ~ /^HTTP\// { value=$2 } END { print value }' <<<"$headers")"
+  allow_origin="$(awk 'tolower($0) ~ /^access-control-allow-origin:/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print }' <<<"$headers" | tail -n 1)"
+  allow_headers="$(awk 'tolower($0) ~ /^access-control-allow-headers:/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print tolower($0) }' <<<"$headers" | tail -n 1 | tr -d '[:space:]')"
+
+  echo "OPTIONS /api/v3/client/bootstrap $code Android CORS"
+  if [ "$code" != "200" ] || [ "$allow_origin" != "$ANDROID_CORS_ORIGIN" ]; then
+    echo "Android CORS preflight rejected trusted native origin (allow-origin=${allow_origin:-missing})" >&2
+    return 1
+  fi
+  for required in authorization idempotency-key x-client-platform x-client-version-code x-client-version-name; do
+    if [[ ",$allow_headers," != *",$required,"* ]]; then
+      echo "Android CORS preflight is missing allowed header $required" >&2
+      return 1
+    fi
+  done
+}
+
 run_checks() {
   local failed=0
 
@@ -145,6 +179,7 @@ run_checks() {
 
   check_actuator_health || failed=1
   check_http_content_type "$PWA_MANIFEST_PATH" "$PWA_MANIFEST_CONTENT_TYPE" || failed=1
+  check_android_cors_preflight || failed=1
 
   return "$failed"
 }

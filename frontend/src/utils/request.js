@@ -6,6 +6,12 @@ import { nativeAuthRawRequest } from '@/platform/nativeAuth'
 import { getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
 import { getClientRequestHeaders } from '@/platform/appRelease'
 import {
+  emitRequestDiagnostic,
+  requestErrorCategory,
+  requestErrorMessage,
+  shouldNotifyRequestError
+} from '@/utils/requestErrors'
+import {
   getClientSessionGeneration,
   isClientSessionGenerationCurrent
 } from '@/utils/sessionScope'
@@ -100,6 +106,7 @@ const redirectToLogin = () => {
 
 request.interceptors.request.use(
   async config => {
+    config.__startedAt = Date.now()
     config.__clientSessionGeneration = getClientSessionGeneration()
     if (isNativeApp()) {
       const origin = getServerOrigin()
@@ -205,8 +212,12 @@ request.interceptors.response.use(
       } else if (shouldNotify) {
         ElMessage.error(await parseMessage(data, '服务器错误'))
       }
-    } else if (!error.config?.__silentError) {
-      ElMessage.error('网络连接失败')
+    } else {
+      const category = requestErrorCategory(error)
+      emitRequestDiagnostic(error, category)
+      if (!error.config?.__silentError && shouldNotifyRequestError(category)) {
+        ElMessage.error(requestErrorMessage(category))
+      }
     }
     return Promise.reject(error)
   }

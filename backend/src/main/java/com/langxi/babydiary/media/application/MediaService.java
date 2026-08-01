@@ -62,7 +62,22 @@ public class MediaService {
     public MediaAsset upload(
             UUID spaceId, long accountId, MultipartFile file, String caption, LocalDateTime takenAt)
             throws IOException {
+        return upload(spaceId, accountId, file, caption, takenAt, null).asset();
+    }
+
+    public UploadResult upload(
+            UUID spaceId,
+            long accountId,
+            MultipartFile file,
+            String caption,
+            LocalDateTime takenAt,
+            UUID clientUploadId)
+            throws IOException {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
+        if (clientUploadId != null) {
+            var replay = media.findByClientUploadId(space.internalId(), accountId, clientUploadId);
+            if (replay.isPresent()) return new UploadResult(replay.get(), false);
+        }
         if (file == null || file.isEmpty())
             throw ApiException.badRequest("MEDIA_FILE_REQUIRED", "请选择媒体文件");
         if (file.getSize() > MediaFileInspector.AUDIO_VIDEO_MAX_BYTES) {
@@ -94,6 +109,7 @@ public class MediaService {
                                     publicId,
                                     space.internalId(),
                                     accountId,
+                                    clientUploadId,
                                     inspected.mediaType(),
                                     safeFilename(file.getOriginalFilename()),
                                     blankToNull(caption),
@@ -137,7 +153,7 @@ public class MediaService {
             }
             MediaAsset uploaded = require(space.internalId(), publicId, accountId);
             cacheInvalidator.albums(spaceId);
-            return uploaded;
+            return new UploadResult(uploaded, true);
         } catch (IOException | RuntimeException exception) {
             if (assetId > 0) media.failUpload(assetId, now());
             if (stored) deleteQuietly(storage, storageKey);
@@ -147,6 +163,8 @@ public class MediaService {
             Files.deleteIfExists(temporary);
         }
     }
+
+    public record UploadResult(MediaAsset asset, boolean created) {}
 
     public Page page(UUID spaceId, long accountId, Query query) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);

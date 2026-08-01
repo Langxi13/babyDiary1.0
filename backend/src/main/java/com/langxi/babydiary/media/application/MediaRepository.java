@@ -11,6 +11,8 @@ public interface MediaRepository {
 
     Optional<MediaAsset> findByPublicId(long spaceId, UUID publicId, long accountId);
 
+    Optional<MediaAsset> findByClientUploadId(long spaceId, long ownerId, UUID clientUploadId);
+
     List<MediaAsset> findByPublicIds(long spaceId, List<UUID> publicIds, long accountId);
 
     List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds);
@@ -92,6 +94,7 @@ public interface MediaRepository {
             UUID publicId,
             long spaceId,
             long ownerId,
+            UUID clientUploadId,
             String mediaType,
             String originalFilename,
             String caption,

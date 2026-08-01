@@ -3,6 +3,7 @@ import request from '@/utils/request'
 import { nativeAuthResultRequest } from '@/platform/nativeAuth'
 import { isNativeApp } from '@/platform/runtimeConfig'
 import { normalizeMedia } from '@/api/models'
+import { mediaApi } from '@/api/media'
 
 const normalizeUser = user => user ? {
   ...user,
@@ -43,11 +44,7 @@ export const authApi = {
   },
 
   async uploadAvatar(spaceId, file) {
-    const mediaBody = new FormData()
-    mediaBody.append('file', file)
-    const media = normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, mediaBody, {
-      timeout: 10 * 60 * 1000
-    }))
+    const media = normalizeMedia(await mediaApi.uploadSource(spaceId, file))
     try {
       return normalizeUser(await request.put(`${API_ROOT}/account/avatar`, { spaceId, assetId: media.id }))
     } catch (error) {
@@ -63,7 +60,11 @@ export const authApi = {
     })
   },
 
-  getSessions() {
+  getSessions(accessToken) {
+    if (isNativeApp()) {
+      return nativeAuthResultRequest('GET', `${API_ROOT}/auth/sessions`, null,
+        accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    }
     return request.get(`${API_ROOT}/auth/sessions`)
   },
 

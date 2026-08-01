@@ -44,10 +44,13 @@ public class ClientBootstrapController {
                                 "BEARER_REFRESH_COOKIE",
                                 serverVersion,
                                 new UploadPolicy(
-                                        10L * 1024 * 1024,
+                                        25L * 1024 * 1024,
+                                        80_000_000L,
                                         50,
                                         List.of(
                                                 "image/gif",
+                                                "image/heic",
+                                                "image/heif",
                                                 "image/jpeg",
                                                 "image/png",
                                                 "image/webp")),
@@ -62,7 +65,10 @@ public class ClientBootstrapController {
             AndroidUpdate androidUpdate) {}
 
     public record UploadPolicy(
-            long maxImageBytes, int maxDiaryImages, List<String> acceptedImageTypes) {}
+            long maxImageBytes,
+            long maxImagePixels,
+            int maxDiaryImages,
+            List<String> acceptedImageTypes) {}
 
     public record AndroidUpdate(
             boolean enabled,

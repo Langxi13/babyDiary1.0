@@ -4,6 +4,7 @@ import { normalizeAnniversary, normalizeDraft, normalizeMedia } from '@/api/mode
 import { invalidateDiaryReads } from '@/api/diary'
 import { cachedRequest, invalidateApiCache } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
+import { mediaApi } from '@/api/media'
 
 const stepHeader = token => token ? { 'X-Step-Up-Token': token } : {}
 
@@ -52,11 +53,7 @@ export const anniversaryApi = {
   },
 
   async uploadCover(spaceId, file) {
-    const formData = new FormData()
-    formData.append('file', file)
-    return normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, formData, {
-      timeout: 10 * 60 * 1000
-    }))
+    return normalizeMedia(await mediaApi.uploadSource(spaceId, file))
   },
 
   async update(spaceId, id, payload) {

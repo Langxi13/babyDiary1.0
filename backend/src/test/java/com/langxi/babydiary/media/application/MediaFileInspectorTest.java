@@ -68,6 +68,28 @@ class MediaFileInspectorTest {
                 .isEqualTo("image/jpeg");
     }
 
+    @Test
+    void detectsHeicAndHeifContainersWhileAcceptingEitherDeclaredFamily() throws Exception {
+        Path probe = directory.resolve("ffprobe-fixture.sh");
+        Files.writeString(
+                probe,
+                "#!/bin/sh\nprintf 'codec_type=video\\nwidth=3\\nheight=2\\n'\n",
+                StandardCharsets.UTF_8);
+        assertThat(probe.toFile().setExecutable(true)).isTrue();
+        MediaFileInspector inspector = new MediaFileInspector(probe.toString());
+
+        MediaFileInspector.Inspection heic = inspector.inspect(isoImage("heic"), "image/heic");
+        MediaFileInspector.Inspection heif = inspector.inspect(isoImage("mif1"), "image/heif");
+
+        assertThat(heic.contentType()).isEqualTo("image/heic");
+        assertThat(heif.contentType()).isEqualTo("image/heif");
+        assertThat(heic.mediaType()).isEqualTo("IMAGE");
+        assertThat(heif.width()).isEqualTo(3);
+        assertThat(heif.height()).isEqualTo(2);
+        assertThat(inspector.inspect(isoImage("heic"), "image/heif").contentType())
+                .isEqualTo("image/heic");
+    }
+
     private MediaFileInspector inspector() {
         return new MediaFileInspector("ffprobe-not-used-for-images");
     }
@@ -80,6 +102,16 @@ class MediaFileInspectorTest {
         Path path = directory.resolve("image-" + System.nanoTime() + "." + format);
         BufferedImage image = new BufferedImage(3, 2, BufferedImage.TYPE_INT_RGB);
         assertThat(ImageIO.write(image, format, path.toFile())).isTrue();
+        return path;
+    }
+
+    private Path isoImage(String brand) throws Exception {
+        byte[] header = new byte[64];
+        header[3] = 24;
+        System.arraycopy("ftyp".getBytes(StandardCharsets.US_ASCII), 0, header, 4, 4);
+        System.arraycopy(brand.getBytes(StandardCharsets.US_ASCII), 0, header, 8, 4);
+        Path path = directory.resolve("image-" + System.nanoTime() + ".heic");
+        Files.write(path, header);
         return path;
     }
 }

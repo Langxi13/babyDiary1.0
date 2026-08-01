@@ -57,17 +57,18 @@ test('diary image list renders custom sortable thumbnails', () => {
 })
 
 test('diary update submits image order for existing and new images', () => {
-  assert.match(source, /const imageOrderForFile = \(file,\s*newImageIndex\) =>/)
+  assert.match(source, /const buildImageSubmission = \(\) =>/)
   assert.match(source, /`existing:\$\{file\.name\}`/)
-  assert.match(source, /`new:\$\{newImageIndex\}`/)
-  assert.match(source, /newImageIndex \+= 1/)
-  assert.match(source, /formData\.append\('mediaOrder', orderEntry\)/)
+  assert.match(source, /`new:\$\{newImages\.length\}`/)
+  assert.match(source, /newImages\.push\(/)
+  assert.match(source, /return \{ newImages, retainedMediaIds, mediaOrder \}/)
 })
 
 test('diary update clears every old image even when replacement images are uploaded', () => {
-  assert.match(source, /initialImageCount\.value > 0 && retainedCount === 0/)
-  assert.match(source, /formData\.append\('clearImages', 'true'\)/)
-  assert.doesNotMatch(source, /retainedCount === 0 && newFileCount === 0/)
+  assert.match(source, /const retainedMediaIds = \[\]/)
+  assert.match(source, /const imageSubmission = buildImageSubmission\(\)/)
+  assert.match(source, /updateDiary\(diaryId\.value, formData, imageSubmission\)/)
+  assert.doesNotMatch(source, /clearImages|appendImagesToFormData/)
 })
 
 test('android mobile upload keeps the native file control visible and offers copy-link fallback dialog', () => {

@@ -3,6 +3,9 @@ import request from '@/utils/request'
 import { diaryPayload, normalizeDiary, normalizeMedia } from '@/api/models'
 import { cachedRequest, invalidateApiCache, stableStringify } from '@/utils/apiCache'
 import { getStepUpToken, withStepUpRetry } from '@/utils/stepUp'
+import { mediaApi } from '@/api/media'
+import { isNativeApp } from '@/platform/runtimeConfig'
+import { downloadNativeFile } from '@/platform/nativeFiles'
 
 const listCursors = new Map()
 const diaryVersions = new Map()
@@ -59,11 +62,7 @@ const uploadFiles = async (spaceId, files) => {
   const uploaded = []
   try {
     for (const file of files) {
-      const body = new FormData()
-      body.append('file', file)
-      uploaded.push(normalizeMedia(await request.post(`${API_ROOT}/spaces/${spaceId}/media`, body, {
-        timeout: 10 * 60 * 1000
-      })))
+      uploaded.push(normalizeMedia(await mediaApi.uploadSource(spaceId, file)))
     }
     return uploaded
   } catch (error) {
@@ -76,11 +75,12 @@ const cleanupUploads = (spaceId, uploaded) => Promise.allSettled(
   uploaded.map(media => request.delete(`${API_ROOT}/spaces/${spaceId}/media/${media.id}`, { __silentError: true }))
 )
 
-const formDataCommand = async (spaceId, formData, editing) => {
-  const files = formData.getAll('imageFiles').filter(value => value instanceof File)
+const formDataCommand = async (spaceId, formData, editing, imageSubmission = null) => {
+  const files = imageSubmission?.newImages ||
+    formData.getAll('imageFiles').filter(value => value instanceof File)
   const uploaded = await uploadFiles(spaceId, files)
-  const retained = formData.getAll('retainedMediaIds').map(String)
-  const order = formData.getAll('mediaOrder').map(String)
+  const retained = imageSubmission?.retainedMediaIds || formData.getAll('retainedMediaIds').map(String)
+  const order = imageSubmission?.mediaOrder || formData.getAll('mediaOrder').map(String)
   let mediaIds
   if (!editing) {
     mediaIds = uploaded.map(item => item.id)
@@ -157,8 +157,8 @@ export const diaryApi = {
     )
   },
 
-  async createDiary(spaceId, formData) {
-    const prepared = await formDataCommand(spaceId, formData, false)
+  async createDiary(spaceId, formData, imageSubmission) {
+    const prepared = await formDataCommand(spaceId, formData, false, imageSubmission)
     try {
       return await this.create(spaceId, prepared.command)
     } catch (error) {
@@ -167,8 +167,8 @@ export const diaryApi = {
     }
   },
 
-  async updateDiary(spaceId, id, formData) {
-    const prepared = await formDataCommand(spaceId, formData, true)
+  async updateDiary(spaceId, id, formData, imageSubmission) {
+    const prepared = await formDataCommand(spaceId, formData, true, imageSubmission)
     try {
       return await this.update(spaceId, id, prepared.command, await requiredVersion(spaceId, id))
     } catch (error) {
@@ -282,15 +282,22 @@ export const diaryApi = {
   ),
 
   exportImages(spaceId, startDate, endDate) {
-    return withStepUpRetry(token => request.get(
-      `${API_ROOT}/spaces/${spaceId}/transfer/media`,
-      {
-        params: { startDate, endDate },
-        responseType: 'blob',
-        headers: stepHeader(token),
-        timeout: 5 * 60 * 1000
-      }
-    ))
+    return withStepUpRetry(token => isNativeApp()
+      ? downloadNativeFile({
+          path: `${API_ROOT}/spaces/${spaceId}/transfer/media`,
+          params: { startDate, endDate },
+          headers: stepHeader(token),
+          filename: `Baby-Diary-images-${startDate}-${endDate}.zip`
+        })
+      : request.get(
+          `${API_ROOT}/spaces/${spaceId}/transfer/media`,
+          {
+            params: { startDate, endDate },
+            responseType: 'blob',
+            headers: stepHeader(token),
+            timeout: 5 * 60 * 1000
+          }
+        ))
   },
 
   getTimeline(spaceId, params = {}, options = {}) {

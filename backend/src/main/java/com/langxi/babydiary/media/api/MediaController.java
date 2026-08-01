@@ -7,6 +7,7 @@ import com.langxi.babydiary.media.application.MediaRepresentationService;
 import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.media.application.MediaView;
 import com.langxi.babydiary.platform.api.ApiContract;
+import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -55,13 +56,17 @@ public class MediaController {
             @PathVariable UUID spaceId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) @Size(max = 500) String caption,
-            @RequestParam(required = false) LocalDateTime takenAt)
+            @RequestParam(required = false) LocalDateTime takenAt,
+            @RequestHeader(value = ClientRequestHeaders.IDEMPOTENCY_KEY, required = false)
+                    UUID clientUploadId)
             throws IOException {
-        return ResponseEntity.status(HttpStatus.CREATED)
+        MediaService.UploadResult uploaded =
+                media.upload(
+                        spaceId, principal.accountId(), file, caption, takenAt, clientUploadId);
+        return ResponseEntity.status(uploaded.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(
                         representations.view(
-                                media.upload(
-                                        spaceId, principal.accountId(), file, caption, takenAt),
+                                uploaded.asset(),
                                 MediaAccessContext.direct(principal.accountId(), false)));
     }
 

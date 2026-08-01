@@ -83,12 +83,12 @@ export const useDiaryStore = defineStore('diary', () => {
     }
   }
 
-  async function createDiary(formData) {
-    return diaryApi.createDiary(await requireSpaceId(), formData)
+  async function createDiary(formData, imageSubmission) {
+    return diaryApi.createDiary(await requireSpaceId(), formData, imageSubmission)
   }
 
-  async function updateDiary(id, formData) {
-    return diaryApi.updateDiary(await requireSpaceId(), id, formData)
+  async function updateDiary(id, formData, imageSubmission) {
+    return diaryApi.updateDiary(await requireSpaceId(), id, formData, imageSubmission)
   }
 
   async function deleteDiary(id) {

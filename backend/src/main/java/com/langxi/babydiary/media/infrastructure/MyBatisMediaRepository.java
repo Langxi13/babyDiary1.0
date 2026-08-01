@@ -51,6 +51,17 @@ public class MyBatisMediaRepository implements MediaRepository {
     }
 
     @Override
+    public Optional<MediaAsset> findByClientUploadId(
+            long spaceId, long ownerId, UUID clientUploadId) {
+        if (clientUploadId == null) return Optional.empty();
+        return hydrate(
+                        mapper.findByClientUploadId(
+                                spaceId, ownerId, BinaryUuid.toBytes(clientUploadId)))
+                .stream()
+                .findFirst();
+    }
+
+    @Override
     public List<MediaAsset> findByPublicIdsInSpace(long spaceId, List<UUID> publicIds) {
         if (publicIds == null || publicIds.isEmpty()) return List.of();
         Map<UUID, MediaAsset> hydrated = new LinkedHashMap<>();
@@ -122,6 +133,9 @@ public class MyBatisMediaRepository implements MediaRepository {
                         BinaryUuid.toBytes(asset.publicId()),
                         asset.spaceId(),
                         asset.ownerId(),
+                        asset.clientUploadId() == null
+                                ? null
+                                : BinaryUuid.toBytes(asset.clientUploadId()),
                         asset.mediaType(),
                         asset.originalFilename(),
                         asset.caption(),

@@ -344,7 +344,7 @@ const {
   moveImage,
   handleNativeImageChange,
   appendNativeFiles,
-  appendImagesToFormData,
+  buildImageSubmission,
   setExistingImages,
   initializeImageUpload,
   disposeImages
@@ -499,15 +499,15 @@ const handleSubmit = async () => {
   loading.value = true
   try {
     const formData = appendFormData()
-    appendImagesToFormData(formData)
+    const imageSubmission = buildImageSubmission()
 
     if (isEdit.value) {
-      const diary = await diaryStore.updateDiary(diaryId.value, formData)
+      const diary = await diaryStore.updateDiary(diaryId.value, formData, imageSubmission)
       await removeDraftSilently()
       ElMessage.success('更新成功')
       router.push(`/diaries/${diary.id || diaryId.value}`)
     } else {
-      const diary = await diaryStore.createDiary(formData)
+      const diary = await diaryStore.createDiary(formData, imageSubmission)
       await removeDraftSilently()
       ElMessage.success('发布成功')
       router.push(`/diaries/${diary.id}`)

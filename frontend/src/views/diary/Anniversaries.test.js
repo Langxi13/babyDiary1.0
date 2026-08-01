@@ -42,10 +42,9 @@ test('new anniversaries default to the local calendar day', () => {
   assert.doesNotMatch(source, /new Date\(\)\.toISOString\(\)\.slice\(0,\s*10\)/)
 })
 
-test('anniversary api exposes multipart cover upload endpoint', () => {
+test('anniversary cover uses the unified web and native media uploader', () => {
   assert.match(apiSource, /uploadCover\(spaceId, file\)/)
-  assert.match(apiSource, /const formData = new FormData\(\)/)
-  assert.match(apiSource, /formData\.append\('file', file\)/)
-  assert.ok(apiSource.includes('$' + '{API_ROOT}/spaces/$' + '{spaceId}/media'))
+  assert.match(apiSource, /mediaApi\.uploadSource\(spaceId, file\)/)
+  assert.match(apiSource, /import \{ mediaApi \} from '@\/api\/media'/)
   assert.match(apiSource, /coverAssetId: value\.coverAssetId \|\| null/)
 })

@@ -267,6 +267,31 @@
   .app-shell.keyboard-open .form-actions {
     bottom: 12px;
   }
+
+  html.platform-android {
+    .mobile-shell-content {
+      .el-button:not(.is-circle),
+      .el-input__wrapper,
+      .el-select__wrapper,
+      .el-date-editor.el-input,
+      .el-date-editor.el-input__wrapper,
+      .el-input-number {
+        min-height: 48px;
+      }
+    }
+
+    .topbar-brand,
+    .topbar-icon {
+      width: 48px;
+      height: 48px;
+    }
+
+    .sheet-link-list button,
+    .sheet-close,
+    .sheet-primary-button {
+      min-height: 48px;
+    }
+  }
 }
 
 @media (max-width: 360px) {

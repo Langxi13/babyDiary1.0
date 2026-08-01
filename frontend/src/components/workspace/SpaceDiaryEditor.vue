@@ -5,7 +5,7 @@
     class="space-diary-drawer"
     :size="drawerSize"
     destroy-on-close
-    @close="emit('update:modelValue', false)"
+    @close="closeEditor"
   >
     <el-form class="space-diary-form" label-position="top" @submit.prevent="save">
       <div class="editor-grid">
@@ -76,7 +76,7 @@
               <strong>{{ file.raw.name }}</strong>
               <span>{{ formatBytes(file.raw.size) }}</span>
             </div>
-            <button type="button" title="移除" aria-label="移除文件" @click="files.splice(index, 1)">
+            <button type="button" title="移除" aria-label="移除文件" @click="removeSelectedFile(index)">
               <el-icon><Close /></el-icon>
             </button>
           </div>
@@ -94,7 +94,7 @@
 
     <template #footer>
       <div class="editor-actions">
-        <el-button @click="emit('update:modelValue', false)">取消</el-button>
+        <el-button @click="closeEditor">取消</el-button>
         <el-button type="primary" :loading="saving" @click="save">
           <el-icon><Check /></el-icon>
           {{ offline ? '保存到本机' : '保存日记' }}
@@ -105,7 +105,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElCheckboxButton, ElCheckboxGroup } from 'element-plus/es/components/checkbox/index.mjs'
@@ -125,6 +125,7 @@ import { withStepUpRetry } from '@/utils/stepUp'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import DiaryMoodPicker from '@/components/diary/DiaryMoodPicker.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
+import { releaseNativeImage } from '@/platform/nativeImages'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/checkbox/style/css.mjs'
 import 'element-plus/es/components/date-picker/style/css.mjs'
@@ -161,6 +162,9 @@ const visibilityOptions = [
   { label: '共同可见', value: 'SHARED' },
   { label: '仅自己', value: 'PRIVATE' }
 ]
+const uploadSource = item => item.raw?.kind === 'native-uri'
+  ? item.raw
+  : { file: item.raw, uploadId: item.uploadId }
 const moods = [
   { key: 'happy', emoji: '😊', label: '开心' },
   { key: 'calm', emoji: '😌', label: '平静' },
@@ -211,6 +215,7 @@ const save = async () => {
     mediaIds: props.diary?.media?.map(item => item.id).filter(Boolean) || []
   }
   const uploadedAssetIds = []
+  let uploadsCompleted = false
   try {
     let saved
     if (offline.value) {
@@ -219,12 +224,11 @@ const save = async () => {
     } else {
       try {
         for (const item of files.value) {
-          const formData = new FormData()
-          formData.append('file', item.raw, item.raw.name)
-          const upload = await mediaApi.upload(props.spaceId, formData)
+          const upload = await mediaApi.uploadSource(props.spaceId, uploadSource(item))
           uploadedAssetIds.push(upload.id)
         }
         payload.mediaIds = [...payload.mediaIds, ...uploadedAssetIds]
+        uploadsCompleted = true
         saved = creating
           ? await diaryApi.create(props.spaceId, payload)
           : await withStepUpRetry(token => diaryApi.update(
@@ -232,6 +236,9 @@ const save = async () => {
           ))
       } catch (error) {
         if (!error.response) {
+          if (!uploadsCompleted) {
+            await Promise.allSettled(uploadedAssetIds.map(mediaId => mediaApi.remove(props.spaceId, mediaId)))
+          }
           await queueDiary(entityId, payload)
           saved = { ...props.diary, ...payload, id: entityId, version: props.diary?.version || 0, pending: true, pendingAction: creating ? 'CREATE' : 'UPDATE' }
         } else {
@@ -240,8 +247,12 @@ const save = async () => {
         }
       }
     }
-    if (offline.value || saved.pending) await queueMedia(entityId)
+    if ((offline.value || saved.pending) && !uploadsCompleted) await queueMedia(entityId)
     ElMessage.success(offline.value || saved.pending ? '已保存到本机，联网后自动同步' : '日记已保存')
+    if (uploadsCompleted || (!offline.value && !saved.pending)) {
+      await Promise.allSettled(files.value.map(item => releaseNativeImage(item.raw)))
+    }
+    files.value = []
     emit('saved', saved)
     emit('update:modelValue', false)
   } finally {
@@ -268,7 +279,9 @@ const queueMedia = async diaryId => {
       spaceId: props.spaceId,
       diaryId,
       filename: item.raw.name,
-      file: item.raw
+      file: item.raw,
+      source: uploadSource(item),
+      uploadId: item.uploadId
     })
   }
 }
@@ -286,11 +299,30 @@ const appendSelectedFiles = selected => {
   }
   const next = selectedFiles
     .slice(0, available)
-    .map(raw => ({ key: `${raw.name}-${raw.size}-${raw.lastModified}`, raw }))
+    .map(raw => ({
+      key: `${raw.name}-${raw.size}-${raw.lastModified}-${crypto.randomUUID()}`,
+      uploadId: raw.uploadId || crypto.randomUUID(),
+      raw
+    }))
   files.value.push(...next)
 }
 
 const selectNativeImages = selected => appendSelectedFiles(selected)
+
+const removeSelectedFile = index => {
+  const [removed] = files.value.splice(index, 1)
+  releaseNativeImage(removed?.raw).catch(() => {})
+}
+
+const discardSelectedFiles = () => {
+  files.value.forEach(item => releaseNativeImage(item.raw).catch(() => {}))
+  files.value = []
+}
+
+const closeEditor = () => {
+  discardSelectedFiles()
+  emit('update:modelValue', false)
+}
 
 const moveFile = targetIndex => {
   if (dragIndex.value < 0 || dragIndex.value === targetIndex) return
@@ -317,6 +349,8 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+onBeforeUnmount(discardSelectedFiles)
 </script>
 
 <style scoped lang="scss">

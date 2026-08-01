@@ -43,10 +43,10 @@ if rg -n --pcre2 '(/api/v1|/api/v2|/images/|contentUrl|thumbnailUrl|posterUrl|wa
   exit 1
 fi
 
-grep -qx 'PRODUCT_VERSION=1.0.0-beta.5' "$ROOT/config/release-version.properties"
-grep -qx 'ANDROID_VERSION_CODE=5' "$ROOT/config/release-version.properties"
-grep -q '<version>1.0.0-beta.5</version>' "$ROOT/backend/pom.xml"
-grep -qx '  "version": "1.0.0-beta.5",' "$ROOT/frontend/package.json"
+grep -qx 'PRODUCT_VERSION=1.0.0-beta.8' "$ROOT/config/release-version.properties"
+grep -qx 'ANDROID_VERSION_CODE=8' "$ROOT/config/release-version.properties"
+grep -q '<version>1.0.0-beta.8</version>' "$ROOT/backend/pom.xml"
+grep -qx '  "version": "1.0.0-beta.8",' "$ROOT/frontend/package.json"
 grep -q 'public static final String ROOT = "/api/v3"' \
   "$ROOT/backend/src/main/java/com/langxi/babydiary/platform/api/ApiContract.java"
 grep -q 'export const API_VERSION = 3' "$ROOT/frontend/src/api/contract.js"

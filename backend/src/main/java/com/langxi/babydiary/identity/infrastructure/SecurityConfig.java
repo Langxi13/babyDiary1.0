@@ -2,6 +2,7 @@ package com.langxi.babydiary.identity.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.api.ApiContract;
+import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -101,15 +102,7 @@ public class SecurityConfig {
                         .toList());
         configuration.setAllowedMethods(
                 List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(
-                List.of(
-                        "Authorization",
-                        "Content-Type",
-                        "If-Match",
-                        "X-Device-Name",
-                        "X-Step-Up-Token",
-                        "X-Client-Platform",
-                        "X-Client-Version-Code"));
+        configuration.setAllowedHeaders(ClientRequestHeaders.CORS_ALLOWED);
         configuration.setExposedHeaders(
                 List.of(
                         "ETag",

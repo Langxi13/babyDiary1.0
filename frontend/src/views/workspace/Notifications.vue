@@ -1,7 +1,7 @@
 <template>
   <div class="notifications-page">
     <main class="notifications-container">
-      <header><div><h1>通知</h1><p>{{ unread }} 条未读</p></div><div><el-button @click="togglePush"><el-icon><Bell /></el-icon>{{ pushEnabled ? '关闭推送' : '开启推送' }}</el-button><el-button type="primary" plain @click="markAll">全部已读</el-button></div></header>
+      <header><div><h1>通知</h1><p>{{ unread }} 条未读</p></div><div><span v-if="nativeApp" class="native-push-status">站内通知</span><el-button v-else @click="togglePush"><el-icon><Bell /></el-icon>{{ pushEnabled ? '关闭推送' : '开启推送' }}</el-button><el-button type="primary" plain @click="markAll">全部已读</el-button></div></header>
       <section v-loading="loading" class="notification-list">
         <button v-for="item in notifications" :key="item.id" type="button" :class="{ unread: !item.readAt }" @click="openNotification(item)">
           <span class="notification-icon"><el-icon><component :is="iconFor(item.type)" /></el-icon></span>
@@ -25,6 +25,7 @@ import { Bell, ChatDotRound, DocumentAdd, EditPen, Star } from '@element-plus/ic
 import { workspaceApi } from '@/api/workspace'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { formatChineseDateTime } from '@/utils/dateDisplay'
+import { isNativeApp } from '@/platform/runtimeConfig'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/empty/style/css.mjs'
 import 'element-plus/es/components/icon/style/css.mjs'
@@ -36,6 +37,7 @@ const notifications = ref([])
 const unread = ref(0)
 const loading = ref(false)
 const pushEnabled = ref(false)
+const nativeApp = isNativeApp()
 
 const load = async () => {
   loading.value = true
@@ -57,6 +59,7 @@ const openNotification = async item => {
 const markAll = async () => { await workspaceApi.notifications.readAll(); await load() }
 
 const togglePush = async () => {
+  if (nativeApp) return
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     ElMessage.warning('当前浏览器不支持推送通知')
     return
@@ -97,7 +100,7 @@ function urlBase64ToUint8Array(value) {
 
 onMounted(async () => {
   await load()
-  if ('serviceWorker' in navigator) {
+  if (!nativeApp && 'serviceWorker' in navigator) {
     const registration = await navigator.serviceWorker.ready
     pushEnabled.value = !!(await registration.pushManager?.getSubscription())
   }
@@ -108,6 +111,7 @@ onMounted(async () => {
 .notifications-page { min-height: 100vh; background: #f6f3f0; }
 .notifications-container { width: min(820px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 54px; }
 .notifications-container > header { margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }.notifications-container h1 { margin: 0; font-size: 28px; }.notifications-container header p { margin: 4px 0 0; color: #8a7f79; }.notifications-container header > div:last-child { display: flex; gap: 8px; }
+.native-push-status { min-height: 42px; padding: 0 12px; border: 1px solid #c9ddd8; border-radius: 8px; display: inline-flex; align-items: center; color: #347b71; background: #edf6f3; font-size: 13px; font-weight: 650; }
 .notification-list { min-height: 380px; border: 1px solid #e5dbd6; border-radius: 8px; overflow: hidden; background: #fff; }
 .notification-list > button { width: 100%; min-height: 78px; padding: 12px 14px; border: 0; border-bottom: 1px solid #eee5e0; background: #fff; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; text-align: left; cursor: pointer; }.notification-list > button:last-child { border-bottom: 0; }.notification-list > button.unread { background: #fff8f6; }.notification-list > button.unread:before { content: ''; position: absolute; width: 4px; height: 38px; margin-left: -14px; border-radius: 0 4px 4px 0; background: #c26963; }
 .notification-icon { width: 40px; height: 40px; border-radius: 8px; background: #edf6f3; color: #347b71; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }.notification-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }.notification-copy strong, .notification-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.notification-copy span, time { color: #6f6661; font-size: 12px; }

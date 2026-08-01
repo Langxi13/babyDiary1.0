@@ -375,6 +375,10 @@ const handleExport = async () => {
       filterForm.endDate
     )
 
+    if (response?.native) {
+      ElMessage.success('导出文件已准备好')
+      return
+    }
     const blob = new Blob([response], { type: 'application/zip' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')

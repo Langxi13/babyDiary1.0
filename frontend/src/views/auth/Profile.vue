@@ -175,6 +175,7 @@ import { copyText } from '@/utils/copyText'
 import { getStepUpToken, requestStepUp, withStepUpRetry } from '@/utils/stepUp'
 import { clearOfflineData } from '@/utils/offlineDb'
 import { clearServerOrigin, getServerOrigin, isNativeApp } from '@/platform/runtimeConfig'
+import { releaseNativeImage } from '@/platform/nativeImages'
 import 'element-plus/es/components/avatar/style/css.mjs'
 import 'element-plus/es/components/button/style/css.mjs'
 import 'element-plus/es/components/form/style/css.mjs'
@@ -367,6 +368,7 @@ const handleAvatarChange = async (uploadFile) => {
     await authStore.uploadAvatar(uploadFile.raw)
     ElMessage.success('头像已更新')
   } finally {
+    await releaseNativeImage(uploadFile.raw)
     avatarUploading.value = false
   }
 }
@@ -396,7 +398,7 @@ const submitPassword = async () => {
 
 const loadSessions = async () => {
   const { authApi } = await import('@/api/auth')
-  sessions.value = await authApi.getSessions() || []
+  sessions.value = await authApi.getSessions(authStore.token) || []
 }
 
 const saveEmail = async () => {

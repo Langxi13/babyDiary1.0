@@ -1,6 +1,8 @@
 import { API_ROOT } from '@/api/contract'
 import request from '@/utils/request'
 import { normalizeDiary, normalizeMedia, normalizeSpace } from '@/api/models'
+import { isNativeApp } from '@/platform/runtimeConfig'
+import { downloadNativeFile } from '@/platform/nativeFiles'
 
 export const workspaceApi = {
   spaces: {
@@ -79,19 +81,32 @@ export const workspaceApi = {
   },
 
   transfer: {
-    exportSpace: (spaceId, stepUpToken) => request.get(
-      `${API_ROOT}/spaces/${spaceId}/transfer/export`,
-      { responseType: 'blob', headers: stepHeader(stepUpToken), timeout: 5 * 60 * 1000 }
-    ),
+    exportSpace: (spaceId, stepUpToken) => isNativeApp()
+      ? downloadNativeFile({
+          path: `${API_ROOT}/spaces/${spaceId}/transfer/export`,
+          headers: stepHeader(stepUpToken),
+          filename: 'Baby-Diary-export.zip'
+        })
+      : request.get(
+          `${API_ROOT}/spaces/${spaceId}/transfer/export`,
+          { responseType: 'blob', headers: stepHeader(stepUpToken), timeout: 5 * 60 * 1000 }
+        ),
     importSpace: (spaceId, formData, stepUpToken) => request.post(
       `${API_ROOT}/spaces/${spaceId}/transfer/import`,
       formData,
       { headers: stepHeader(stepUpToken), timeout: 10 * 60 * 1000 }
     ),
-    exportBook: (spaceId, params, stepUpToken) => request.get(
-      `${API_ROOT}/spaces/${spaceId}/books`,
-      { params, responseType: 'blob', headers: stepHeader(stepUpToken), timeout: 5 * 60 * 1000 }
-    )
+    exportBook: (spaceId, params, stepUpToken) => isNativeApp()
+      ? downloadNativeFile({
+          path: `${API_ROOT}/spaces/${spaceId}/books`,
+          params,
+          headers: stepHeader(stepUpToken),
+          filename: `Baby-Diary.${params.format || 'pdf'}`
+        })
+      : request.get(
+          `${API_ROOT}/spaces/${spaceId}/books`,
+          { params, responseType: 'blob', headers: stepHeader(stepUpToken), timeout: 5 * 60 * 1000 }
+        )
   },
 
   shares: {

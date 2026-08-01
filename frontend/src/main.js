@@ -7,9 +7,17 @@ import 'element-plus/es/components/loading/style/css.mjs'
 import App from './App.vue'
 import router from './router'
 import { initializeRuntimeConfig, isNativeApp } from './platform/runtimeConfig'
+import { nativePlatformClass } from './platform/nativeLifecycle'
+import { cleanupExpiredNativeImages } from './platform/nativeImages'
+import { cleanupNativeExports } from './platform/nativeFiles'
 import './assets/styles/main.scss'
 
 await initializeRuntimeConfig()
+document.documentElement.classList.add(...nativePlatformClass().split(' ').filter(Boolean))
+if (isNativeApp()) {
+  cleanupExpiredNativeImages().catch(() => {})
+  cleanupNativeExports().catch(() => {})
+}
 
 const app = createApp(App)
 

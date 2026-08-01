@@ -129,6 +129,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { withStepUpRetry } from '@/utils/stepUp'
 import { copyText } from '@/utils/copyText'
+import { resolveServerUrl } from '@/platform/runtimeConfig'
 
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
@@ -203,7 +204,7 @@ const createInvite = async () => {
   inviting.value = true
   try {
     const result = await workspaceApi.spaces.invite(activeSpaceId.value, { email: inviteForm.email.trim(), role: inviteForm.role })
-    inviteLink.value = `${window.location.origin}/spaces/invitations/${result.token}`
+    inviteLink.value = resolveServerUrl(`/spaces/invitations/${result.token}`)
   } finally { inviting.value = false }
 }
 const copyInvite = async () => {
@@ -264,7 +265,7 @@ const importArchive = async event => {
   try { const data = new FormData(); data.append('archive', file); const result = await withStepUpRetry(token => workspaceApi.transfer.importSpace(activeSpaceId.value, data, token)); ElMessage.success(`已导入 ${result.importedDiaries} 篇日记`) }
   finally { importing.value = false; event.target.value = '' }
 }
-const download = (blob, filename) => { const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
+const download = (blob, filename) => { if (blob?.native) return; const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000) }
 
 watch(activeSpaceId, load)
 onMounted(async () => { await workspaceStore.initialize(); await load() })

@@ -19,6 +19,11 @@ public interface MediaMapper {
             @Param("publicId") byte[] publicId,
             @Param("accountId") long accountId);
 
+    List<MediaRow> findByClientUploadId(
+            @Param("spaceId") long spaceId,
+            @Param("ownerId") long ownerId,
+            @Param("clientUploadId") byte[] clientUploadId);
+
     List<MediaRow> findByPublicIds(
             @Param("spaceId") long spaceId,
             @Param("publicIds") List<byte[]> publicIds,
@@ -58,9 +63,9 @@ public interface MediaMapper {
 
     @Insert(
             """
-            INSERT INTO media_asset(public_id,space_id,owner_id,media_type,original_filename,caption,taken_at,
+            INSERT INTO media_asset(public_id,space_id,owner_id,client_upload_id,media_type,original_filename,caption,taken_at,
               access_scope,library_visible,status,created_at,updated_at)
-            VALUES(#{publicId},#{spaceId},#{ownerId},#{mediaType},#{originalFilename},#{caption},#{takenAt},
+            VALUES(#{publicId},#{spaceId},#{ownerId},#{clientUploadId},#{mediaType},#{originalFilename},#{caption},#{takenAt},
               #{accessScope},#{libraryVisible},#{status},UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))
             """)
     @Options(useGeneratedKeys = true, keyProperty = "assetId")
@@ -121,7 +126,7 @@ public interface MediaMapper {
 
     @Update(
             """
-            UPDATE media_asset SET status='DELETE_PENDING',deleted_at=#{deletedAt},updated_at=UTC_TIMESTAMP(6)
+            UPDATE media_asset SET status='DELETE_PENDING',client_upload_id=NULL,deleted_at=#{deletedAt},updated_at=UTC_TIMESTAMP(6)
             WHERE space_id=#{spaceId} AND public_id=#{publicId} AND owner_id=#{accountId}
               AND status='READY' AND deleted_at IS NULL
             """)
@@ -142,7 +147,7 @@ public interface MediaMapper {
             @Param("assetId") long assetId, @Param("deletedAt") LocalDateTime deletedAt);
 
     @Update(
-            "UPDATE media_asset SET status='FAILED',deleted_at=#{failedAt},updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId}")
+            "UPDATE media_asset SET status='FAILED',client_upload_id=NULL,deleted_at=#{failedAt},updated_at=UTC_TIMESTAMP(6) WHERE asset_id=#{assetId}")
     void failUpload(@Param("assetId") long assetId, @Param("failedAt") LocalDateTime failedAt);
 
     @Update(
@@ -261,6 +266,7 @@ public interface MediaMapper {
         private final byte[] publicId;
         private final long spaceId;
         private final long ownerId;
+        private final byte[] clientUploadId;
         private final String mediaType;
         private final String originalFilename;
         private final String caption;
@@ -273,6 +279,7 @@ public interface MediaMapper {
                 byte[] publicId,
                 long spaceId,
                 long ownerId,
+                byte[] clientUploadId,
                 String mediaType,
                 String originalFilename,
                 String caption,
@@ -283,6 +290,7 @@ public interface MediaMapper {
             this.publicId = publicId;
             this.spaceId = spaceId;
             this.ownerId = ownerId;
+            this.clientUploadId = clientUploadId;
             this.mediaType = mediaType;
             this.originalFilename = originalFilename;
             this.caption = caption;
@@ -310,6 +318,10 @@ public interface MediaMapper {
 
         public long getOwnerId() {
             return ownerId;
+        }
+
+        public byte[] getClientUploadId() {
+            return clientUploadId;
         }
 
         public String getMediaType() {

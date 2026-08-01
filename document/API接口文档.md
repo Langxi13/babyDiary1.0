@@ -52,7 +52,7 @@
 
 `GET /api/v3/client/bootstrap`
 
-无需登录。返回 API 版本、会话策略、原生来源要求和经过校验的 Android 更新信息。原生客户端只接受 HTTPS 根地址，开发模拟器可使用受限的本地 HTTP 调试开关。
+无需登录。返回 API 版本、会话策略、服务器版本、上传策略和经过校验的 Android 更新信息。上传策略当前声明 25 MB、8000 万像素、单篇50张及 JPEG/PNG/GIF/WebP/HEIC/HEIF 类型。原生客户端只接受 HTTPS 根地址，开发模拟器可使用受限的本地 HTTP 调试开关。
 
 ### 注册与登录
 
@@ -149,7 +149,7 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/api/v3/spaces/{spaceId}/media` | 上传图片、音频或视频 |
+| `POST` | `/api/v3/spaces/{spaceId}/media` | 上传图片、音频或视频；可带 UUID `Idempotency-Key` |
 | `GET` | `/api/v3/spaces/{spaceId}/media` | 分页查询空间媒体 |
 | `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}` | 查看媒体资产元数据；锁定媒体需要 step-up |
 | `GET` | `/api/v3/spaces/{spaceId}/media/{assetId}/variants/{variant}` | 获取受保护派生资源 |
@@ -162,7 +162,7 @@
 
 公开媒体 URL 的查询参数为 `profile`、`ticket`、`expires` 和 `signature`，其中 profile 与 HMAC 保护的访问上下文都纳入签名，客户端不得修改。旧的无上下文签名不再接受。内容读取支持 `GET`、`HEAD`、单段 `Range`、`ETag/If-None-Match`；无效 Range 返回 `416`。锁定或分享上下文使用 `Cache-Control: no-store`。
 
-上传先写入临时文件，再校验真实文件头和声明 MIME；图片上限 25 MB/8000 万像素，音视频上限 256 MB。原始文件以未经转码的字节进入不可变 `ORIGINAL/source`。图片派生任务串行生成最长边 800 的 compact 和最长边 2048 的 screen，派生图剥离 EXIF/GPS/XMP、规范到 sRGB 且不放大；JPEG 照片使用自适应 WebP 与 SSIM 门槛，PNG/透明图使用无损 WebP，节省不足 10% 时不保存该派生。GIF/动画 WebP 只生成静态 compact，screen 回退原始动画。海报、音视频转码和波形同样由 `MEDIA_PROCESS` 后台任务生成。删除不会同步删除对象，而是标记 `DELETE_PENDING` 并排入幂等 `STORAGE_GC`；引用存在时返回 `MEDIA_IN_USE`。
+上传先写入临时文件，再校验真实文件头和声明 MIME；JPEG、PNG、GIF、WebP、HEIC、HEIF 图片上限 25 MB/8000 万像素，音视频上限 256 MB。原始文件以未经转码的字节进入不可变 `ORIGINAL/source`。首次幂等上传返回 `201`；同一空间、账户和 UUID 键的已完成重放返回 `200` 及同一媒体 ID；上传失败或媒体进入删除生命周期时释放该键。图片派生任务串行生成最长边 800 的 compact 和最长边 2048 的 screen，派生图剥离 EXIF/GPS/XMP、规范到 sRGB 且不放大；JPEG 照片使用自适应 WebP 与 SSIM 门槛，PNG/透明图使用无损 WebP，节省不足 10% 时不保存该派生。GIF/动画 WebP 只生成静态 compact，screen 回退原始动画。海报、音视频转码和波形同样由 `MEDIA_PROCESS` 后台任务生成。删除不会同步删除对象，而是标记 `DELETE_PENDING` 并排入幂等 `STORAGE_GC`；引用存在时返回 `MEDIA_IN_USE`。
 
 ### 相册与收藏
 

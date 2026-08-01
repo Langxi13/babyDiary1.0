@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.E2E_WEB_BASE_URL || 'http://127.0.0.1:4173'
+const chromiumExecutablePath = process.env.E2E_CHROMIUM_EXECUTABLE_PATH
+const videoMode = process.env.E2E_DISABLE_VIDEO === 'true' ? 'off' : 'retain-on-failure'
 
 export default defineConfig({
   testDir: './e2e',
@@ -20,14 +22,18 @@ export default defineConfig({
     storageState: './e2e/.auth/user.json',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: videoMode,
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai'
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 900 } }
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1366, height: 900 },
+        launchOptions: chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined
+      }
     },
     {
       name: 'firefox',

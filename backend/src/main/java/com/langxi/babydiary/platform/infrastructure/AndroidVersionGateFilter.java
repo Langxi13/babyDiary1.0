@@ -2,6 +2,7 @@ package com.langxi.babydiary.platform.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.api.ApiContract;
+import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import com.langxi.babydiary.platform.application.ClientReleaseProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,8 +22,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class AndroidVersionGateFilter extends OncePerRequestFilter {
-    static final String PLATFORM_HEADER = "X-Client-Platform";
-    static final String VERSION_CODE_HEADER = "X-Client-Version-Code";
+    static final String PLATFORM_HEADER = ClientRequestHeaders.PLATFORM;
+    static final String VERSION_CODE_HEADER = ClientRequestHeaders.VERSION_CODE;
 
     private final ClientReleaseProperties releases;
     private final ObjectMapper objectMapper;

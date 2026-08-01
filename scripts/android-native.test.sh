@@ -17,6 +17,11 @@ grep -q '"androidScheme": "https"' "$CONFIG"
 grep -q '"CapacitorCookies"' "$CONFIG"
 grep -q "@capacitor/browser" "$ROOT/frontend/package.json"
 grep -q "project(':capacitor-browser')" "$CAPACITOR_BUILD"
+for plugin in file-transfer filesystem network share; do
+  grep -q "@capacitor/$plugin" "$ROOT/frontend/package.json"
+  grep -q "project(':capacitor-$plugin')" "$CAPACITOR_BUILD"
+done
+! grep -q '"CapacitorHttp"' "$CONFIG"
 grep -q 'Browser.open' "$APP_RELEASE_SOURCE"
 grep -q 'android:allowBackup="false"' "$MANIFEST"
 grep -q 'android:fillType="evenOdd"' "$MONOCHROME_ICON"

@@ -22,6 +22,8 @@ public class MediaFileInspector {
     private static final Set<String> ALLOWED_DECLARED =
             Set.of(
                     "image/jpeg",
+                    "image/heic",
+                    "image/heif",
                     "image/png",
                     "image/gif",
                     "image/webp",
@@ -106,6 +108,9 @@ public class MediaFileInspector {
         if (starts(value, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
         if (ascii(value, 0, "GIF87a") || ascii(value, 0, "GIF89a")) return "image/gif";
         if (ascii(value, 0, "RIFF") && ascii(value, 8, "WEBP")) return "image/webp";
+        if (ascii(value, 4, "ftyp") && heifBrand(value, "heic", "heix", "hevc", "hevx"))
+            return "image/heic";
+        if (ascii(value, 4, "ftyp") && heifBrand(value, "mif1", "msf1")) return "image/heif";
         if (starts(value, 0x1a, 0x45, 0xdf, 0xa3)) return "video/webm";
         if (ascii(value, 0, "OggS")) return "audio/ogg";
         if (ascii(value, 0, "RIFF") && ascii(value, 8, "WAVE")) return "audio/wav";
@@ -205,6 +210,8 @@ public class MediaFileInspector {
         if ("AUDIO".equals(mediaType)
                 && Set.of("audio/wav", "audio/x-wav").contains(declared)
                 && "audio/wav".equals(detected)) return true;
+        if (Set.of("image/heic", "image/heif").contains(declared)
+                && Set.of("image/heic", "image/heif").contains(detected)) return true;
         return Set.of("video/mp4", "video/quicktime", "audio/mp4").contains(declared)
                 && Set.of("video/mp4", "audio/mp4").contains(detected);
     }
@@ -230,6 +237,15 @@ public class MediaFileInspector {
             if (value[offset + index] != bytes[index]) return false;
         }
         return true;
+    }
+
+    private boolean heifBrand(byte[] value, String... brands) {
+        for (int offset = 8; offset + 4 <= value.length; offset += 4) {
+            for (String brand : brands) {
+                if (ascii(value, offset, brand)) return true;
+            }
+        }
+        return false;
     }
 
     public record Inspection(

@@ -36,6 +36,8 @@ cat > "$CURL_FAKE" <<'SH'
 set -euo pipefail
 format=""
 output_file=""
+dump_headers=""
+method="GET"
 url=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -45,6 +47,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     -o)
       output_file="$2"
+      shift 2
+      ;;
+    -D)
+      dump_headers="$2"
+      shift 2
+      ;;
+    -X)
+      method="$2"
       shift 2
       ;;
     http://*|https://*)
@@ -99,6 +109,25 @@ case "$path" in
     ;;
 esac
 
+if [ "$method" = "OPTIONS" ] && [ "$path" = "/api/v3/client/bootstrap" ]; then
+  code=200
+  content_type="text/plain"
+  body=''
+  cors_origin='https://localhost'
+  cors_headers=$'Access-Control-Allow-Origin: '"$cors_origin"$'\r\nAccess-Control-Allow-Headers: authorization,idempotency-key,x-client-platform,x-client-version-code,x-client-version-name\r\n'
+else
+  cors_headers=''
+fi
+
+if [ -n "$dump_headers" ]; then
+  header_output="HTTP/1.1 $code OK"$'\r\n'"Content-Type: $content_type"$'\r\n'"$cors_headers"$'\r\n'
+  if [ "$dump_headers" = "-" ]; then
+    printf '%s' "$header_output"
+  else
+    printf '%s' "$header_output" > "$dump_headers"
+  fi
+fi
+
 if [ -z "$output_file" ]; then
   printf '%s' "$body"
 elif [ "$output_file" != "/dev/null" ]; then
@@ -129,6 +158,7 @@ grep -q "GET /actuator/health 200 application/vnd.spring-boot.actuator.v3+json" 
 grep -q "actuator status UP" <<<"$OUTPUT"
 grep -q "GET /api/v3/account/profile 401" <<<"$OUTPUT"
 grep -q "GET /manifest.webmanifest 200 application/manifest+json" <<<"$OUTPUT"
+grep -q "OPTIONS /api/v3/client/bootstrap 200 Android CORS" <<<"$OUTPUT"
 
 set +e
 FAIL_OUTPUT="$(

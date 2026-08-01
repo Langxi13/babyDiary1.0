@@ -2,16 +2,18 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { copyText } from '@/utils/copyText'
 import { mediaThumbnailUrl } from '@/api/models'
+import { releaseNativeImage } from '@/platform/nativeImages'
 
-const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const ACCEPTED_IMAGE_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'
+])
+const MAX_IMAGE_SIZE = 25 * 1024 * 1024
 const MAX_DIARY_IMAGES = 50
 
-export function useDiaryImages({ route, isEdit }) {
+export function useDiaryImages({ route }) {
   const fileList = ref([])
   const previewVisible = ref(false)
   const previewUrl = ref('')
-  const initialImageCount = ref(0)
   const isAndroidDevice = ref(false)
   const androidUploadHelpVisible = ref(false)
   const androidUploadUrlInput = ref(null)
@@ -45,11 +47,11 @@ export function useDiaryImages({ route, isEdit }) {
   const isValidImageFile = (file) => {
     const contentType = String(file?.type || '').toLowerCase()
     if (!ACCEPTED_IMAGE_TYPES.has(contentType)) {
-      ElMessage.error('仅支持 JPEG、PNG、GIF 和 WebP 图片')
+      ElMessage.error('仅支持 JPEG、PNG、GIF、WebP、HEIC 和 HEIF 图片')
       return false
     }
     if (!file.size || file.size > MAX_IMAGE_SIZE) {
-      ElMessage.error('图片大小不能超过10MB')
+      ElMessage.error('图片大小不能超过25MB')
       return false
     }
     return true
@@ -69,6 +71,7 @@ export function useDiaryImages({ route, isEdit }) {
     if (file?.url?.startsWith('blob:')) {
       URL.revokeObjectURL(file.url)
     }
+    releaseNativeImage(file?.raw).catch(() => {})
   }
 
   const handleImageChange = (_uploadFile, uploadFiles) => {
@@ -76,7 +79,13 @@ export function useDiaryImages({ route, isEdit }) {
       .filter(file => file.isExisting || (file.raw && isValidImageFile(file.raw)))
       .map(file => file.url || !file.raw
         ? file
-        : { ...file, url: URL.createObjectURL(file.raw) })
+        : {
+            ...file,
+            uploadId: file.uploadId || file.raw?.uploadId || crypto.randomUUID(),
+            url: file.raw?.kind === 'native-uri'
+              ? file.raw.previewUrl
+              : URL.createObjectURL(file.raw)
+          })
   }
 
   const removeImageAt = (index) => {
@@ -113,50 +122,34 @@ export function useDiaryImages({ route, isEdit }) {
       .map((file, index) => ({
         name: file.name,
         uid: `native-${Date.now()}-${index}`,
-        url: URL.createObjectURL(file),
+        uploadId: file.uploadId || crypto.randomUUID(),
+        url: file.kind === 'native-uri' ? file.previewUrl : URL.createObjectURL(file),
         raw: file
       }))
 
     fileList.value = [...fileList.value, ...acceptedFiles]
   }
 
-  const imageOrderForFile = (file, newImageIndex) => {
-    if (file.raw) return `new:${newImageIndex}`
-    if (file.isExisting && file.name) return `existing:${file.name}`
-    return ''
-  }
-
-  const appendImagesToFormData = (formData) => {
-    if (!isEdit.value) {
-      fileList.value.filter(file => file.raw).forEach(file => {
-        formData.append('imageFiles', file.raw)
-      })
-      return
-    }
-
-    let newImageIndex = 0
+  const buildImageSubmission = () => {
+    const newImages = []
+    const retainedMediaIds = []
+    const mediaOrder = []
     for (const file of fileList.value) {
-      const orderEntry = imageOrderForFile(file, newImageIndex)
       if (file.raw) {
-        formData.append('imageFiles', file.raw)
-        newImageIndex += 1
+        mediaOrder.push(`new:${newImages.length}`)
+        newImages.push(file.raw.kind === 'native-uri'
+          ? file.raw
+          : { file: file.raw, uploadId: file.uploadId || crypto.randomUUID() })
       } else if (file.isExisting && file.name) {
-        formData.append('retainedMediaIds', file.name)
-      }
-      if (orderEntry) {
-        formData.append('mediaOrder', orderEntry)
+        retainedMediaIds.push(file.name)
+        mediaOrder.push(`existing:${file.name}`)
       }
     }
-
-    const retainedCount = fileList.value.filter(file => file.isExisting && file.name).length
-    if (initialImageCount.value > 0 && retainedCount === 0) {
-      formData.append('clearImages', 'true')
-    }
+    return { newImages, retainedMediaIds, mediaOrder }
   }
 
   const setExistingImages = (media = []) => {
     const images = media.filter(item => item?.mediaType === 'IMAGE')
-    initialImageCount.value = images.length
     fileList.value = images.map((item, index) => ({
       name: item.id,
       url: mediaThumbnailUrl(item),
@@ -191,7 +184,7 @@ export function useDiaryImages({ route, isEdit }) {
     moveImage,
     handleNativeImageChange,
     appendNativeFiles,
-    appendImagesToFormData,
+    buildImageSubmission,
     setExistingImages,
     initializeImageUpload,
     disposeImages

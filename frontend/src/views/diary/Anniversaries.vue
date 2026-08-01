@@ -158,6 +158,7 @@ import { mediaThumbnailUrl } from '@/api/models'
 import { useWorkspaceStore } from '@/stores/workspace'
 import NativeImageActions from '@/components/mobile/NativeImageActions.vue'
 import { isNativeApp } from '@/platform/runtimeConfig'
+import { releaseNativeImage } from '@/platform/nativeImages'
 import { formatChineseDate } from '@/utils/dateDisplay'
 import { formatLocalDate } from '@/utils/diaryFormState'
 import 'element-plus/es/components/button/style/css.mjs'
@@ -267,8 +268,10 @@ const handleCoverChange = (uploadFile) => {
     ElMessage.error('只能上传图片文件')
     return
   }
+  releaseNativeImage(coverFile.value).catch(() => {})
   coverFile.value = file
-  setCoverPreviewUrl(URL.createObjectURL(file), true)
+  if (file.kind === 'native-uri') setCoverPreviewUrl(file.previewUrl)
+  else setCoverPreviewUrl(URL.createObjectURL(file), true)
 }
 
 const handleNativeCoverFiles = (files) => {
@@ -277,6 +280,7 @@ const handleNativeCoverFiles = (files) => {
 }
 
 const removeCover = () => {
+  releaseNativeImage(coverFile.value).catch(() => {})
   coverFile.value = null
   form.coverAssetId = ''
   setCoverPreviewUrl('')
@@ -304,6 +308,8 @@ const submitForm = async () => {
       await anniversaryApi.create(spaceId, payload)
     }
     ElMessage.success('保存成功')
+    await releaseNativeImage(coverFile.value)
+    coverFile.value = null
     dialogVisible.value = false
     await fetchAnniversaries()
   } finally {
@@ -324,7 +330,10 @@ const removeItem = async (id) => {
 }
 
 onMounted(fetchAnniversaries)
-onBeforeUnmount(() => setCoverPreviewUrl(''))
+onBeforeUnmount(() => {
+  releaseNativeImage(coverFile.value).catch(() => {})
+  setCoverPreviewUrl('')
+})
 </script>
 
 <style src="./styles/Anniversaries.scss" scoped lang="scss"></style>

@@ -467,6 +467,8 @@ public class MediaProcessingJobHandler implements BackgroundJobHandler {
         if (contentType == null) return ".bin";
         return switch (contentType) {
             case "image/jpeg" -> ".jpg";
+            case "image/heic" -> ".heic";
+            case "image/heif" -> ".heif";
             case "image/png" -> ".png";
             case "image/gif" -> ".gif";
             case "image/webp" -> ".webp";

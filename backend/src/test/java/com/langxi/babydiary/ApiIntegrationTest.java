@@ -21,6 +21,7 @@ import com.langxi.babydiary.ai.application.AiClient;
 import com.langxi.babydiary.ai.application.AiReportJobHandler;
 import com.langxi.babydiary.identity.application.InvitationCodeService;
 import com.langxi.babydiary.media.application.StorageGcJobHandler;
+import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import com.langxi.babydiary.platform.infrastructure.BackgroundJobMapper;
 import jakarta.servlet.http.Cookie;
 import java.io.ByteArrayInputStream;
@@ -230,7 +231,13 @@ class ApiIntegrationTest {
         mvc.perform(get("/api/v3/client/bootstrap"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.apiVersion").value(3))
-                .andExpect(jsonPath("$.serverVersion").value("1.0.0-beta.5"));
+                .andExpect(jsonPath("$.serverVersion").value("1.0.0-beta.8"))
+                .andExpect(jsonPath("$.upload.maxImageBytes").value(25L * 1024 * 1024))
+                .andExpect(jsonPath("$.upload.maxImagePixels").value(80_000_000))
+                .andExpect(jsonPath("$.upload.maxDiaryImages").value(50))
+                .andExpect(jsonPath("$.upload.acceptedImageTypes").isArray())
+                .andExpect(jsonPath("$.upload.acceptedImageTypes[1]").value("image/heic"))
+                .andExpect(jsonPath("$.upload.acceptedImageTypes[2]").value("image/heif"));
     }
 
     @Test
@@ -737,6 +744,60 @@ class ApiIntegrationTest {
                                 "SELECT used_bytes FROM space_storage_usage WHERE space_id=11",
                                 Long.class))
                 .isZero();
+    }
+
+    @Test
+    void mediaUploadIdempotencyReplaysOneAssetAndReleasesTheKeyAfterDeletion() throws Exception {
+        String token = accessToken(login("owner"));
+        UUID uploadId = UUID.randomUUID();
+
+        MvcResult first =
+                mvc.perform(
+                                multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                                        .file(imageFile("first.png"))
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .header(
+                                                ClientRequestHeaders.IDEMPOTENCY_KEY,
+                                                uploadId.toString()))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        UUID firstAssetId = UUID.fromString(body(first).path("id").asText());
+
+        mvc.perform(
+                        multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                                .file(imageFile("replayed.png"))
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                .header(ClientRequestHeaders.IDEMPOTENCY_KEY, uploadId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(firstAssetId.toString()));
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM media_asset WHERE client_upload_id=UUID_TO_BIN(?)",
+                                Integer.class,
+                                uploadId.toString()))
+                .isEqualTo(1);
+
+        mvc.perform(
+                        delete(
+                                        "/api/v3/spaces/{spaceId}/media/{assetId}",
+                                        OWNER_SPACE_ID,
+                                        firstAssetId)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isNoContent());
+
+        MvcResult replacement =
+                mvc.perform(
+                                multipart("/api/v3/spaces/{spaceId}/media", OWNER_SPACE_ID)
+                                        .file(imageFile("replacement.png"))
+                                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                        .header(
+                                                ClientRequestHeaders.IDEMPOTENCY_KEY,
+                                                uploadId.toString()))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        assertThat(UUID.fromString(body(replacement).path("id").asText()))
+                .isNotEqualTo(firstAssetId);
     }
 
     @Test

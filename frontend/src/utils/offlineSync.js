@@ -10,6 +10,7 @@ import {
 } from '@/utils/offlineDb'
 import { chunkOperations } from '@/utils/offlineQueue'
 import { getStepUpToken } from '@/utils/stepUp'
+import { releaseNativeImage } from '@/platform/nativeImages'
 
 const syncingSpaces = new Set()
 
@@ -53,23 +54,27 @@ export async function syncWorkspace(spaceId) {
       const uploaded = []
       try {
         for (const pendingMedia of items) {
-          const formData = new FormData()
-          formData.append('file', pendingMedia.file, pendingMedia.filename || 'media')
-          if (pendingMedia.caption) formData.append('caption', pendingMedia.caption)
-          const uploadedMedia = await mediaApi.upload(spaceId, formData)
-          uploaded.push(uploadedMedia.id)
+          const source = pendingMedia.source || {
+            file: pendingMedia.file,
+            uploadId: pendingMedia.uploadId || pendingMedia.id
+          }
+          const uploadedMedia = await mediaApi.uploadSource(spaceId, source, {
+            caption: pendingMedia.caption
+          })
+          uploaded.push({ id: uploadedMedia.id, source })
         }
         const stepUpToken = getStepUpToken()
         const current = await diaryApi.getDiary(spaceId, diaryId, { force: true })
-        const mediaIds = [
+        const mediaIds = [...new Set([
           ...(current.media || []).map(item => item.id).filter(Boolean),
-          ...uploaded
-        ]
+          ...uploaded.map(item => item.id)
+        ])]
         await diaryApi.update(spaceId, diaryId, { ...current, mediaIds }, current.version, stepUpToken)
         await removeOfflineOperations(items.map(item => item.id))
+        await Promise.allSettled(items.map(item => releaseNativeImage(item.source || item.file)))
         synced += items.length
       } catch {
-        await Promise.allSettled(uploaded.map(mediaId => mediaApi.remove(spaceId, mediaId)))
+        await Promise.allSettled(uploaded.map(item => mediaApi.remove(spaceId, item.id)))
         break
       }
     }
