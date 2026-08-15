@@ -33,6 +33,12 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 
 ## 本地运行
 
+本机迁移后的源码目录为 `/root/projects/Baby-Diary`；生产发布目录为 `/srv/baby-diary`，
+数据库/对象/备份和 root-only 配置分别位于 `/var/lib/baby-diary`、
+`/var/backups/baby-diary` 和 `/etc/baby-diary`。systemd 服务已切换到这些路径，
+旧 `/usr/local/Web-Project/Baby-Diary` 仅保留作最终回滚核对。备份验证使用
+`scripts/verify-backup.sh`，迁移总记录见 `/root/docs/migrations/2026-08-15-usr-local-relocation`。
+
 1. 准备环境变量：
 
 ```bash
