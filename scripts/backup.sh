@@ -5,6 +5,7 @@ umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/baby-diary}"
 BACKUP_ROOT="${BACKUP_ROOT:-$PROJECT_ROOT/backups}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
 BACKUP_PASSPHRASE_FILE="${BACKUP_PASSPHRASE_FILE:-/etc/baby-diary/backup-passphrase}"
@@ -120,7 +121,7 @@ FLYWAY_VERSION="$(MYSQL_PWD="$MYSQL_PASSWORD" mysql --batch --skip-column-names 
   --protocol=TCP --host="$MYSQL_HOST" --port="$MYSQL_PORT" -u"$MYSQL_USER" "$MYSQL_DATABASE" \
   -e 'SELECT version FROM flyway_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1' \
   2>/dev/null || printf unknown)"
-DEPLOYED_JAR="$PROJECT_ROOT/deploy/backend/Baby-Diary.jar"
+DEPLOYED_JAR="$DEPLOY_ROOT/backend/Baby-Diary.jar"
 DEPLOYED_JAR_SHA256="$(test -f "$DEPLOYED_JAR" && sha256sum "$DEPLOYED_JAR" | awk '{print $1}' || printf unavailable)"
 
 cat > "$INCOMPLETE/backup.manifest" <<EOF

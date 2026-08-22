@@ -101,7 +101,7 @@ scripts/build-android-release.sh
 sudo env ANDROID_UPDATE_RESTART_SERVICE=true scripts/publish-android-update.sh
 ```
 
-发布脚本会再次验证 APK/AAB 版本和固定签名证书，生成 SHA-256，把 APK 放入 `deploy/frontend/downloads/android/`，并写入不含秘密的 `/etc/baby-diary/android-update.env`。普通网页部署会保留该下载目录。
+发布脚本会再次验证 APK/AAB 版本和固定签名证书，生成 SHA-256，把 APK 放入 `/srv/baby-diary/frontend/downloads/android/`，并写入不含秘密的 `/etc/baby-diary/android-update.env`。普通网页部署会保留该下载目录。
 
 同一版本文件默认不可被不同内容覆盖；正常发布必须递增版本号。只有修复尚未对外发布的本地制品时，才可显式设置 `ANDROID_UPDATE_ALLOW_REPLACE=true`，并在发布后重新核对清单与文件校验值。
 

@@ -3,10 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/baby-diary}"
 VERSION_FILE="${ANDROID_RELEASE_VERSION_FILE:-$PROJECT_ROOT/config/release-version.properties}"
 APK_PATH="${APK_PATH:-$PROJECT_ROOT/frontend/android/app/build/outputs/apk/release/app-release.apk}"
 AAB_PATH="${AAB_PATH:-$PROJECT_ROOT/frontend/android/app/build/outputs/bundle/release/app-release.aab}"
-DOWNLOAD_DIR="${ANDROID_DOWNLOAD_DIR:-$PROJECT_ROOT/deploy/frontend/downloads/android}"
+DOWNLOAD_DIR="${ANDROID_DOWNLOAD_DIR:-$DEPLOY_ROOT/frontend/downloads/android}"
 UPDATE_ENV_FILE="${ANDROID_UPDATE_ENV_FILE:-/etc/baby-diary/android-update.env}"
 MINIMUM_VERSION_CODE="${ANDROID_MINIMUM_VERSION_CODE:-1}"
 MANDATORY="${ANDROID_UPDATE_MANDATORY:-false}"

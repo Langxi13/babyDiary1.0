@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+DEPLOY_ROOT="${DEPLOY_ROOT:-/srv/baby-diary}"
+CONFIG_ROOT="${CONFIG_ROOT:-/etc/baby-diary}"
 SERVICE_NAME="${SERVICE_NAME:-diary-backend}"
 JAR_NAME="${JAR_NAME:-Baby-Diary.jar}"
 SERVICE_USER="${SERVICE_USER:-baby-diary}"
@@ -31,8 +33,6 @@ scripts/ensure-redis.sh
 chmod +x scripts/ensure-backup-passphrase.sh scripts/ensure-object-permissions.sh
 scripts/ensure-backup-passphrase.sh
 scripts/ensure-object-permissions.sh
-install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$PROJECT_ROOT/logs"
-
 install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
 install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
@@ -40,11 +40,13 @@ install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary
 install -D -m 0644 config/diary-backend-update.conf /etc/systemd/system/diary-backend.service.d/20-baby-diary-update.conf
 java_bin="$(command -v java)"
 escaped_java_bin="${java_bin//&/\&}"
-escaped_project_root="${PROJECT_ROOT//&/\&}"
+escaped_deploy_root="${DEPLOY_ROOT//&/\&}"
+escaped_config_root="${CONFIG_ROOT//&/\&}"
 escaped_jar_name="${JAR_NAME//&/\&}"
 sed \
   -e "s|@JAVA_BIN@|$escaped_java_bin|g" \
-  -e "s|@PROJECT_ROOT@|$escaped_project_root|g" \
+  -e "s|@DEPLOY_ROOT@|$escaped_deploy_root|g" \
+  -e "s|@CONFIG_ROOT@|$escaped_config_root|g" \
   -e "s|@JAR_NAME@|$escaped_jar_name|g" \
   config/diary-backend-runtime.conf | install -D -m 0644 /dev/stdin "$SYSTEMD_RUNTIME_OVERRIDE"
 rm -f "$SYSTEMD_RETIRED_OVERRIDE"
@@ -54,12 +56,18 @@ systemctl daemon-reload
 scripts/runtime-governance-check.sh
 nginx -t
 
+install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
+  "$DEPLOY_ROOT" "$DEPLOY_ROOT/backend" "$DEPLOY_ROOT/frontend" "$DEPLOY_ROOT/logs"
+install -D -m 0640 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
+  config/application-prod.yml "$CONFIG_ROOT/application-prod.yml"
+
 systemctl stop "$SERVICE_NAME"
-if [ -f "deploy/backend/$JAR_NAME" ]; then
-  cp "deploy/backend/$JAR_NAME" "deploy/backend/$JAR_NAME.previous"
+if [ -f "$DEPLOY_ROOT/backend/$JAR_NAME" ]; then
+  cp "$DEPLOY_ROOT/backend/$JAR_NAME" "$DEPLOY_ROOT/backend/$JAR_NAME.previous"
 fi
-cp "backend/target/$JAR_NAME" "deploy/backend/$JAR_NAME"
-rsync -a --delete --exclude downloads/ frontend/dist/ deploy/frontend/
+install -m 0640 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
+  "backend/target/$JAR_NAME" "$DEPLOY_ROOT/backend/$JAR_NAME"
+rsync -a --delete --exclude downloads/ frontend/dist/ "$DEPLOY_ROOT/frontend/"
 systemctl start "$SERVICE_NAME"
 
 systemctl reload nginx
