@@ -56,8 +56,10 @@ systemctl daemon-reload
 scripts/runtime-governance-check.sh
 nginx -t
 
+install -d -m 0755 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
+  "$DEPLOY_ROOT" "$DEPLOY_ROOT/frontend"
 install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
-  "$DEPLOY_ROOT" "$DEPLOY_ROOT/backend" "$DEPLOY_ROOT/frontend" "$DEPLOY_ROOT/logs"
+  "$DEPLOY_ROOT/backend" "$DEPLOY_ROOT/logs"
 install -D -m 0640 -o "$SERVICE_USER" -g "$SERVICE_GROUP" \
   config/application-prod.yml "$CONFIG_ROOT/application-prod.yml"
 
