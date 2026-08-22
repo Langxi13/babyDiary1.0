@@ -17,6 +17,47 @@ public class MyBatisAlbumRepository implements AlbumRepository {
     }
 
     @Override
+    public List<SystemCatalogRow> findSystemCatalog(
+            long spaceId, long accountId, boolean includeProtected) {
+        return mapper.findSystemCatalog(spaceId, accountId, includeProtected).stream()
+                .map(
+                        row ->
+                                new SystemCatalogRow(
+                                        row.systemKey(),
+                                        row.mediaCount(),
+                                        row.coverPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.coverPublicId())))
+                .toList();
+    }
+
+    @Override
+    public List<CustomCatalogRow> findCustomCatalog(long spaceId, boolean includeProtected) {
+        return mapper.findCustomCatalog(spaceId, includeProtected).stream()
+                .map(
+                        row ->
+                                new CustomCatalogRow(
+                                        row.groupId(),
+                                        row.groupPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.groupPublicId()),
+                                        row.groupName(),
+                                        row.groupSortOrder(),
+                                        row.albumId(),
+                                        row.albumPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.albumPublicId()),
+                                        row.albumType(),
+                                        row.albumName(),
+                                        row.albumDescription(),
+                                        row.coverPublicId() == null
+                                                ? null
+                                                : BinaryUuid.fromBytes(row.coverPublicId()),
+                                        row.mediaCount()))
+                .toList();
+    }
+
+    @Override
     public List<GroupRow> findGroups(long spaceId) {
         return mapper.findGroups(spaceId).stream()
                 .map(

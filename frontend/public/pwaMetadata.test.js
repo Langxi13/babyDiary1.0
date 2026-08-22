@@ -11,7 +11,7 @@ test('html exposes mobile web app metadata for iOS home screen use', () => {
   assert.match(html, /name="apple-mobile-web-app-capable"\s+content="yes"/)
   assert.match(html, /name="apple-mobile-web-app-title"\s+content="Baby Diary"/)
   assert.match(html, /name="apple-mobile-web-app-status-bar-style"\s+content="default"/)
-  assert.match(html, /rel="apple-touch-icon"\s+href="\/app-icon\.png"/)
+  assert.match(html, /rel="apple-touch-icon"\s+href="\/apple-touch-icon\.png"/)
 })
 
 test('manifest has installable app shell metadata', () => {
@@ -21,8 +21,8 @@ test('manifest has installable app shell metadata', () => {
 })
 
 test('service worker cache version is bumped when the app shell metadata changes', () => {
-  assert.match(serviceWorker, /baby-diary-shell-v13/)
-  assert.match(serviceWorker, /\/app-icon\.png/)
+  assert.match(serviceWorker, /baby-diary-shell-v14/)
+  assert.match(serviceWorker, /\/app-icon-display\.png/)
 })
 
 test('app asks the service worker to check for updates after registration', () => {

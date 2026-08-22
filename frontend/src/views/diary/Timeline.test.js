@@ -19,9 +19,13 @@ test('timeline renders year month and week collapsible groups', () => {
   assert.match(source, /isExpanded\(week\.key\)/)
 })
 
-test('timeline defaults to expanding every visible group after data loads', () => {
+test('timeline expands only the newest loaded month and lazy-loads other months', () => {
   assert.match(source, /expandedKeys\.value = new Set\(initialExpandedTimelineKeys\(tree\)\)/)
-  assert.doesNotMatch(source, /hasVisibleExpandedKey/)
+  assert.match(source, /getTimelineIndex/)
+  assert.match(source, /getTimelineMonth/)
+  assert.match(source, /toggleMonth/)
+  assert.match(source, /加载更多/)
+  assert.doesNotMatch(source, /do\s*\{[\s\S]*?nextCursor/)
 })
 
 test('timeline collapse layout keeps dense groups readable on mobile and desktop', () => {

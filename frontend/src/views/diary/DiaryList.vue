@@ -156,8 +156,8 @@
                 fit="cover"
                 class="diary-image"
               />
-              <span v-if="diaryImages(diary).length > 4" class="more-images">
-                +{{ diaryImages(diary).length - 4 }}
+              <span v-if="diary.mediaCount > 4" class="more-images">
+                +{{ diary.mediaCount - 4 }}
               </span>
             </div>
 

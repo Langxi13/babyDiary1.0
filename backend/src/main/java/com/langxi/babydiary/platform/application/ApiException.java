@@ -35,4 +35,12 @@ public final class ApiException extends RuntimeException {
     public static ApiException conflict(String code, String message) {
         return new ApiException(HttpStatus.CONFLICT, code, message);
     }
+
+    public static ApiException payloadTooLarge(String code, String message) {
+        return new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, code, message);
+    }
+
+    public static ApiException tooManyRequests(String code, String message) {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, code, message);
+    }
 }

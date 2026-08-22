@@ -17,6 +17,9 @@ public interface DiaryMapper {
     List<DiaryRow> findPage(
             @Param("query") DiaryRepository.Query query, @Param("tagPublicId") byte[] tagPublicId);
 
+    List<DiaryRow> findSummaryPage(
+            @Param("query") DiaryRepository.Query query, @Param("tagPublicId") byte[] tagPublicId);
+
     long count(
             @Param("query") DiaryRepository.Query query, @Param("tagPublicId") byte[] tagPublicId);
 
@@ -29,6 +32,8 @@ public interface DiaryMapper {
     List<TagRow> findTags(@Param("diaryIds") List<Long> diaryIds);
 
     List<MediaRow> findMedia(@Param("diaryIds") List<Long> diaryIds);
+
+    List<SummaryMediaRow> findSummaryMedia(@Param("diaryIds") List<Long> diaryIds);
 
     List<IdRow> resolveTagIds(
             @Param("spaceId") long spaceId, @Param("publicIds") List<byte[]> publicIds);
@@ -520,6 +525,101 @@ public interface DiaryMapper {
 
         public void setProtectedContent(boolean protectedContent) {
             this.protectedContent = protectedContent;
+        }
+    }
+
+    final class SummaryMediaRow {
+        private long diaryId;
+        private Long assetId;
+        private byte[] publicId;
+        private String mediaType;
+        private Integer position;
+        private String status;
+        private String thumbnailProfile;
+        private String previewProfile;
+        private boolean protectedContent;
+        private long mediaCount;
+
+        public SummaryMediaRow() {}
+
+        public long diaryId() {
+            return diaryId;
+        }
+
+        public Long assetId() {
+            return assetId;
+        }
+
+        public byte[] publicId() {
+            return publicId;
+        }
+
+        public String mediaType() {
+            return mediaType;
+        }
+
+        public Integer position() {
+            return position;
+        }
+
+        public String status() {
+            return status;
+        }
+
+        public String thumbnailProfile() {
+            return thumbnailProfile;
+        }
+
+        public String previewProfile() {
+            return previewProfile;
+        }
+
+        public boolean protectedContent() {
+            return protectedContent;
+        }
+
+        public long mediaCount() {
+            return mediaCount;
+        }
+
+        public void setDiaryId(long diaryId) {
+            this.diaryId = diaryId;
+        }
+
+        public void setAssetId(Long assetId) {
+            this.assetId = assetId;
+        }
+
+        public void setPublicId(byte[] publicId) {
+            this.publicId = publicId;
+        }
+
+        public void setMediaType(String mediaType) {
+            this.mediaType = mediaType;
+        }
+
+        public void setPosition(Integer position) {
+            this.position = position;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public void setThumbnailProfile(String thumbnailProfile) {
+            this.thumbnailProfile = thumbnailProfile;
+        }
+
+        public void setPreviewProfile(String previewProfile) {
+            this.previewProfile = previewProfile;
+        }
+
+        public void setProtectedContent(boolean protectedContent) {
+            this.protectedContent = protectedContent;
+        }
+
+        public void setMediaCount(long mediaCount) {
+            this.mediaCount = mediaCount;
         }
     }
 

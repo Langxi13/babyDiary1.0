@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SERVICE_NAME="${SERVICE_NAME:-diary-backend}"
 JAR_NAME="${JAR_NAME:-Baby-Diary.jar}"
+SERVICE_USER="${SERVICE_USER:-baby-diary}"
+SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 SYSTEMD_RUNTIME_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-runtime.conf"
 SYSTEMD_RETIRED_OVERRIDE="/etc/systemd/system/diary-backend.service.d/30-baby-diary-v3.conf"
 
@@ -29,6 +31,7 @@ scripts/ensure-redis.sh
 chmod +x scripts/ensure-backup-passphrase.sh scripts/ensure-object-permissions.sh
 scripts/ensure-backup-passphrase.sh
 scripts/ensure-object-permissions.sh
+install -d -m 0750 -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$PROJECT_ROOT/logs"
 
 install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
 install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf

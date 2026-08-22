@@ -1,9 +1,8 @@
 package com.langxi.babydiary.identity.infrastructure;
 
 import com.langxi.babydiary.identity.application.AccessTokenCodec;
-import com.langxi.babydiary.identity.application.AccountGateway;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
-import com.langxi.babydiary.identity.domain.Account;
+import com.langxi.babydiary.identity.application.AuthenticationProjectionCache;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,9 +20,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class AuthenticationFilter extends OncePerRequestFilter {
     private final AccessTokenCodec tokens;
-    private final AccountGateway accounts;
+    private final AuthenticationProjectionCache accounts;
 
-    public AuthenticationFilter(AccessTokenCodec tokens, AccountGateway accounts) {
+    public AuthenticationFilter(AccessTokenCodec tokens, AuthenticationProjectionCache accounts) {
         this.tokens = tokens;
         this.accounts = accounts;
     }
@@ -36,19 +35,12 @@ public class AuthenticationFilter extends OncePerRequestFilter {
         if (authorization != null && authorization.startsWith("Bearer ")) {
             tokens.decode(authorization.substring(7).trim())
                     .filter(token -> token.expiresAt().isAfter(Instant.now()))
-                    .flatMap(
-                            token ->
-                                    accounts.findById(token.accountId())
-                                            .filter(Account::active)
-                                            .filter(
-                                                    account ->
-                                                            account.tokenVersion()
-                                                                    == token.tokenVersion()))
+                    .flatMap(token -> accounts.find(token.accountId(), token.tokenVersion()))
                     .ifPresent(
                             account -> {
                                 AccountPrincipal principal =
                                         new AccountPrincipal(
-                                                account.id(),
+                                                account.accountId(),
                                                 account.publicId(),
                                                 account.username(),
                                                 account.systemRole());

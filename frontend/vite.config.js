@@ -20,6 +20,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(releaseInfo.PRODUCT_VERSION)
   },
   build: {
+    manifest: true,
     rollupOptions: {
       output: {
         manualChunks(id) {

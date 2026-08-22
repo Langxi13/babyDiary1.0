@@ -135,6 +135,7 @@ export const albumApi = {
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:albums:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
     return { id: mediaId, favorite: true }
   },
 
@@ -144,6 +145,7 @@ export const albumApi = {
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:albums:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
   },
 
   async generateProposal(spaceId, payload) {

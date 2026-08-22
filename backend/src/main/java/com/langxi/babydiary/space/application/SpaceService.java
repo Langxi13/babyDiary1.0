@@ -1,5 +1,6 @@
 package com.langxi.babydiary.space.application;
 
+import com.langxi.babydiary.platform.application.AfterCommit;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.space.domain.SpaceSummary;
 import java.util.List;
@@ -11,9 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpaceService implements SpaceAccess {
     private static final long DEFAULT_QUOTA = 5L * 1024 * 1024 * 1024;
     private final SpaceGateway spaces;
+    private final SpaceAccessProjectionCache accessCache;
 
-    public SpaceService(SpaceGateway spaces) {
+    public SpaceService(SpaceGateway spaces, SpaceAccessProjectionCache accessCache) {
         this.spaces = spaces;
+        this.accessCache = accessCache;
     }
 
     public List<SpaceView> list(long accountId) {
@@ -48,19 +51,22 @@ public class SpaceService implements SpaceAccess {
         if (!spaces.update(context.internalId(), normalizedName, visibility)) {
             throw ApiException.notFound("SPACE_NOT_FOUND", "空间不存在或无权访问");
         }
+        AfterCommit.run(() -> accessCache.invalidateSpace(spaceId));
+        SpaceContext fresh = spaces.findContext(spaceId, accountId).orElse(context);
         return new SpaceView(
                 spaceId,
                 normalizedName,
                 context.type(),
                 context.role(),
                 visibility,
-                context.storageQuotaBytes(),
-                context.storageUsedBytes());
+                fresh.storageQuotaBytes(),
+                fresh.storageUsedBytes());
     }
 
     @Override
     public SpaceContext requireMember(UUID spaceId, long accountId) {
-        return spaces.findContext(spaceId, accountId)
+        return accessCache
+                .find(spaceId, accountId)
                 .orElseThrow(() -> ApiException.notFound("SPACE_NOT_FOUND", "空间不存在或无权访问"));
     }
 

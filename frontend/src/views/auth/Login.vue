@@ -2,7 +2,7 @@
   <div class="auth-page">
     <main class="auth-card">
       <header class="auth-header">
-        <img src="/app-icon.png" alt="" class="auth-logo" />
+        <img src="/app-icon-display.png" alt="" class="auth-logo" />
         <div>
           <span>私人日记与回忆相册</span>
           <h1>Baby Diary</h1>

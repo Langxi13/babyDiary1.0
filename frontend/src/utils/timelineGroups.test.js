@@ -56,7 +56,7 @@ test('dense months are grouped into week sections while sparse months keep direc
   assert.equal(sparseMonth.diaries.length, 2)
 })
 
-test('initialExpandedTimelineKeys opens every year month and week by default', () => {
+test('initialExpandedTimelineKeys opens only the newest year and loaded month', () => {
   const tree = buildTimelineTree([
     {
       month: '2026-07',
@@ -72,9 +72,16 @@ test('initialExpandedTimelineKeys opens every year month and week by default', (
     timelineKey('year', '2026'),
     timelineKey('month', '2026-07'),
     timelineKey('week', '2026-07', '第2周'),
-    timelineKey('week', '2026-07', '第1周'),
-    timelineKey('month', '2026-06'),
-    timelineKey('year', '2025'),
-    timelineKey('month', '2025-12')
+    timelineKey('week', '2026-07', '第1周')
   ])
+})
+
+test('aggregate counts are preserved before a month page is loaded', () => {
+  const tree = buildTimelineTree([
+    { month: '2026-07', diaryCount: 120, mediaCount: 300, diaries: [], loaded: false }
+  ])
+
+  assert.equal(tree[0].diaryCount, 120)
+  assert.equal(tree[0].photoCount, 300)
+  assert.equal(tree[0].months[0].usesWeeks, false)
 })

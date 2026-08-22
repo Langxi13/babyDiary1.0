@@ -15,16 +15,20 @@ public class SlowRequestLoggingInterceptor implements HandlerInterceptor {
             SlowRequestLoggingInterceptor.class.getName() + ".startTime";
 
     private final long thresholdMillis;
+    private final RequestSqlCounter sql;
 
     public SlowRequestLoggingInterceptor(
-            @Value("${app.http.slow-request-threshold-ms:1000}") long thresholdMillis) {
+            @Value("${app.http.slow-request-threshold-ms:1000}") long thresholdMillis,
+            RequestSqlCounter sql) {
         this.thresholdMillis = Math.max(1, thresholdMillis);
+        this.sql = sql;
     }
 
     @Override
     public boolean preHandle(
             HttpServletRequest request, HttpServletResponse response, Object handler) {
         request.setAttribute(START_TIME, System.nanoTime());
+        sql.begin();
         return true;
     }
 
@@ -35,17 +39,17 @@ public class SlowRequestLoggingInterceptor implements HandlerInterceptor {
             Object handler,
             Exception exception) {
         Object started = request.getAttribute(START_TIME);
-        if (!(started instanceof Long startedNanos)) {
-            return;
-        }
+        int sqlCount = sql.end();
+        if (!(started instanceof Long startedNanos)) return;
         long elapsedMillis = (System.nanoTime() - startedNanos) / 1_000_000L;
         if (elapsedMillis >= thresholdMillis) {
             log.warn(
-                    "Slow request method={} path={} status={} elapsedMs={}",
+                    "Slow request method={} path={} status={} elapsedMs={} sqlCount={}",
                     request.getMethod(),
                     request.getRequestURI(),
                     response.getStatus(),
-                    elapsedMillis);
+                    elapsedMillis,
+                    sqlCount);
         }
     }
 }

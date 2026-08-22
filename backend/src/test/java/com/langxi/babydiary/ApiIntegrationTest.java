@@ -23,6 +23,8 @@ import com.langxi.babydiary.identity.application.InvitationCodeService;
 import com.langxi.babydiary.media.application.StorageGcJobHandler;
 import com.langxi.babydiary.platform.api.ClientRequestHeaders;
 import com.langxi.babydiary.platform.infrastructure.BackgroundJobMapper;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -128,7 +130,41 @@ class ApiIntegrationTest {
 
     @Autowired AiReportJobHandler aiReportJobs;
 
+    @Autowired MeterRegistry metrics;
+
     @MockitoBean AiClient aiClient;
+
+    @Test
+    void boundedReadModelsStayWithinSqlBudgets() throws Exception {
+        String token = accessToken(login("owner"));
+        createDiary(token, "SQL budget", "2026-08-01");
+        DistributionSummary sqlCounts = metrics.get("baby.diary.http.sql.count").summary();
+
+        double beforeHome = sqlCounts.totalAmount();
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/home", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.diaryTotal").value(1))
+                .andExpect(jsonPath("$.recentDiaries.length()").value(1));
+        assertThat(sqlCounts.totalAmount() - beforeHome).isLessThanOrEqualTo(4);
+
+        double beforeSummaries = sqlCounts.totalAmount();
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/diaries/summaries", OWNER_SPACE_ID)
+                                .param("size", "20")
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1));
+        assertThat(sqlCounts.totalAmount() - beforeSummaries).isLessThanOrEqualTo(4);
+
+        double beforeAlbums = sqlCounts.totalAmount();
+        mvc.perform(
+                        get("/api/v3/spaces/{spaceId}/album-groups", OWNER_SPACE_ID)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk());
+        assertThat(sqlCounts.totalAmount() - beforeAlbums).isLessThanOrEqualTo(3);
+    }
 
     @BeforeEach
     void seed() {

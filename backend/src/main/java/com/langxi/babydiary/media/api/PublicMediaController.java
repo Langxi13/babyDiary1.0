@@ -5,6 +5,8 @@ import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.media.application.MediaUrlSigner;
 import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -49,6 +51,12 @@ public class PublicMediaController {
         MediaAccessContext context = verified.context();
         boolean noStore = context.elevated() || context.source() == MediaAccessContext.Source.SHARE;
         return MediaContentResponse.create(
-                media, resolved, range, ifNoneMatch, "HEAD".equals(request.getMethod()), noStore);
+                media,
+                resolved,
+                range,
+                ifNoneMatch,
+                "HEAD".equals(request.getMethod()),
+                noStore,
+                Duration.between(Instant.now(), verified.expiresAt()));
     }
 }

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -48,105 +49,78 @@ public class AlbumQueryService {
     }
 
     private AlbumCatalog catalog(long spaceId, long accountId, boolean elevated) {
-        List<AlbumCatalog.Group> groups = new ArrayList<>();
-        List<AlbumRepository.YearBucket> years =
-                albums.findLibraryYears(spaceId, accountId, elevated);
-        Map<UUID, MediaAsset> yearCovers =
-                media
-                        .findByPublicIdsInSpace(
-                                spaceId,
-                                years.stream()
-                                        .map(AlbumRepository.YearBucket::coverAssetId)
-                                        .toList())
-                        .stream()
+        List<AlbumRepository.SystemCatalogRow> systemRows =
+                albums.findSystemCatalog(spaceId, accountId, elevated);
+        List<AlbumRepository.CustomCatalogRow> customRows =
+                albums.findCustomCatalog(spaceId, elevated);
+        List<UUID> coverIds =
+                java.util.stream.Stream.concat(
+                                systemRows.stream()
+                                        .map(AlbumRepository.SystemCatalogRow::coverAssetId),
+                                customRows.stream()
+                                        .map(AlbumRepository.CustomCatalogRow::coverAssetId))
+                        .filter(java.util.Objects::nonNull)
+                        .distinct()
+                        .toList();
+        Map<UUID, MediaAsset> covers =
+                media.findByPublicIdsInSpace(spaceId, coverIds).stream()
                         .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
-        List<AlbumCatalog.Album> systemAlbums = new ArrayList<>();
-        MediaAsset allCover =
-                firstMedia(
-                        spaceId, albums.findLibraryPublicIds(spaceId, accountId, elevated, 0, 1));
-        MediaAsset favoriteCover =
-                firstMedia(
-                        spaceId, albums.findFavoritePublicIds(spaceId, accountId, elevated, 0, 1));
-        systemAlbums.add(
-                systemAlbum(
-                        "all",
-                        "所有图片",
-                        albums.countLibraryImages(spaceId, accountId, elevated),
-                        allCover));
-        systemAlbums.add(
-                systemAlbum(
-                        "favorites",
-                        "收藏",
-                        albums.countFavoriteMedia(spaceId, accountId, elevated),
-                        favoriteCover));
-        for (AlbumRepository.YearBucket year : years) {
-            MediaAsset cover = yearCovers.get(year.coverAssetId());
-            MediaAsset.Variant coverVariant =
-                    cover == null ? null : AlbumProjection.coverVariant(cover);
-            systemAlbums.add(
-                    new AlbumCatalog.Album(
-                            null,
-                            null,
-                            "year:" + year.year(),
-                            "SYSTEM",
-                            year.year() + " 年",
-                            "",
-                            year.coverAssetId(),
-                            coverVariant == null ? null : coverVariant.type(),
-                            coverVariant == null ? null : coverVariant.profile(),
-                            year.mediaCount(),
-                            cover));
-        }
-        groups.add(new AlbumCatalog.Group(null, "SYSTEM", "默认相册", List.copyOf(systemAlbums)));
+
+        List<AlbumCatalog.Group> groups = new ArrayList<>();
+        List<AlbumCatalog.Album> systemAlbums =
+                systemRows.stream()
+                        .map(
+                                row ->
+                                        systemAlbum(
+                                                row.systemKey(),
+                                                systemAlbumName(row.systemKey()),
+                                                row.mediaCount(),
+                                                covers.get(row.coverAssetId())))
+                        .toList();
+        groups.add(new AlbumCatalog.Group(null, "SYSTEM", "默认相册", systemAlbums));
 
         Map<Long, List<AlbumCatalog.Album>> byGroup = new LinkedHashMap<>();
-        List<AlbumRepository.GroupRow> groupRows = albums.findGroups(spaceId);
-        for (AlbumRepository.GroupRow group : groupRows) {
-            byGroup.put(group.internalId(), new ArrayList<>());
-            groups.add(
-                    new AlbumCatalog.Group(
-                            group.id(), "CUSTOM", group.name(), byGroup.get(group.internalId())));
-        }
-        List<AlbumRepository.AlbumRow> albumRows = albums.findAlbums(spaceId, elevated);
-        Map<UUID, UUID> fallbackCoverIds =
-                albums.findFallbackCovers(spaceId, elevated).stream()
-                        .collect(
-                                java.util.stream.Collectors.toMap(
-                                        AlbumRepository.AlbumCover::albumId,
-                                        AlbumRepository.AlbumCover::assetId));
-        Map<UUID, MediaAsset> covers =
-                media
-                        .findByPublicIdsInSpace(
-                                spaceId,
-                                java.util.stream.Stream.concat(
-                                                albumRows.stream()
-                                                        .map(
-                                                                AlbumRepository.AlbumRow
-                                                                        ::coverAssetId),
-                                                fallbackCoverIds.values().stream())
-                                        .filter(java.util.Objects::nonNull)
-                                        .distinct()
-                                        .toList())
-                        .stream()
-                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
-        boolean hasUngrouped = false;
-        for (AlbumRepository.AlbumRow album : albumRows) {
+        Set<Long> addedGroups = new java.util.LinkedHashSet<>();
+        for (AlbumRepository.CustomCatalogRow row : customRows) {
+            long groupKey = row.groupInternalId() == null ? 0L : row.groupInternalId();
             List<AlbumCatalog.Album> target =
-                    album.groupInternalId() == null ? null : byGroup.get(album.groupInternalId());
-            if (target == null) {
-                target = byGroup.computeIfAbsent(0L, ignored -> new ArrayList<>());
-                if (!hasUngrouped) {
-                    groups.add(new AlbumCatalog.Group(null, "CUSTOM", "未分组", target));
-                    hasUngrouped = true;
-                }
+                    byGroup.computeIfAbsent(groupKey, ignored -> new ArrayList<>());
+            if (addedGroups.add(groupKey)) {
+                groups.add(
+                        new AlbumCatalog.Group(
+                                row.groupId(),
+                                "CUSTOM",
+                                row.groupInternalId() == null ? "未分组" : row.groupName(),
+                                target));
             }
-            UUID coverId =
-                    album.coverAssetId() == null
-                            ? fallbackCoverIds.get(album.id())
-                            : album.coverAssetId();
-            target.add(AlbumProjection.album(album, album.groupId(), coverId, covers.get(coverId)));
+            if (row.albumId() == null) continue;
+            AlbumRepository.AlbumRow album =
+                    new AlbumRepository.AlbumRow(
+                            row.albumInternalId(),
+                            row.albumId(),
+                            row.groupInternalId(),
+                            row.groupId(),
+                            row.albumType(),
+                            row.albumName(),
+                            row.albumDescription(),
+                            row.coverAssetId(),
+                            null,
+                            null,
+                            row.mediaCount());
+            target.add(
+                    AlbumProjection.album(
+                            album,
+                            row.groupId(),
+                            row.coverAssetId(),
+                            covers.get(row.coverAssetId())));
         }
         return new AlbumCatalog(List.copyOf(groups));
+    }
+
+    private String systemAlbumName(String key) {
+        if ("all".equals(key)) return "所有图片";
+        if ("favorites".equals(key)) return "收藏";
+        return key.substring("year:".length()) + " 年";
     }
 
     public AlbumCatalog.Detail detail(
@@ -172,19 +146,20 @@ public class AlbumQueryService {
         List<UUID> ids =
                 albums.findMediaPublicIds(
                         spaceId, albumId, elevated, bounds.offset(), bounds.size());
-        List<MediaAsset> items = media.findByPublicIdsInSpace(spaceId, ids);
-        UUID coverId = row.coverAssetId();
-        if (coverId == null && row.mediaCount() > 0) {
-            coverId =
-                    albums.findMediaPublicIds(spaceId, albumId, elevated, 0, 1).stream()
-                            .findFirst()
-                            .orElse(null);
-        }
-        MediaAsset cover = firstMedia(spaceId, coverId == null ? List.of() : List.of(coverId));
+        UUID coverId =
+                row.coverAssetId() == null
+                        ? ids.stream().findFirst().orElse(null)
+                        : row.coverAssetId();
+        List<UUID> hydrationIds = new ArrayList<>(ids);
+        if (coverId != null && !hydrationIds.contains(coverId)) hydrationIds.add(coverId);
+        Map<UUID, MediaAsset> hydrated =
+                media.findByPublicIdsInSpace(spaceId, hydrationIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(MediaAsset::id, value -> value));
+        List<MediaAsset> items =
+                ids.stream().map(hydrated::get).filter(java.util.Objects::nonNull).toList();
+        MediaAsset cover = hydrated.get(coverId);
         return new AlbumCatalog.Detail(
-                AlbumProjection.album(row, row.groupId(), coverId, cover),
-                items,
-                albums.countMedia(spaceId, albumId, elevated));
+                AlbumProjection.album(row, row.groupId(), coverId, cover), items, row.mediaCount());
     }
 
     public AlbumCatalog.Detail systemDetail(
@@ -235,7 +210,6 @@ public class AlbumQueryService {
                                         elevated,
                                         bounds.offset(),
                                         bounds.size());
-        List<MediaAsset> items = media.findByPublicIds(spaceId, ids, accountId);
         long total =
                 year != null
                         ? albums.countLibraryImagesByYear(spaceId, accountId, year, elevated)
@@ -243,14 +217,8 @@ public class AlbumQueryService {
                                 ? albums.countFavoriteMedia(spaceId, accountId, elevated)
                                 : albums.countLibraryImages(spaceId, accountId, elevated);
         String name = year != null ? year + " 年" : "favorites".equals(key) ? "收藏" : "所有图片";
-        List<UUID> coverIds =
-                year != null
-                        ? albums.findLibraryPublicIdsByYear(
-                                spaceId, accountId, year, elevated, 0, 1)
-                        : "favorites".equals(key)
-                                ? albums.findFavoritePublicIds(spaceId, accountId, elevated, 0, 1)
-                                : albums.findLibraryPublicIds(spaceId, accountId, elevated, 0, 1);
-        MediaAsset cover = firstMedia(spaceId, coverIds);
+        List<MediaAsset> items = media.findByPublicIds(spaceId, ids, accountId);
+        MediaAsset cover = items.stream().findFirst().orElse(null);
         return new AlbumCatalog.Detail(systemAlbum(key, name, total, cover), items, total);
     }
 

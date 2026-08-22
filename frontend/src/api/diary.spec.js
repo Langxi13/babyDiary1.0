@@ -15,23 +15,23 @@ vi.mock('@/utils/stepUp', () => ({
 
 import { diaryApi } from './diary'
 
-describe('diary timeline paging', () => {
+describe('bounded diary reads', () => {
   beforeEach(() => {
     mocks.get.mockReset()
     mocks.post.mockReset()
     mocks.invalidate.mockReset()
   })
 
-  it('loads every cursor page and translates month filters to a date range', async () => {
+  it('loads the timeline index and only the selected month first page', async () => {
     mocks.get
       .mockResolvedValueOnce({
-        items: [{ id: 'd-1', diaryDate: '2026-07-31', media: [] }],
-        nextCursor: 'cursor-1',
-        totalElements: null
+        years: [{ year: 2026, count: 2, mediaCount: 3, months: [
+          { month: '2026-07', count: 2, mediaCount: 3 }
+        ] }]
       })
       .mockResolvedValueOnce({
-        items: [{ id: 'd-2', diaryDate: '2026-07-01', media: [] }],
-        nextCursor: null,
+        items: [{ id: 'd-1', diaryDate: '2026-07-31', previews: [] }],
+        nextCursor: 'cursor-1',
         totalElements: null
       })
 
@@ -42,29 +42,36 @@ describe('diary timeline paging', () => {
     })
 
     expect(groups).toEqual([
-      expect.objectContaining({ month: '2026-07', diaries: expect.arrayContaining([
-        expect.objectContaining({ id: 'd-1' }),
-        expect.objectContaining({ id: 'd-2' })
-      ]) })
+      expect.objectContaining({
+        month: '2026-07',
+        diaryCount: 2,
+        mediaCount: 3,
+        diaries: [expect.objectContaining({ id: 'd-1' })],
+        nextCursor: 'cursor-1',
+        loaded: true
+      })
     ])
     expect(mocks.get).toHaveBeenCalledTimes(2)
-    expect(mocks.get.mock.calls[0][1].params).toEqual(expect.objectContaining({
+    expect(mocks.get.mock.calls[0][0]).toBe('/api/v3/spaces/space-1/diaries/timeline')
+    expect(mocks.get.mock.calls[1][0]).toBe('/api/v3/spaces/space-1/diaries/summaries')
+    expect(mocks.get.mock.calls[1][1].params).toEqual(expect.objectContaining({
       startDate: '2026-07-01',
       endDate: '2026-07-31',
       mood: 'HAPPY',
-      size: 50,
+      size: 20,
       includeTotal: false,
       cursor: undefined
     }))
-    expect(mocks.get.mock.calls[1][1].params.cursor).toBe('cursor-1')
   })
 
-  it('rejects a repeated cursor instead of looping forever', async () => {
-    mocks.get.mockResolvedValue({ items: [], nextCursor: 'same-cursor' })
+  it('fetches exactly one summary page for an explicit month cursor', async () => {
+    mocks.get.mockResolvedValue({ items: [], nextCursor: 'next-cursor' })
 
-    await expect(diaryApi.getTimeline('space-1', {}))
-      .rejects.toThrow('时间轴分页游标重复')
-    expect(mocks.get).toHaveBeenCalledTimes(2)
+    await expect(diaryApi.getTimelineMonth('space-1', {
+      month: '2026-06', cursor: 'current-cursor'
+    })).resolves.toEqual({ diaries: [], nextCursor: 'next-cursor' })
+    expect(mocks.get).toHaveBeenCalledTimes(1)
+    expect(mocks.get.mock.calls[0][1].params.cursor).toBe('current-cursor')
   })
 
   it('updates local version state and invalidates reads after restoring a revision', async () => {

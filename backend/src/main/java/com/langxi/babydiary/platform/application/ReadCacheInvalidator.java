@@ -11,6 +11,7 @@ public class ReadCacheInvalidator {
     public static final String TAGS = "tags";
     public static final String DIARY_AGGREGATES = "diary-aggregates";
     public static final String ALBUM_METADATA = "album-metadata";
+    public static final String HOME = "home";
 
     private final ReadCache cache;
 
@@ -19,19 +20,23 @@ public class ReadCacheInvalidator {
     }
 
     public void diary(UUID spaceId) {
-        afterCommit(spaceId, Set.of(DIARY_AGGREGATES));
+        afterCommit(spaceId, Set.of(DIARY_AGGREGATES, HOME));
     }
 
     public void tags(UUID spaceId) {
-        afterCommit(spaceId, Set.of(TAGS));
+        afterCommit(spaceId, Set.of(TAGS, HOME));
     }
 
     public void albums(UUID spaceId) {
-        afterCommit(spaceId, Set.of(ALBUM_METADATA));
+        afterCommit(spaceId, Set.of(ALBUM_METADATA, HOME));
     }
 
     public void diaryAndAlbums(UUID spaceId) {
-        afterCommit(spaceId, Set.of(DIARY_AGGREGATES, ALBUM_METADATA));
+        afterCommit(spaceId, Set.of(DIARY_AGGREGATES, ALBUM_METADATA, HOME));
+    }
+
+    public void home(UUID spaceId) {
+        afterCommit(spaceId, Set.of(HOME));
     }
 
     private void afterCommit(UUID spaceId, Set<String> areas) {

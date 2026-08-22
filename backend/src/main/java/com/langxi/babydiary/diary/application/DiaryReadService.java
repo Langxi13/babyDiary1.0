@@ -90,25 +90,38 @@ public class DiaryReadService {
         return new CalendarMonth(month, days);
     }
 
-    public TimelineIndex timeline(UUID spaceId, long accountId) {
+    public TimelineIndex timeline(
+            UUID spaceId, long accountId, String mood, UUID tagId, boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
+        String normalizedMood = mood == null || mood.isBlank() ? null : mood.trim();
+        if (elevated) {
+            return timeline(space.internalId(), accountId, normalizedMood, tagId, true);
+        }
         return cache.get(
                 ReadCacheInvalidator.DIARY_AGGREGATES,
                 spaceId,
                 accountId,
-                "timeline",
+                "timeline:mood=" + normalizedMood + ":tag=" + tagId,
                 Duration.ofMinutes(3),
                 TIMELINE,
-                () -> timeline(space.internalId(), accountId));
+                () -> timeline(space.internalId(), accountId, normalizedMood, tagId, false));
     }
 
-    private TimelineIndex timeline(long spaceId, long accountId) {
+    private TimelineIndex timeline(
+            long spaceId, long accountId, String mood, UUID tagId, boolean elevated) {
         Map<Integer, List<MonthSummary>> months = new LinkedHashMap<>();
         Map<Integer, Long> yearCounts = new LinkedHashMap<>();
-        for (DiaryReadRepository.MonthCount row : reads.findMonthCounts(spaceId, accountId)) {
+        Map<Integer, Long> yearMediaCounts = new LinkedHashMap<>();
+        for (DiaryReadRepository.MonthCount row :
+                reads.findMonthCounts(spaceId, accountId, mood, tagId, elevated)) {
             months.computeIfAbsent(row.year(), ignored -> new ArrayList<>())
-                    .add(new MonthSummary(YearMonth.of(row.year(), row.month()), row.count()));
+                    .add(
+                            new MonthSummary(
+                                    YearMonth.of(row.year(), row.month()),
+                                    row.count(),
+                                    row.mediaCount()));
             yearCounts.merge(row.year(), row.count(), Long::sum);
+            yearMediaCounts.merge(row.year(), row.mediaCount(), Long::sum);
         }
         return new TimelineIndex(
                 yearCounts.entrySet().stream()
@@ -117,35 +130,56 @@ public class DiaryReadService {
                                         new YearSummary(
                                                 entry.getKey(),
                                                 entry.getValue(),
+                                                yearMediaCounts.getOrDefault(entry.getKey(), 0L),
                                                 List.copyOf(months.get(entry.getKey()))))
                         .toList());
     }
 
-    public List<WeekSummary> weeks(UUID spaceId, long accountId, YearMonth month) {
+    public List<WeekSummary> weeks(
+            UUID spaceId,
+            long accountId,
+            YearMonth month,
+            String mood,
+            UUID tagId,
+            boolean elevated) {
         SpaceAccess.SpaceContext space = spaces.requireMember(spaceId, accountId);
         if (month == null) throw ApiException.badRequest("MONTH_REQUIRED", "请选择月份");
+        String normalizedMood = mood == null || mood.isBlank() ? null : mood.trim();
+        if (elevated) {
+            return weekRows(space, accountId, month, normalizedMood, tagId, true);
+        }
         return cache.get(
                 ReadCacheInvalidator.DIARY_AGGREGATES,
                 spaceId,
                 accountId,
-                "weeks:" + month,
+                "weeks:" + month + ":mood=" + normalizedMood + ":tag=" + tagId,
                 Duration.ofMinutes(3),
                 WEEKS,
-                () ->
-                        reads
-                                .findWeekCounts(
-                                        space.internalId(),
-                                        accountId,
-                                        month.atDay(1),
-                                        month.atEndOfMonth())
-                                .stream()
-                                .map(
-                                        row ->
-                                                new WeekSummary(
-                                                        row.weekStart(),
-                                                        row.weekStart().plusDays(6),
-                                                        row.count()))
-                                .toList());
+                () -> weekRows(space, accountId, month, normalizedMood, tagId, false));
+    }
+
+    private List<WeekSummary> weekRows(
+            SpaceAccess.SpaceContext space,
+            long accountId,
+            YearMonth month,
+            String mood,
+            UUID tagId,
+            boolean elevated) {
+        return reads
+                .findWeekCounts(
+                        space.internalId(),
+                        accountId,
+                        month.atDay(1),
+                        month.atEndOfMonth(),
+                        mood,
+                        tagId,
+                        elevated)
+                .stream()
+                .map(
+                        row ->
+                                new WeekSummary(
+                                        row.weekStart(), row.weekStart().plusDays(6), row.count()))
+                .toList();
     }
 
     private String ellipsis(String value, int max) {
@@ -162,9 +196,9 @@ public class DiaryReadService {
 
     public record TimelineIndex(List<YearSummary> years) {}
 
-    public record YearSummary(int year, long count, List<MonthSummary> months) {}
+    public record YearSummary(int year, long count, long mediaCount, List<MonthSummary> months) {}
 
-    public record MonthSummary(YearMonth month, long count) {}
+    public record MonthSummary(YearMonth month, long count, long mediaCount) {}
 
     public record WeekSummary(LocalDate start, LocalDate end, long count) {}
 }

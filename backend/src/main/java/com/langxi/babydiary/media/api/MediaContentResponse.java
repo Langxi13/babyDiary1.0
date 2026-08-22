@@ -20,6 +20,24 @@ final class MediaContentResponse {
             String ifNoneMatch,
             boolean head,
             boolean noStore) {
+        return create(
+                media, resolved, rangeHeader, ifNoneMatch, head, noStore, Duration.ofMinutes(5));
+    }
+
+    static ResponseEntity<StreamingResponseBody> create(
+            MediaService media,
+            MediaService.ResolvedVariant resolved,
+            String rangeHeader,
+            String ifNoneMatch,
+            boolean head,
+            boolean noStore,
+            Duration cacheLifetime) {
+        Duration maxAge =
+                cacheLifetime == null || cacheLifetime.isNegative()
+                        ? Duration.ZERO
+                        : cacheLifetime.compareTo(Duration.ofMinutes(5)) > 0
+                                ? Duration.ofMinutes(5)
+                                : cacheLifetime;
         long total = resolved.variant().sizeBytes();
         if ((rangeHeader == null || rangeHeader.isBlank())
                 && matches(ifNoneMatch, resolved.etag())) {
@@ -28,7 +46,7 @@ final class MediaContentResponse {
                     .cacheControl(
                             noStore
                                     ? CacheControl.noStore()
-                                    : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate())
+                                    : CacheControl.maxAge(maxAge).cachePrivate())
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .build();
         }
@@ -47,9 +65,7 @@ final class MediaContentResponse {
                     "bytes " + range.start() + '-' + range.end() + '/' + total);
         }
         headers.setCacheControl(
-                noStore
-                        ? CacheControl.noStore()
-                        : CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate());
+                noStore ? CacheControl.noStore() : CacheControl.maxAge(maxAge).cachePrivate());
         if (head) return new ResponseEntity<>(null, headers, status);
         StreamingResponseBody body =
                 output -> {

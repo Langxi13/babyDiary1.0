@@ -2,12 +2,14 @@ package com.langxi.babydiary.platform.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +28,10 @@ public class OutboxEventWorker {
     private final boolean enabled;
     private final String workerId;
     private final int staleMinutes;
+    private final WorkerPollSignal pollSignal;
+    private final MeterRegistry metrics;
+    private final EmptyPollBackoff backoff = new EmptyPollBackoff();
+    private final ReentrantLock workerLock = new ReentrantLock();
 
     public OutboxEventWorker(
             OutboxEventRepository events,
@@ -34,13 +40,17 @@ public class OutboxEventWorker {
             List<OutboxEventHandler> handlers,
             @Value("${app.outbox.enabled:true}") boolean enabled,
             @Value("${app.jobs.worker-id:single-node}") String workerId,
-            @Value("${app.outbox.stale-after-minutes:10}") int staleMinutes) {
+            @Value("${app.outbox.stale-after-minutes:10}") int staleMinutes,
+            WorkerPollSignal pollSignal,
+            MeterRegistry metrics) {
         this.events = events;
         this.json = json;
         this.transactions = transactions;
         this.enabled = enabled;
         this.workerId = truncate(workerId == null ? "single-node" : workerId, 40);
         this.staleMinutes = Math.max(2, staleMinutes);
+        this.pollSignal = pollSignal;
+        this.metrics = metrics;
         Map<String, OutboxEventHandler> registered = new LinkedHashMap<>();
         for (OutboxEventHandler handler : handlers) {
             for (String type : handler.eventTypes()) {
@@ -55,18 +65,41 @@ public class OutboxEventWorker {
     @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:2000}")
     public void poll() {
         if (!enabled) return;
+        if (!backoff.ready(pollSignal.outboxVersion()) || !workerLock.tryLock()) return;
+        try {
+            pollOnce();
+        } finally {
+            workerLock.unlock();
+        }
+    }
+
+    private void pollOnce() {
         String claim = workerId + ":" + UUID.randomUUID();
         OutboxEventRepository.Event event =
                 transactions.execute(
                         status ->
                                 events.claim(claim, now()) == 1 ? events.findClaimed(claim) : null);
-        if (event == null) return;
+        if (event == null) {
+            backoff.empty();
+            pollMetric("empty");
+            return;
+        }
+        backoff.active();
+        pollMetric("claimed");
         execute(event, claim);
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.recovery-delay-ms:300000}")
     public void recoverStale() {
-        if (!enabled) return;
+        if (!enabled || !workerLock.tryLock()) return;
+        try {
+            recoverStaleLocked();
+        } finally {
+            workerLock.unlock();
+        }
+    }
+
+    private void recoverStaleLocked() {
         LocalDateTime now = now();
         LocalDateTime staleBefore = now.minusMinutes(staleMinutes);
         transactions.executeWithoutResult(
@@ -134,5 +167,10 @@ public class OutboxEventWorker {
 
     private String truncate(String value, int maxLength) {
         return value.substring(0, Math.min(value.length(), maxLength));
+    }
+
+    private void pollMetric(String result) {
+        metrics.counter("baby.diary.worker.polls", "worker", "outbox", "result", result)
+                .increment();
     }
 }

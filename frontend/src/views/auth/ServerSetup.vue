@@ -1,7 +1,7 @@
 <template>
   <div class="server-setup-page">
     <main class="server-setup-panel">
-      <img src="/app-icon.png" alt="" class="server-setup-logo" />
+      <img src="/app-icon-display.png" alt="" class="server-setup-logo" />
       <div class="server-setup-heading">
         <span>连接你的私人日记</span>
         <h1>设置服务器</h1>

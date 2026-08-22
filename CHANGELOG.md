@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-23
+
+- Added bounded diary summaries, lazy timeline month pages, one-request home projection, consolidated album reads and context-aware signed-media hydration to reduce SQL/request amplification and browser payloads.
+- Added Redis single-flight read fallback, account/space projection caches, post-commit invalidation, SQL request metrics and cache payload observability while preserving step-up and elevated-response no-store rules.
+- Streamed portable archive manifests and media, bounded diary-book rendering, serialized export concurrency, and added temporary-file cleanup and explicit 413/429 export responses.
+- Added worker empty-poll backoff and non-overlap locks, Flyway V7 read-path indexes, JVM/container/database/Redis resource budgets, immutable frontend asset caching and Vite manifest-based bundle budgets.
+- Added a deterministic 10,000-diary/20,000-media staging fixture, k6 read-path and Redis-outage scenarios, SQL `EXPLAIN` capture, and the [性能优化与压测指南](document/性能优化与压测指南.md). Full k6 staging execution remains a release-host task; this change was validated with automated tests and build gates.
+
 ## 2026-08-02
 
 - Released `1.0.0-beta.8` (`versionCode 8`) as the final privacy-scanned Android/Web artifact after normalizing non-production URL placeholders.

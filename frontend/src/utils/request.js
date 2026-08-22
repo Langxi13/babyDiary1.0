@@ -207,6 +207,8 @@ request.interceptors.response.use(
         ElMessage.warning(await parseMessage(data, '请先完成二次验证'))
       } else if (status === 429 && shouldNotify) {
         ElMessage.warning(await parseMessage(data, '请求过于频繁，请稍后再试'))
+      } else if (status === 413 && shouldNotify) {
+        ElMessage.warning(await parseMessage(data, '导出内容过大，请缩小日期范围'))
       } else if (status === 404 && shouldNotify) {
         ElMessage.error(await parseMessage(data, '资源不存在'))
       } else if (shouldNotify) {

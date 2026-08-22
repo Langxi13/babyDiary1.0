@@ -12,6 +12,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+08:00
+      - --innodb-buffer-pool-size=134217728
     volumes:
       - staging-mysql-data:/var/lib/mysql
     healthcheck:
@@ -73,7 +74,7 @@ services:
       - "127.0.0.1:${STAGING_API_PORT:-11002}:10002"
     volumes:
       - staging-media-data:/data
-    mem_limit: 1536m
+    mem_limit: 1100m
     cpus: 0.8
 
   frontend:

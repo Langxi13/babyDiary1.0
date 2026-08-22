@@ -39,6 +39,7 @@ public class MediaService {
     private final MediaAccessPolicy access;
     private final BackgroundJobQueue jobs;
     private final ReadCacheInvalidator cacheInvalidator;
+    private final SignedMediaVariantRepository signedVariants;
 
     public MediaService(
             SpaceAccess spaces,
@@ -48,7 +49,8 @@ public class MediaService {
             MediaVariantPolicy variants,
             MediaAccessPolicy access,
             BackgroundJobQueue jobs,
-            ReadCacheInvalidator cacheInvalidator) {
+            ReadCacheInvalidator cacheInvalidator,
+            SignedMediaVariantRepository signedVariants) {
         this.spaces = spaces;
         this.media = media;
         this.storages = storages;
@@ -57,6 +59,7 @@ public class MediaService {
         this.access = access;
         this.jobs = jobs;
         this.cacheInvalidator = cacheInvalidator;
+        this.signedVariants = signedVariants;
     }
 
     public MediaAsset upload(
@@ -219,11 +222,21 @@ public class MediaService {
             String variant,
             String profile,
             MediaAccessContext context) {
-        access.require(spaceId, assetId, context);
-        MediaAsset asset =
-                media.findInSpace(spaceId, assetId, false)
+        String type = variants.normalizeType(variant);
+        String selectedProfile = variants.normalizeProfile(profile);
+        SignedMediaVariantRepository.Resolved resolved =
+                signedVariants
+                        .resolve(spaceId, assetId, type, selectedProfile, context)
                         .orElseThrow(() -> ApiException.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问"));
-        return resolve(asset, variant, profile);
+        if (resolved.protectedContent()) {
+            if (context.source() == MediaAccessContext.Source.SHARE) {
+                throw ApiException.notFound("MEDIA_NOT_FOUND", "媒体不存在或无权访问");
+            }
+            if (!context.elevated()) {
+                throw new ApiException(HttpStatus.LOCKED, "STEP_UP_REQUIRED", "请先完成二次验证");
+            }
+        }
+        return new ResolvedVariant(null, resolved.variant(), etag(resolved.variant()));
     }
 
     public StoredObject open(ResolvedVariant resolved, long offset, long length)

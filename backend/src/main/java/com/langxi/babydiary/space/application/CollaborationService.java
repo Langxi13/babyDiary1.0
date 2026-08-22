@@ -3,6 +3,7 @@ package com.langxi.babydiary.space.application;
 import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaLinkView;
 import com.langxi.babydiary.media.application.MediaRepresentationService;
+import com.langxi.babydiary.platform.application.AfterCommit;
 import com.langxi.babydiary.platform.application.ApiException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -21,15 +22,18 @@ public class CollaborationService {
     private final SpaceAccess spaces;
     private final CollaborationRepository collaboration;
     private final MediaRepresentationService media;
+    private final SpaceAccessProjectionCache accessCache;
     private final SecureRandom random = new SecureRandom();
 
     public CollaborationService(
             SpaceAccess spaces,
             CollaborationRepository collaboration,
-            MediaRepresentationService media) {
+            MediaRepresentationService media,
+            SpaceAccessProjectionCache accessCache) {
         this.spaces = spaces;
         this.collaboration = collaboration;
         this.media = media;
+        this.accessCache = accessCache;
     }
 
     public List<Member> members(UUID spaceId, long accountId) {
@@ -128,6 +132,7 @@ public class CollaborationService {
         if (!collaboration.updateRole(space.internalId(), target.accountId(), normalized)) {
             throw ApiException.notFound("SPACE_MEMBER_NOT_FOUND", "成员不存在");
         }
+        AfterCommit.run(() -> accessCache.invalidate(spaceId, target.accountId()));
     }
 
     @Transactional
@@ -140,6 +145,7 @@ public class CollaborationService {
         if (!collaboration.removeMember(space.internalId(), target.accountId())) {
             throw ApiException.notFound("SPACE_MEMBER_NOT_FOUND", "成员不存在");
         }
+        AfterCommit.run(() -> accessCache.invalidate(spaceId, target.accountId()));
     }
 
     private SpaceAccess.SpaceContext requireSharedOwner(UUID spaceId, long actorId) {

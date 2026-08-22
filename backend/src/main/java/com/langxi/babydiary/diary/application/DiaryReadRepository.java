@@ -7,9 +7,17 @@ import java.util.UUID;
 public interface DiaryReadRepository {
     List<CalendarRow> findCalendar(long spaceId, long accountId, LocalDate start, LocalDate end);
 
-    List<MonthCount> findMonthCounts(long spaceId, long accountId);
+    List<MonthCount> findMonthCounts(
+            long spaceId, long accountId, String mood, UUID tagId, boolean elevated);
 
-    List<WeekCount> findWeekCounts(long spaceId, long accountId, LocalDate start, LocalDate end);
+    List<WeekCount> findWeekCounts(
+            long spaceId,
+            long accountId,
+            LocalDate start,
+            LocalDate end,
+            String mood,
+            UUID tagId,
+            boolean elevated);
 
     record CalendarRow(
             UUID diaryId,
@@ -19,7 +27,7 @@ public interface DiaryReadRepository {
             int mediaCount,
             boolean locked) {}
 
-    record MonthCount(int year, int month, long count) {}
+    record MonthCount(int year, int month, long count, long mediaCount) {}
 
     record WeekCount(LocalDate weekStart, long count) {}
 }

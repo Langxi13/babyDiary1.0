@@ -7,6 +7,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 SERVICE_FILE="$TMP_DIR/diary-backend.service"
 HARDENING_FILE="$TMP_DIR/10-baby-diary-hardening.conf"
+RUNTIME_FILE="$TMP_DIR/30-baby-diary-runtime.conf"
 ENV_FILE="$TMP_DIR/backend.env"
 OBJECT_DIR="$TMP_DIR/objects"
 HOST_TMP="$TMP_DIR/host-tmp"
@@ -24,6 +25,14 @@ cat > "$HARDENING_FILE" <<'HARDENING'
 [Service]
 PrivateTmp=true
 HARDENING
+
+cat > "$RUNTIME_FILE" <<'RUNTIME'
+[Service]
+ExecStart=/usr/bin/java -Xms128m -Xmx768m -jar /opt/baby-diary/app.jar
+MemoryHigh=900M
+MemoryMax=1100M
+RUNTIME
+export SYSTEMD_RUNTIME_FILE="$RUNTIME_FILE"
 
 cat > "$NGINX_SITE_FILE" <<'NGINX'
 server {
@@ -89,6 +98,7 @@ OUTPUT="$(
 grep -q "service user baby-diary" <<<"$OUTPUT"
 grep -q "service stop uses systemd default" <<<"$OUTPUT"
 grep -q "service private tmp enabled" <<<"$OUTPUT"
+grep -q "service memory limits configured" <<<"$OUTPUT"
 grep -q "host tmp mode 1777" <<<"$OUTPUT"
 grep -q "backend.env mode 600" <<<"$OUTPUT"
 grep -q "database user baby_diary_app" <<<"$OUTPUT"

@@ -5,6 +5,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AlbumRepository {
+    List<SystemCatalogRow> findSystemCatalog(
+            long spaceId, long accountId, boolean includeProtected);
+
+    List<CustomCatalogRow> findCustomCatalog(long spaceId, boolean includeProtected);
+
     List<GroupRow> findGroups(long spaceId);
 
     List<AlbumRow> findAlbums(long spaceId, boolean includeProtected);
@@ -86,6 +91,21 @@ public interface AlbumRepository {
     record YearBucket(int year, long mediaCount, UUID coverAssetId) {}
 
     record AlbumCover(UUID albumId, UUID assetId) {}
+
+    record SystemCatalogRow(String systemKey, long mediaCount, UUID coverAssetId) {}
+
+    record CustomCatalogRow(
+            Long groupInternalId,
+            UUID groupId,
+            String groupName,
+            Integer groupSortOrder,
+            Long albumInternalId,
+            UUID albumId,
+            String albumType,
+            String albumName,
+            String albumDescription,
+            UUID coverAssetId,
+            long mediaCount) {}
 
     record AlbumRow(
             long internalId,

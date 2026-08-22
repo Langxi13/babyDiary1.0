@@ -31,16 +31,45 @@ public class MyBatisDiaryReadRepository implements DiaryReadRepository {
     }
 
     @Override
-    public List<MonthCount> findMonthCounts(long spaceId, long accountId) {
-        return mapper.findMonthCounts(spaceId, accountId).stream()
-                .map(row -> new MonthCount(row.diaryYear(), row.diaryMonth(), row.diaryCount()))
+    public List<MonthCount> findMonthCounts(
+            long spaceId, long accountId, String mood, java.util.UUID tagId, boolean elevated) {
+        return mapper
+                .findMonthCounts(
+                        spaceId,
+                        accountId,
+                        mood,
+                        tagId == null ? null : BinaryUuid.toBytes(tagId),
+                        elevated)
+                .stream()
+                .map(
+                        row ->
+                                new MonthCount(
+                                        row.diaryYear(),
+                                        row.diaryMonth(),
+                                        row.diaryCount(),
+                                        row.mediaCount()))
                 .toList();
     }
 
     @Override
     public List<WeekCount> findWeekCounts(
-            long spaceId, long accountId, LocalDate start, LocalDate end) {
-        return mapper.findWeekCounts(spaceId, accountId, start, end).stream()
+            long spaceId,
+            long accountId,
+            LocalDate start,
+            LocalDate end,
+            String mood,
+            java.util.UUID tagId,
+            boolean elevated) {
+        return mapper
+                .findWeekCounts(
+                        spaceId,
+                        accountId,
+                        start,
+                        end,
+                        mood,
+                        tagId == null ? null : BinaryUuid.toBytes(tagId),
+                        elevated)
+                .stream()
                 .map(row -> new WeekCount(row.weekStart(), row.diaryCount()))
                 .toList();
     }

@@ -18,7 +18,7 @@ Baby Diary 是一个面向个人、伴侣和家庭的私有日记应用。项目
 - 私密限时分享、ZIP v3 便携归档导入导出、PDF/EPUB 日记书导出
 - Redis 缓存、UUID 数据模型、统一媒体资产模型、真实 Actuator 健康检查和部署前治理脚本
 
-完整功能、数据所有权、接口与质量门禁见 [document/统一功能与契约矩阵.md](document/统一功能与契约矩阵.md)、[document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md) 和 [document/测试与发布验收方案.md](document/测试与发布验收方案.md)。
+完整功能、数据所有权、接口与质量门禁见 [document/统一功能与契约矩阵.md](document/统一功能与契约矩阵.md)、[document/系统功能文档.md](document/系统功能文档.md)、[document/API接口文档.md](document/API接口文档.md)、[document/测试与发布验收方案.md](document/测试与发布验收方案.md) 和 [document/性能优化与压测指南.md](document/性能优化与压测指南.md)。
 
 ## 技术要求
 

@@ -4,6 +4,7 @@ import com.langxi.babydiary.media.application.MediaAccessContext;
 import com.langxi.babydiary.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.domain.MediaAsset;
+import com.langxi.babydiary.platform.application.AfterCommit;
 import com.langxi.babydiary.platform.application.ApiException;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class ProfileService {
     private final PasswordEncoder passwords;
     private final MediaAccessPolicy mediaAccess;
     private final CredentialRepository credentials;
+    private final AuthenticationProjectionCache authenticationCache;
 
     public ProfileService(
             ProfileRepository profiles,
@@ -34,13 +36,15 @@ public class ProfileService {
             MediaRepository media,
             PasswordEncoder passwords,
             MediaAccessPolicy mediaAccess,
-            CredentialRepository credentials) {
+            CredentialRepository credentials,
+            AuthenticationProjectionCache authenticationCache) {
         this.profiles = profiles;
         this.spaces = spaces;
         this.media = media;
         this.passwords = passwords;
         this.mediaAccess = mediaAccess;
         this.credentials = credentials;
+        this.authenticationCache = authenticationCache;
     }
 
     public ProfileView profile(long accountId) {
@@ -73,6 +77,7 @@ public class ProfileService {
                     "ACCOUNT_FIELD_EXISTS",
                     "用户名或邮箱已被使用");
         }
+        AfterCommit.run(() -> authenticationCache.invalidate(accountId));
         return profile(accountId);
     }
 
@@ -118,6 +123,7 @@ public class ProfileService {
         }
         credentials.changePassword(
                 accountId, passwords.encode(nextPassword), LocalDateTime.now(ZoneOffset.UTC));
+        AfterCommit.run(() -> authenticationCache.invalidate(accountId));
     }
 
     private ProfileRepository.Profile requireProfile(long accountId) {

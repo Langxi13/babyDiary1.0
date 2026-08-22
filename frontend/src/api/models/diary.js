@@ -2,8 +2,10 @@ import { normalizeMedia } from './media'
 
 export const normalizeDiary = (diary = {}) => ({
   ...diary,
+  contentText: diary.contentText ?? diary.contentSnippet ?? '',
   tags: diary.tags || [],
-  media: (diary.media || []).map(normalizeMedia)
+  media: (diary.media || diary.previews || []).map(normalizeMedia),
+  mediaCount: Number(diary.mediaCount ?? (diary.media || diary.previews || []).length)
 })
 
 export const diaryPayload = (value = {}) => ({

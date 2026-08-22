@@ -1,5 +1,5 @@
-const CACHE_NAME = 'baby-diary-shell-v13'
-const SHELL_ASSETS = ['/', '/index.html', '/favicon.svg', '/app-icon.png', '/manifest.webmanifest']
+const CACHE_NAME = 'baby-diary-shell-v14'
+const SHELL_ASSETS = ['/', '/index.html', '/favicon.svg', '/app-icon-display.png', '/manifest.webmanifest']
 const SHELL_ASSET_PATHS = new Set(SHELL_ASSETS)
 
 self.addEventListener('install', event => {

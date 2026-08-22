@@ -2,7 +2,7 @@
   <div class="page-shell about-page-shell">
     <main class="page-container about-page">
       <header class="about-heading">
-        <img src="/app-icon.png" alt="" />
+        <img src="/app-icon-display.png" alt="" />
         <div>
           <span>应用信息</span>
           <h1>Baby Diary</h1>

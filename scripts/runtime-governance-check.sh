@@ -8,6 +8,7 @@ SERVICE_GROUP="${SERVICE_GROUP:-$SERVICE_USER}"
 DB_APP_USER="${DB_APP_USER:-baby_diary_app}"
 SYSTEMD_SERVICE_FILE="${SYSTEMD_SERVICE_FILE:-/etc/systemd/system/diary-backend.service}"
 SYSTEMD_HARDENING_FILE="${SYSTEMD_HARDENING_FILE:-/etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf}"
+SYSTEMD_RUNTIME_FILE="${SYSTEMD_RUNTIME_FILE:-/etc/systemd/system/diary-backend.service.d/30-baby-diary-runtime.conf}"
 BACKEND_ENV_FILE="${BACKEND_ENV_FILE:-/etc/baby-diary/backend.env}"
 OBJECT_DIR_OVERRIDE="${OBJECT_DIR:-}"
 NGINX_USER="${NGINX_USER:-www-data}"
@@ -28,6 +29,7 @@ require_file() {
 
 require_file "$SYSTEMD_SERVICE_FILE"
 require_file "$SYSTEMD_HARDENING_FILE"
+require_file "$SYSTEMD_RUNTIME_FILE"
 require_file "$BACKEND_ENV_FILE"
 
 grep -q "^User=$SERVICE_USER$" "$SYSTEMD_SERVICE_FILE"
@@ -44,6 +46,24 @@ grep -q '^PrivateTmp=true$' "$SYSTEMD_HARDENING_FILE" || {
   exit 1
 }
 echo "service private tmp enabled"
+
+grep -q -- '-Xms128m' "$SYSTEMD_RUNTIME_FILE" || {
+  echo "backend runtime must set -Xms128m" >&2
+  exit 1
+}
+grep -q -- '-Xmx768m' "$SYSTEMD_RUNTIME_FILE" || {
+  echo "backend runtime must set -Xmx768m" >&2
+  exit 1
+}
+grep -q '^MemoryHigh=900M$' "$SYSTEMD_RUNTIME_FILE" || {
+  echo "backend runtime must set MemoryHigh=900M" >&2
+  exit 1
+}
+grep -q '^MemoryMax=1100M$' "$SYSTEMD_RUNTIME_FILE" || {
+  echo "backend runtime must set MemoryMax=1100M" >&2
+  exit 1
+}
+echo "service memory limits configured"
 
 tmp_mode="$(stat -c '%a' "$TMP_ROOT")"
 if [ "$tmp_mode" != "1777" ]; then

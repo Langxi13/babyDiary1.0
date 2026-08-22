@@ -35,7 +35,14 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ProblemDetail> business(ApiException exception) {
-        return problem(exception.status(), exception.code(), exception.getMessage(), null);
+        ResponseEntity<ProblemDetail> response =
+                problem(exception.status(), exception.code(), exception.getMessage(), null);
+        if ("EXPORT_BUSY".equals(exception.code())) {
+            return ResponseEntity.status(response.getStatusCode())
+                    .header(org.springframework.http.HttpHeaders.RETRY_AFTER, "30")
+                    .body(response.getBody());
+        }
+        return response;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

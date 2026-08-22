@@ -56,6 +56,34 @@
         LIMIT #{query.limit}
     </select>
 
+    <select id="findSummaryPage" resultMap="diaryRow">
+        SELECT d.diary_id,d.public_id,s.public_id AS space_public_id,d.author_id,d.title,d.diary_date,
+               NULL AS content_html,LEFT(d.content_text,160) AS content_text,d.mood_key,d.visibility,d.locked,
+               d.version,d.created_at,d.updated_at,d.deleted_at
+        FROM diary d JOIN diary_space s ON s.space_id=d.space_id
+        WHERE <include refid="visibleDiary"/>
+        <if test="query.startDate != null">AND d.diary_date&gt;=#{query.startDate}</if>
+        <if test="query.endDate != null">AND d.diary_date&lt;=#{query.endDate}</if>
+        <if test="query.mood != null">
+            <if test="!query.elevated">AND d.locked=0</if>
+            AND d.mood_key=#{query.mood}
+        </if>
+        <if test="query.keyword != null">
+            <if test="!query.elevated">AND d.locked=0</if>
+            AND MATCH(d.title,d.content_text) AGAINST(#{query.keyword} IN NATURAL LANGUAGE MODE)
+        </if>
+        <if test="tagPublicId != null">
+            <if test="!query.elevated">AND d.locked=0</if>
+            AND EXISTS (SELECT 1 FROM diary_tag dt JOIN tag t ON t.tag_id=dt.tag_id
+                        WHERE dt.diary_id=d.diary_id AND t.public_id=#{tagPublicId})
+        </if>
+        <if test="query.cursorDate != null">
+            AND (d.diary_date&lt;#{query.cursorDate} OR (d.diary_date=#{query.cursorDate} AND d.diary_id&lt;#{query.cursorId}))
+        </if>
+        ORDER BY d.diary_date DESC,d.diary_id DESC
+        LIMIT #{query.limit}
+    </select>
+
     <select id="count" resultType="long">
         SELECT COUNT(*)
         FROM diary d
@@ -126,6 +154,38 @@
         <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
           AND a.deleted_at IS NULL AND a.status='READY'
         ORDER BY dm.diary_id,dm.position,a.asset_id
+    </select>
+
+    <select id="findSummaryMedia" resultType="com.langxi.babydiary.diary.infrastructure.DiaryMapper$SummaryMediaRow">
+        WITH media_counts AS (
+          SELECT dm.diary_id,COUNT(*) AS media_count
+          FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
+          WHERE dm.diary_id IN
+          <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND a.deleted_at IS NULL AND a.status='READY'
+          GROUP BY dm.diary_id
+        ), image_profiles AS (
+          SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,dm.position,a.status,
+                 COALESCE(MAX(CASE WHEN v.variant_type='THUMBNAIL' AND v.profile='compact' THEN v.profile END),
+                          MAX(CASE WHEN v.variant_type='THUMBNAIL' THEN v.profile END)) AS thumbnail_profile,
+                 COALESCE(MAX(CASE WHEN v.variant_type='PREVIEW' AND v.profile='screen' THEN v.profile END),
+                          MAX(CASE WHEN v.variant_type='PREVIEW' THEN v.profile END)) AS preview_profile,
+                 EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
+                         WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1) AS protected_content,
+                 ROW_NUMBER() OVER (PARTITION BY dm.diary_id ORDER BY dm.position,a.asset_id) AS media_rank
+          FROM diary_media dm JOIN media_asset a ON a.asset_id=dm.asset_id
+          LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.status='READY'
+            AND v.deleted_at IS NULL AND v.variant_type IN ('THUMBNAIL','PREVIEW')
+          WHERE dm.diary_id IN
+          <foreach collection="diaryIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND a.media_type='IMAGE' AND a.deleted_at IS NULL AND a.status='READY'
+          GROUP BY dm.diary_id,a.asset_id,a.public_id,a.media_type,dm.position,a.status
+        )
+        SELECT c.diary_id,i.asset_id,i.public_id,i.media_type,i.position,i.status,
+               i.thumbnail_profile,i.preview_profile,COALESCE(i.protected_content,0) AS protected_content,
+               c.media_count
+        FROM media_counts c LEFT JOIN image_profiles i ON i.diary_id=c.diary_id AND i.media_rank&lt;=4
+        ORDER BY c.diary_id,i.position,i.asset_id
     </select>
 
     <select id="resolveTagIds" resultType="com.langxi.babydiary.diary.infrastructure.DiaryMapper$IdRow">

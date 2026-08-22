@@ -12,6 +12,12 @@ MAXMEMORY_POLICY="${REDIS_MAXMEMORY_POLICY:-allkeys-lru}"
 configure_redis() {
   docker exec "$CONTAINER_NAME" redis-cli CONFIG SET maxmemory "$MAXMEMORY" >/dev/null
   docker exec "$CONTAINER_NAME" redis-cli CONFIG SET maxmemory-policy "$MAXMEMORY_POLICY" >/dev/null
+  actual_maxmemory="$(docker exec "$CONTAINER_NAME" redis-cli --raw CONFIG GET maxmemory | tail -n 1)"
+  actual_policy="$(docker exec "$CONTAINER_NAME" redis-cli --raw CONFIG GET maxmemory-policy | tail -n 1)"
+  if [ "$actual_maxmemory" != "134217728" ] || [ "$actual_policy" != "allkeys-lru" ]; then
+    echo "Redis must use maxmemory=128mb and maxmemory-policy=allkeys-lru" >&2
+    exit 1
+  fi
 }
 
 if ! command -v docker >/dev/null 2>&1; then

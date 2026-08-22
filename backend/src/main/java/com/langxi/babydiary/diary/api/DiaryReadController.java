@@ -39,15 +39,24 @@ public class DiaryReadController {
 
     @GetMapping("/timeline")
     public DiaryReadService.TimelineIndex timeline(
-            @AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID spaceId) {
-        return reads.timeline(spaceId, principal.accountId());
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @RequestParam(required = false) String mood,
+            @RequestParam(required = false) UUID tagId,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+        return reads.timeline(
+                spaceId, principal.accountId(), mood, tagId, stepUp.valid(principal, token));
     }
 
     @GetMapping("/timeline/weeks")
     public List<DiaryReadService.WeekSummary> weeks(
             @AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID spaceId,
-            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
-        return reads.weeks(spaceId, principal.accountId(), month);
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month,
+            @RequestParam(required = false) String mood,
+            @RequestParam(required = false) UUID tagId,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String token) {
+        return reads.weeks(
+                spaceId, principal.accountId(), month, mood, tagId, stepUp.valid(principal, token));
     }
 }

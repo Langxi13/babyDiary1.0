@@ -48,7 +48,7 @@ async function cursorForPage(spaceId, params, targetPage, stepUpToken) {
     listCursors.set(key, state)
   }
   for (let page = state.cursors.length - 1; page < targetPage; page += 1) {
-    const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
+    const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries/summaries`, {
       params: { ...normalizeListParams(params), cursor: state.cursors[page] || undefined },
       headers: stepHeader(stepUpToken)
     })
@@ -125,7 +125,7 @@ export const diaryApi = {
       async () => {
         const page = Math.max(0, Number(params.page) || 0)
         const cursor = await cursorForPage(spaceId, params, page, stepUpToken)
-        const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
+        const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries/summaries`, {
           params: { ...normalizeListParams(params), cursor: cursor || undefined },
           headers: stepHeader(stepUpToken)
         })
@@ -300,45 +300,68 @@ export const diaryApi = {
         ))
   },
 
-  getTimeline(spaceId, params = {}, options = {}) {
+  getTimelineIndex(spaceId, params = {}, options = {}) {
     const stepUpToken = getStepUpToken()
-    return cachedRequest(`spaces:${spaceId}:diaries:timeline:${stableStringify(params)}:access:${accessMode(stepUpToken)}`, async () => {
-      const query = { ...normalizeListParams(params), size: 50, includeTotal: false }
-      if (Number.isInteger(params.year)) {
-        const month = Number.isInteger(params.month)
-          ? String(params.month).padStart(2, '0')
-          : null
-        query.startDate = month ? `${params.year}-${month}-01` : `${params.year}-01-01`
-        query.endDate = month
-          ? new Date(Date.UTC(params.year, params.month, 0)).toISOString().slice(0, 10)
-          : `${params.year}-12-31`
-      }
-
-      const diaries = []
-      const seenCursors = new Set()
-      let cursor
-      do {
-        const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries`, {
-          params: { ...query, cursor },
-          headers: stepHeader(stepUpToken)
-        })
-        diaries.push(...(result.items || []).map(item => rememberVersion(normalizeDiary(item))))
-        cursor = result.nextCursor || undefined
-        if (cursor && seenCursors.has(cursor)) {
-          throw new Error('时间轴分页游标重复，无法继续加载')
-        }
-        if (cursor) seenCursors.add(cursor)
-      } while (cursor)
-
-      const groups = new Map()
-      for (const diary of diaries) {
-        const month = diary.diaryDate?.slice(0, 7)
-        if (!month) continue
-        if (!groups.has(month)) groups.set(month, { month, diaries: [] })
-        groups.get(month).diaries.push(diary)
-      }
-      return [...groups.values()]
+    const query = { mood: params.mood || undefined, tagId: params.tagId || undefined }
+    return cachedRequest(`spaces:${spaceId}:diaries:timeline:index:${stableStringify(query)}:access:${accessMode(stepUpToken)}`, async () => {
+      const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries/timeline`, {
+        params: query,
+        headers: stepHeader(stepUpToken)
+      })
+      return (result.years || []).flatMap(year => (year.months || []).map(month => ({
+        month: month.month,
+        diaryCount: Number(month.count) || 0,
+        mediaCount: Number(month.mediaCount) || 0,
+        diaries: [],
+        nextCursor: null,
+        loaded: false
+      })))
     }, { ttl: options.ttl ?? 120000, force: options.force, cacheIf: () => !stepUpToken })
+  },
+
+  getTimelineMonth(spaceId, params = {}, options = {}) {
+    const stepUpToken = getStepUpToken()
+    const [year, month] = String(params.month || '').split('-').map(Number)
+    if (!Number.isInteger(year) || !Number.isInteger(month)) {
+      return Promise.reject(new Error('时间轴月份无效'))
+    }
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
+    const query = {
+      startDate,
+      endDate,
+      mood: params.mood || undefined,
+      tagId: params.tagId || undefined,
+      cursor: params.cursor || undefined,
+      size: Math.min(50, Math.max(1, Number(params.size) || 20)),
+      includeTotal: false
+    }
+    return cachedRequest(`spaces:${spaceId}:diaries:timeline:month:${stableStringify(query)}:access:${accessMode(stepUpToken)}`, async () => {
+      const result = await request.get(`${API_ROOT}/spaces/${spaceId}/diaries/summaries`, {
+        params: query,
+        headers: stepHeader(stepUpToken)
+      })
+      return {
+        diaries: (result.items || []).map(item => rememberVersion(normalizeDiary(item))),
+        nextCursor: result.nextCursor || null
+      }
+    }, { ttl: options.ttl ?? 120000, force: options.force, cacheIf: () => !stepUpToken })
+  },
+
+  async getTimeline(spaceId, params = {}, options = {}) {
+    let groups = await this.getTimelineIndex(spaceId, params, options)
+    if (Number.isInteger(params.year)) {
+      groups = groups.filter(group => group.month.startsWith(`${params.year}-`) &&
+        (!Number.isInteger(params.month) || group.month === `${params.year}-${String(params.month).padStart(2, '0')}`))
+    }
+    if (!groups.length) return groups
+    const selectedMonth = Number.isInteger(params.year) && Number.isInteger(params.month)
+      ? `${params.year}-${String(params.month).padStart(2, '0')}`
+      : groups[0].month
+    const page = await this.getTimelineMonth(spaceId, { ...params, month: selectedMonth }, options)
+    return groups.map(group => group.month === selectedMonth
+      ? { ...group, ...page, loaded: true }
+      : group)
   },
 
   getCalendar(spaceId, params = {}, options = {}) {
@@ -370,6 +393,7 @@ export function invalidateDiaryReads(spaceId) {
     invalidateApiCache(`spaces:${spaceId}:diaries:`)
     invalidateApiCache(`spaces:${spaceId}:photos:`)
     invalidateApiCache(`spaces:${spaceId}:albums:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
   } else {
     invalidateApiCache()
   }

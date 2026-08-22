@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.diary.application.DiaryRepository;
 import com.langxi.babydiary.platform.application.ApiException;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.util.List;
 import java.util.UUID;
@@ -19,16 +20,19 @@ public class DraftService {
     private final DraftRepository drafts;
     private final DiaryRepository diaries;
     private final ObjectMapper json;
+    private final ReadCacheInvalidator cacheInvalidator;
 
     public DraftService(
             SpaceAccess spaces,
             DraftRepository drafts,
             DiaryRepository diaries,
-            ObjectMapper json) {
+            ObjectMapper json,
+            ReadCacheInvalidator cacheInvalidator) {
         this.spaces = spaces;
         this.drafts = drafts;
         this.diaries = diaries;
         this.json = json;
+        this.cacheInvalidator = cacheInvalidator;
     }
 
     public List<DraftView> list(UUID spaceId, long accountId) {
@@ -82,6 +86,7 @@ public class DraftService {
                         internalDiaryId,
                         draftKey,
                         serialized));
+        cacheInvalidator.home(spaceId);
         return detail(spaceId, draftKey, accountId);
     }
 
@@ -90,6 +95,7 @@ public class DraftService {
         SpaceAccess.SpaceContext space = spaces.requireWriter(spaceId, accountId);
         validateKey(draftKey);
         drafts.delete(space.internalId(), accountId, draftKey);
+        cacheInvalidator.home(spaceId);
     }
 
     private DraftView toDraft(DraftRepository.Row row) {

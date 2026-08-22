@@ -2,6 +2,7 @@ package com.langxi.babydiary.diary.infrastructure;
 
 import com.langxi.babydiary.diary.application.DiaryRepository;
 import com.langxi.babydiary.diary.domain.DiaryEntry;
+import com.langxi.babydiary.diary.domain.DiarySummary;
 import com.langxi.babydiary.platform.application.BinaryUuid;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,6 +26,59 @@ public class MyBatisDiaryRepository implements DiaryRepository {
     public List<DiaryEntry> findPage(Query query) {
         byte[] tag = query.tagId() == null ? null : BinaryUuid.toBytes(query.tagId());
         return hydrate(mapper.findPage(query, tag));
+    }
+
+    @Override
+    public List<DiarySummary> findSummaryPage(Query query) {
+        byte[] tag = query.tagId() == null ? null : BinaryUuid.toBytes(query.tagId());
+        List<DiaryMapper.DiaryRow> rows = mapper.findSummaryPage(query, tag);
+        if (rows.isEmpty()) return List.of();
+        List<Long> ids = rows.stream().map(DiaryMapper.DiaryRow::diaryId).toList();
+        Map<Long, List<DiaryEntry.TagRef>> tags = new HashMap<>();
+        for (DiaryMapper.TagRow row : mapper.findTags(ids)) {
+            tags.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
+                    .add(
+                            new DiaryEntry.TagRef(
+                                    BinaryUuid.fromBytes(row.publicId()), row.name(), row.color()));
+        }
+        Map<Long, Long> counts = new HashMap<>();
+        Map<Long, List<DiarySummary.Preview>> previews = new HashMap<>();
+        for (DiaryMapper.SummaryMediaRow row : mapper.findSummaryMedia(ids)) {
+            counts.put(row.diaryId(), row.mediaCount());
+            if (row.assetId() == null || row.publicId() == null) continue;
+            previews.computeIfAbsent(row.diaryId(), ignored -> new ArrayList<>())
+                    .add(
+                            new DiarySummary.Preview(
+                                    BinaryUuid.fromBytes(row.publicId()),
+                                    row.mediaType(),
+                                    row.position(),
+                                    row.status(),
+                                    row.thumbnailProfile(),
+                                    row.previewProfile(),
+                                    row.protectedContent()));
+        }
+        return rows.stream()
+                .map(
+                        row ->
+                                new DiarySummary(
+                                        row.diaryId(),
+                                        BinaryUuid.fromBytes(row.publicId()),
+                                        BinaryUuid.fromBytes(row.spacePublicId()),
+                                        row.authorId(),
+                                        row.title(),
+                                        row.diaryDate(),
+                                        row.contentText(),
+                                        row.moodKey(),
+                                        row.visibility(),
+                                        row.locked(),
+                                        row.version(),
+                                        row.createdAt(),
+                                        row.updatedAt(),
+                                        row.deletedAt(),
+                                        tags.getOrDefault(row.diaryId(), List.of()),
+                                        counts.getOrDefault(row.diaryId(), 0L),
+                                        previews.getOrDefault(row.diaryId(), List.of())))
+                .toList();
     }
 
     @Override

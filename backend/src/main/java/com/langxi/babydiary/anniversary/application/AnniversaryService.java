@@ -6,6 +6,7 @@ import com.langxi.babydiary.media.application.MediaAccessPolicy;
 import com.langxi.babydiary.media.application.MediaRepository;
 import com.langxi.babydiary.media.domain.MediaAsset;
 import com.langxi.babydiary.platform.application.ApiException;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,16 +23,19 @@ public class AnniversaryService {
     private final AnniversaryRepository anniversaries;
     private final MediaRepository media;
     private final MediaAccessPolicy mediaAccess;
+    private final ReadCacheInvalidator cacheInvalidator;
 
     public AnniversaryService(
             SpaceAccess spaces,
             AnniversaryRepository anniversaries,
             MediaRepository media,
-            MediaAccessPolicy mediaAccess) {
+            MediaAccessPolicy mediaAccess,
+            ReadCacheInvalidator cacheInvalidator) {
         this.spaces = spaces;
         this.anniversaries = anniversaries;
         this.media = media;
         this.mediaAccess = mediaAccess;
+        this.cacheInvalidator = cacheInvalidator;
     }
 
     public List<Item> list(UUID spaceId, long accountId) {
@@ -66,6 +70,7 @@ public class AnniversaryService {
                         value.description(),
                         value.coverAssetId(),
                         value.sortOrder()));
+        cacheInvalidator.home(spaceId);
         return item(space.internalId(), require(space.internalId(), publicId));
     }
 
@@ -86,6 +91,7 @@ public class AnniversaryService {
                         value.sortOrder()))) {
             throw ApiException.notFound("ANNIVERSARY_NOT_FOUND", "纪念日不存在或无权访问");
         }
+        cacheInvalidator.home(spaceId);
         return item(space.internalId(), require(space.internalId(), anniversaryId));
     }
 
@@ -96,6 +102,7 @@ public class AnniversaryService {
                 space.internalId(), anniversaryId, LocalDateTime.now(ZoneOffset.UTC))) {
             throw ApiException.notFound("ANNIVERSARY_NOT_FOUND", "纪念日不存在或无权访问");
         }
+        cacheInvalidator.home(spaceId);
     }
 
     private Validated validate(

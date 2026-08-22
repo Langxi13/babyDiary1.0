@@ -25,8 +25,8 @@ test('authentication fields avoid mobile zoom and expose useful autocomplete hin
 })
 
 test('authentication pages use the app icon without decorative gradient backgrounds', () => {
-  assert.match(loginSource, /src="\/app-icon\.png"/)
-  assert.match(registerSource, /src="\/app-icon\.png"/)
+  assert.match(loginSource, /src="\/app-icon-display\.png"/)
+  assert.match(registerSource, /src="\/app-icon-display\.png"/)
   assert.doesNotMatch(styleSource, /linear-gradient/)
 })
 

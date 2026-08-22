@@ -1,5 +1,6 @@
 package com.langxi.babydiary.identity.application;
 
+import com.langxi.babydiary.platform.application.AfterCommit;
 import com.langxi.babydiary.platform.application.ApiException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -25,6 +26,7 @@ public class AccountRecoveryService {
     private final CredentialRepository credentials;
     private final PasswordEncoder passwords;
     private final AccountMailService mail;
+    private final AuthenticationProjectionCache authenticationCache;
     private final SecureRandom random = new SecureRandom();
 
     public AccountRecoveryService(
@@ -32,12 +34,14 @@ public class AccountRecoveryService {
             ProfileService profiles,
             CredentialRepository credentials,
             PasswordEncoder passwords,
-            AccountMailService mail) {
+            AccountMailService mail,
+            AuthenticationProjectionCache authenticationCache) {
         this.mapper = mapper;
         this.profiles = profiles;
         this.credentials = credentials;
         this.passwords = passwords;
         this.mail = mail;
+        this.authenticationCache = authenticationCache;
     }
 
     @Transactional
@@ -135,6 +139,7 @@ public class AccountRecoveryService {
         if (mapper.updatePassword(accountId, passwords.encode(password), now) != 1)
             throw tokenInvalid();
         mapper.revokeSessions(accountId, now);
+        AfterCommit.run(() -> authenticationCache.invalidate(accountId));
     }
 
     private String normalizeEmail(String value) {

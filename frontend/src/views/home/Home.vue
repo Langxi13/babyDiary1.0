@@ -134,10 +134,8 @@ import { ElEmpty } from 'element-plus/es/components/empty/index.mjs'
 import { ElIcon } from 'element-plus/es/components/icon/index.mjs'
 import { ElTag } from 'element-plus/es/components/tag/index.mjs'
 import { Edit, Notebook, Tickets } from '@element-plus/icons-vue'
-import { useDiaryStore } from '@/stores/diary'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { anniversaryApi, draftApi } from '@/api/experience'
-import { albumApi } from '@/api/album'
+import { homeApi } from '@/api/home'
 import { mediaThumbnailUrl } from '@/api/models'
 import { moodColor, moodLabel, stripHtml } from '@/utils/diaryMeta'
 import { formatChineseDate, formatChineseDateTime } from '@/utils/dateDisplay'
@@ -148,7 +146,6 @@ import 'element-plus/es/components/message/style/css.mjs'
 import 'element-plus/es/components/tag/style/css.mjs'
 
 const router = useRouter()
-const diaryStore = useDiaryStore()
 const workspaceStore = useWorkspaceStore()
 
 const recentDiaries = ref([])
@@ -212,48 +209,22 @@ const anniversaryText = (item) => {
   return `已经 ${item.daysPassed} 天`
 }
 
-const loadDiaries = async () => {
-  loading.diaries = true
+const loadHome = async () => {
+  Object.keys(loading).forEach(key => { loading[key] = true })
   try {
-    await diaryStore.fetchDiaries({ page: 0, size: 4 })
-    recentDiaries.value = diaryStore.diaries
-    totalDiaries.value = diaryStore.pagination.totalElements
+    const result = await homeApi.get(await requireSpaceId())
+    recentDiaries.value = result.recentDiaries
+    totalDiaries.value = result.diaryTotal
+    drafts.value = result.drafts
+    anniversaries.value = result.anniversaries
+    favoritePhotos.value = result.favorites
   } finally {
-    loading.diaries = false
-  }
-}
-
-const loadDrafts = async () => {
-  loading.drafts = true
-  try {
-    drafts.value = (await draftApi.list(await requireSpaceId())).slice(0, 3)
-  } finally {
-    loading.drafts = false
-  }
-}
-
-const loadAnniversaries = async () => {
-  loading.anniversaries = true
-  try {
-    anniversaries.value = (await anniversaryApi.list(await requireSpaceId())).slice(0, 3)
-  } finally {
-    loading.anniversaries = false
-  }
-}
-
-const loadFavoritePhotos = async () => {
-  loading.photos = true
-  try {
-    favoritePhotos.value = (await albumApi.getSystemPhotoPage(
-      await requireSpaceId(), 'favorites', { page: 0, size: 6 }
-    )).content || []
-  } finally {
-    loading.photos = false
+    Object.keys(loading).forEach(key => { loading[key] = false })
   }
 }
 
 onMounted(async () => {
-  await Promise.allSettled([loadDiaries(), loadDrafts(), loadAnniversaries(), loadFavoritePhotos()])
+  await loadHome()
 })
 </script>
 

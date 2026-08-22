@@ -3,6 +3,8 @@ package com.langxi.babydiary.platform.infrastructure;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.langxi.babydiary.platform.application.ReadCache;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -11,6 +13,8 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -33,14 +37,24 @@ public class RedisReadCache implements ReadCache {
     private final AtomicLong nextWarningAt = new AtomicLong();
     private final AtomicLong disabledUntil = new AtomicLong();
     private final Set<Invalidation> pendingInvalidations = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, CompletableFuture<Object>> loads =
+            new ConcurrentHashMap<>();
+    private final MeterRegistry metrics;
+    private final DistributionSummary payloadBytes;
 
     public RedisReadCache(
             ObjectProvider<StringRedisTemplate> redis,
             ObjectMapper json,
+            MeterRegistry metrics,
             @Value("${app.cache.enabled:true}") boolean enabled,
             @Value("${app.cache.prefix:baby-diary:cache:}") String prefix) {
         this.redis = redis.getIfAvailable();
         this.json = json;
+        this.metrics = metrics;
+        this.payloadBytes =
+                DistributionSummary.builder("baby.diary.cache.payload.bytes")
+                        .description("Serialized Redis read-cache payload size")
+                        .register(metrics);
         this.enabled = enabled;
         this.prefix = prefix == null || prefix.isBlank() ? "baby-diary:cache:" : prefix;
     }
@@ -54,7 +68,11 @@ public class RedisReadCache implements ReadCache {
             Duration ttl,
             TypeReference<T> type,
             Supplier<T> loader) {
-        if (!available()) return loader.get();
+        String fallbackKey = dataKey(area, spaceId, accountId, "fallback", variant);
+        if (!available()) {
+            event(area, "fallback");
+            return singleFlight(fallbackKey, loader);
+        }
         String version;
         String key;
         try {
@@ -62,20 +80,35 @@ public class RedisReadCache implements ReadCache {
             version = version(area, spaceId);
             key = dataKey(area, spaceId, accountId, version, variant);
             String cached = redis.opsForValue().get(key);
-            if (cached != null) return json.readValue(cached, type);
+            if (cached != null) {
+                event(area, "hit");
+                payloadBytes.record(cached.getBytes(StandardCharsets.UTF_8).length);
+                return json.readValue(cached, type);
+            }
+            event(area, "miss");
         } catch (Exception exception) {
+            event(area, "fallback");
             warn(exception);
-            return loader.get();
+            return singleFlight(fallbackKey, loader);
         }
 
-        T value = loader.get();
-        if (value == null) return null;
-        try {
-            redis.opsForValue().set(key, json.writeValueAsString(value), ttl);
-        } catch (Exception exception) {
-            warn(exception);
-        }
-        return value;
+        String resolvedKey = key;
+        return singleFlight(
+                resolvedKey,
+                () -> {
+                    T value = loader.get();
+                    if (value == null) return null;
+                    try {
+                        String serialized = json.writeValueAsString(value);
+                        redis.opsForValue().set(resolvedKey, serialized, ttl);
+                        payloadBytes.record(serialized.getBytes(StandardCharsets.UTF_8).length);
+                        event(area, "write");
+                    } catch (Exception exception) {
+                        event(area, "fallback");
+                        warn(exception);
+                    }
+                    return value;
+                });
     }
 
     @Override
@@ -89,6 +122,7 @@ public class RedisReadCache implements ReadCache {
             String key = versionKey(area, spaceId);
             redis.opsForValue().increment(key);
             redis.expire(key, VERSION_TTL);
+            event(area, "invalidate");
         } catch (RuntimeException exception) {
             pendingInvalidations.add(new Invalidation(area, spaceId));
             warn(exception);
@@ -157,6 +191,47 @@ public class RedisReadCache implements ReadCache {
         log.warn(
                 "Redis read cache unavailable; using database fallback: {}",
                 exception.getClass().getSimpleName());
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T singleFlight(String key, Supplier<T> loader) {
+        CompletableFuture<Object> mine = new CompletableFuture<>();
+        CompletableFuture<Object> active = loads.putIfAbsent(key, mine);
+        if (active != null) {
+            try {
+                return (T) active.join();
+            } catch (CompletionException exception) {
+                throw propagate(exception.getCause());
+            }
+        }
+        try {
+            T value = loader.get();
+            mine.complete(value);
+            return value;
+        } catch (RuntimeException | Error exception) {
+            mine.completeExceptionally(exception);
+            throw exception;
+        } finally {
+            loads.remove(key, mine);
+        }
+    }
+
+    private RuntimeException propagate(Throwable throwable) {
+        if (throwable instanceof RuntimeException runtime) return runtime;
+        if (throwable instanceof Error error) throw error;
+        return new IllegalStateException(throwable);
+    }
+
+    private void event(String area, String result) {
+        metrics.counter(
+                        "baby.diary.cache.requests",
+                        "cache",
+                        "redis",
+                        "area",
+                        safe(area),
+                        "result",
+                        result)
+                .increment();
     }
 
     private record Invalidation(String area, UUID spaceId) {}

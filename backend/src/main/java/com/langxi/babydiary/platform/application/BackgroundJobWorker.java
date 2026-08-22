@@ -2,12 +2,14 @@ package com.langxi.babydiary.platform.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +28,10 @@ public class BackgroundJobWorker {
     private final boolean enabled;
     private final String workerId;
     private final int staleMinutes;
+    private final WorkerPollSignal pollSignal;
+    private final MeterRegistry metrics;
+    private final EmptyPollBackoff backoff = new EmptyPollBackoff();
+    private final ReentrantLock workerLock = new ReentrantLock();
 
     public BackgroundJobWorker(
             BackgroundJobRepository jobs,
@@ -34,7 +40,9 @@ public class BackgroundJobWorker {
             List<BackgroundJobHandler> handlers,
             @Value("${app.jobs.enabled:true}") boolean enabled,
             @Value("${app.jobs.worker-id:single-node}") String workerId,
-            @Value("${app.jobs.stale-after-minutes:30}") int staleMinutes) {
+            @Value("${app.jobs.stale-after-minutes:30}") int staleMinutes,
+            WorkerPollSignal pollSignal,
+            MeterRegistry metrics) {
         this.jobs = jobs;
         this.json = json;
         this.transactions = transactions;
@@ -44,6 +52,8 @@ public class BackgroundJobWorker {
                         ? "single-node"
                         : workerId.substring(0, Math.min(workerId.length(), 40));
         this.staleMinutes = Math.max(5, staleMinutes);
+        this.pollSignal = pollSignal;
+        this.metrics = metrics;
         Map<String, BackgroundJobHandler> values = new LinkedHashMap<>();
         for (BackgroundJobHandler handler : handlers) {
             if (values.putIfAbsent(handler.type(), handler) != null) {
@@ -58,6 +68,15 @@ public class BackgroundJobWorker {
     @Scheduled(fixedDelayString = "${app.jobs.poll-delay-ms:2000}")
     public void poll() {
         if (!enabled || handlerTypes.isEmpty()) return;
+        if (!backoff.ready(pollSignal.jobsVersion()) || !workerLock.tryLock()) return;
+        try {
+            pollOnce();
+        } finally {
+            workerLock.unlock();
+        }
+    }
+
+    private void pollOnce() {
         String claim = workerId + ":" + UUID.randomUUID();
         BackgroundJobRepository.Job job =
                 transactions.execute(
@@ -67,13 +86,27 @@ public class BackgroundJobWorker {
                                     ? jobs.findClaimed(claim)
                                     : null;
                         });
-        if (job == null) return;
+        if (job == null) {
+            backoff.empty();
+            pollMetric("empty");
+            return;
+        }
+        backoff.active();
+        pollMetric("claimed");
         execute(job, claim);
     }
 
     @Scheduled(fixedDelayString = "${app.jobs.recovery-delay-ms:300000}")
     public void recoverStale() {
-        if (!enabled) return;
+        if (!enabled || !workerLock.tryLock()) return;
+        try {
+            recoverStaleLocked();
+        } finally {
+            workerLock.unlock();
+        }
+    }
+
+    private void recoverStaleLocked() {
         LocalDateTime now = now();
         LocalDateTime staleBefore = now.minusMinutes(staleMinutes);
         transactions.executeWithoutResult(
@@ -140,5 +173,9 @@ public class BackgroundJobWorker {
 
     private LocalDateTime now() {
         return LocalDateTime.now(ZoneOffset.UTC);
+    }
+
+    private void pollMetric(String result) {
+        metrics.counter("baby.diary.worker.polls", "worker", "jobs", "result", result).increment();
     }
 }

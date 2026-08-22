@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.langxi.babydiary.sync.infrastructure",
     "com.langxi.babydiary.share.infrastructure",
     "com.langxi.babydiary.transfer.infrastructure",
+    "com.langxi.babydiary.home.infrastructure",
     "com.langxi.babydiary.platform.infrastructure"
 })
 @EnableScheduling

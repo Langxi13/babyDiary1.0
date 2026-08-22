@@ -60,7 +60,9 @@ export const buildTimelineTree = (groups = [], options = {}) => {
     }
 
     const yearNode = years.get(year)
-    const usesWeeks = diaries.length >= weeklyThreshold
+    const diaryCount = Number(group.diaryCount ?? diaries.length)
+    const mediaCount = Number(group.mediaCount ?? countPhotos(diaries))
+    const usesWeeks = diaryCount >= weeklyThreshold && diaries.length > 0
     const monthNode = {
       key: timelineKey('month', month),
       month,
@@ -68,8 +70,10 @@ export const buildTimelineTree = (groups = [], options = {}) => {
       diaries,
       weeks: usesWeeks ? buildWeeks(month, diaries) : [],
       usesWeeks,
-      diaryCount: diaries.length,
-      photoCount: countPhotos(diaries)
+      diaryCount,
+      photoCount: mediaCount,
+      loaded: !!group.loaded,
+      nextCursor: group.nextCursor || null
     }
 
     yearNode.months.push(monthNode)
@@ -86,15 +90,9 @@ export const buildTimelineTree = (groups = [], options = {}) => {
 }
 
 export const initialExpandedTimelineKeys = (tree = []) => {
-  const keys = []
-  for (const year of tree) {
-    keys.push(year.key)
-    for (const month of year.months) {
-      keys.push(month.key)
-      for (const week of month.weeks) {
-        keys.push(week.key)
-      }
-    }
-  }
+  const year = tree[0]
+  const month = year?.months?.find(item => item.loaded) || year?.months?.[0]
+  const keys = year ? [year.key] : []
+  if (month) keys.push(month.key, ...month.weeks.map(week => week.key))
   return keys
 }

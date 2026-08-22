@@ -1,7 +1,9 @@
 package com.langxi.babydiary.diary.api;
 
 import com.langxi.babydiary.diary.application.DiaryService;
+import com.langxi.babydiary.diary.application.DiarySummaryService;
 import com.langxi.babydiary.diary.domain.DiaryEntry;
+import com.langxi.babydiary.diary.domain.DiarySummary;
 import com.langxi.babydiary.identity.application.AccountPrincipal;
 import com.langxi.babydiary.identity.application.StepUpService;
 import com.langxi.babydiary.media.application.MediaAccessContext;
@@ -40,12 +42,58 @@ public class DiaryController {
     private final DiaryService diaries;
     private final MediaRepresentationService media;
     private final StepUpService stepUp;
+    private final DiarySummaryService summaries;
 
     public DiaryController(
-            DiaryService diaries, MediaRepresentationService media, StepUpService stepUp) {
+            DiaryService diaries,
+            MediaRepresentationService media,
+            StepUpService stepUp,
+            DiarySummaryService summaries) {
         this.diaries = diaries;
         this.media = media;
         this.stepUp = stepUp;
+        this.summaries = summaries;
+    }
+
+    @GetMapping("/summaries")
+    public CursorResponse<DiarySummaryResponse> summaries(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID spaceId,
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String mood,
+            @RequestParam(required = false) UUID tagId,
+            @RequestParam(defaultValue = "false") boolean trash,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "true") boolean includeTotal,
+            @RequestParam(required = false) String cursor,
+            @RequestHeader(value = "X-Step-Up-Token", required = false) String stepToken) {
+        boolean elevated = stepUp.valid(principal, stepToken);
+        CursorPage<DiarySummary> page =
+                summaries.list(
+                        spaceId,
+                        principal.accountId(),
+                        new DiaryService.ListQuery(
+                                startDate,
+                                endDate,
+                                keyword,
+                                mood,
+                                tagId,
+                                trash,
+                                cursor,
+                                size,
+                                includeTotal),
+                        elevated);
+        return new CursorResponse<>(
+                page.items().stream()
+                        .map(
+                                value ->
+                                        DiarySummaryResponse.from(
+                                                value, media, principal.accountId(), elevated))
+                        .toList(),
+                page.nextCursor(),
+                page.totalElements());
     }
 
     @GetMapping
@@ -356,6 +404,86 @@ public class DiaryController {
                             value.previewProfile(),
                             context,
                             reveal));
+        }
+    }
+
+    public record DiarySummaryResponse(
+            UUID id,
+            String title,
+            LocalDate diaryDate,
+            String contentSnippet,
+            String mood,
+            String visibility,
+            boolean locked,
+            int version,
+            String createdAt,
+            String updatedAt,
+            List<DiaryTagResponse> tags,
+            long mediaCount,
+            List<DiaryPreviewResponse> previews) {
+        static DiarySummaryResponse from(
+                DiarySummary diary,
+                MediaRepresentationService media,
+                long accountId,
+                boolean elevated) {
+            return new DiarySummaryResponse(
+                    diary.id(),
+                    diary.title(),
+                    diary.diaryDate(),
+                    diary.contentSnippet(),
+                    diary.mood(),
+                    diary.visibility(),
+                    diary.locked(),
+                    diary.version(),
+                    diary.createdAt() == null ? null : diary.createdAt().toString(),
+                    diary.updatedAt() == null ? null : diary.updatedAt().toString(),
+                    diary.tags().stream().map(DiaryTagResponse::from).toList(),
+                    diary.mediaCount(),
+                    diary.previews().stream()
+                            .map(
+                                    value ->
+                                            DiaryPreviewResponse.from(
+                                                    diary.id(),
+                                                    diary.locked(),
+                                                    diary.spaceId(),
+                                                    value,
+                                                    media,
+                                                    accountId,
+                                                    elevated))
+                            .toList());
+        }
+    }
+
+    public record DiaryPreviewResponse(
+            UUID id,
+            String mediaType,
+            int position,
+            String status,
+            boolean protectedContent,
+            MediaView.Representations representations) {
+        static DiaryPreviewResponse from(
+                UUID diaryId,
+                boolean locked,
+                UUID spaceId,
+                DiarySummary.Preview value,
+                MediaRepresentationService media,
+                long accountId,
+                boolean elevated) {
+            boolean reveal = !value.protectedContent() || elevated;
+            return new DiaryPreviewResponse(
+                    value.id(),
+                    value.mediaType(),
+                    value.position(),
+                    value.status(),
+                    value.protectedContent(),
+                    media.links(
+                            spaceId,
+                            value.id(),
+                            null,
+                            value.thumbnailProfile(),
+                            value.previewProfile(),
+                            MediaAccessContext.diary(accountId, diaryId, elevated),
+                            reveal && (!locked || elevated)));
         }
     }
 }

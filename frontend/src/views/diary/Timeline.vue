@@ -47,7 +47,7 @@
 
           <div v-if="isExpanded(year.key)" class="timeline-year-body">
             <section v-for="month in year.months" :key="month.key" class="month-block">
-              <button type="button" class="timeline-month-toggle" @click="toggleExpanded(month.key)">
+              <button type="button" class="timeline-month-toggle" @click="toggleMonth(month)">
                 <span class="toggle-main">
                   <el-icon class="toggle-icon" :class="{ expanded: isExpanded(month.key) }"><ArrowRight /></el-icon>
                   <strong>{{ formatChineseMonth(month.month) }}</strong>
@@ -60,6 +60,7 @@
               </button>
 
               <div v-if="isExpanded(month.key)" class="month-items">
+                <div v-if="month.loading" v-loading="true" class="month-loading"></div>
                 <template v-if="month.usesWeeks">
                   <section v-for="week in month.weeks" :key="week.key" class="week-block">
                     <button type="button" class="timeline-week-toggle" @click="toggleExpanded(week.key)">
@@ -135,6 +136,12 @@
                     </div>
                   </article>
                 </template>
+                <el-button
+                  v-if="month.nextCursor"
+                  class="load-more-button"
+                  :loading="month.loading"
+                  @click="loadMonth(month, true)"
+                >加载更多</el-button>
               </div>
             </section>
           </div>
@@ -145,7 +152,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElButton } from 'element-plus/es/components/button/index.mjs'
 import { ElDatePicker } from 'element-plus/es/components/date-picker/index.mjs'
@@ -209,6 +216,36 @@ const toggleExpanded = (key) => {
   expandedKeys.value = next
 }
 
+const queryFilters = () => ({
+  tagId: filters.tagId || undefined,
+  mood: filters.mood || undefined
+})
+
+const loadMonth = async (month, append = false) => {
+  const target = groups.value.find(group => group.month === month.month)
+  if (!target || target.loading || (!append && target.loaded)) return
+  target.loading = true
+  try {
+    const page = await diaryApi.getTimelineMonth(await requireSpaceId(), {
+      ...queryFilters(),
+      month: target.month,
+      cursor: append ? target.nextCursor : undefined,
+      size: 20
+    })
+    target.diaries = append ? [...target.diaries, ...page.diaries] : page.diaries
+    target.nextCursor = page.nextCursor
+    target.loaded = true
+  } finally {
+    target.loading = false
+  }
+}
+
+const toggleMonth = async (month) => {
+  const opening = !isExpanded(month.key)
+  toggleExpanded(month.key)
+  if (opening && !month.loaded) await loadMonth(month)
+}
+
 const previewText = (diary) => {
   const text = diary.contentHtml ? stripHtml(diary.contentHtml) : diary.contentText
   return text?.slice(0, 160) || ''
@@ -224,18 +261,13 @@ const fetchTimeline = async () => {
   fetchSeq.value = seq
   loading.value = true
   try {
-    const params = {
-      tagId: filters.tagId,
-      mood: filters.mood || undefined
-    }
-    if (monthValue.value) {
-      const [year, month] = monthValue.value.split('-')
-      params.year = Number(year)
-      params.month = Number(month)
-    }
-    const result = await diaryApi.getTimeline(await requireSpaceId(), params)
+    const params = queryFilters()
+    let result = await diaryApi.getTimelineIndex(await requireSpaceId(), params, { force: true })
+    if (monthValue.value) result = result.filter(group => group.month === monthValue.value)
     if (seq === fetchSeq.value) {
       groups.value = result || []
+      if (groups.value.length) await loadMonth(groups.value[0])
+      ensureDefaultExpansion(timelineTree.value)
     }
   } finally {
     if (seq === fetchSeq.value) {
@@ -248,7 +280,6 @@ onMounted(async () => {
   await Promise.all([fetchTags(), fetchTimeline()])
 })
 
-watch(timelineTree, ensureDefaultExpansion, { immediate: true })
 </script>
 
 <style src="./styles/Timeline.scss" scoped lang="scss"></style>

@@ -49,6 +49,7 @@ export const anniversaryApi = {
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:anniversaries:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
     return normalizeAnniversary(item)
   },
 
@@ -63,12 +64,14 @@ export const anniversaryApi = {
       { headers: stepHeader(token) }
     ))
     invalidateApiCache(`spaces:${spaceId}:anniversaries:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
     return normalizeAnniversary(item)
   },
 
   async remove(spaceId, id) {
     await request.delete(`${API_ROOT}/spaces/${spaceId}/anniversaries/${id}`)
     invalidateApiCache(`spaces:${spaceId}:anniversaries:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
   }
 }
 
@@ -92,11 +95,13 @@ export const draftApi = {
       payload: draftPayload
     })
     invalidateApiCache(`spaces:${spaceId}:drafts:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
     return normalizeDraft(draft)
   },
 
   async remove(spaceId, draftKey) {
     await request.delete(`${API_ROOT}/spaces/${spaceId}/drafts/${encodeURIComponent(draftKey)}`)
     invalidateApiCache(`spaces:${spaceId}:drafts:`)
+    invalidateApiCache(`spaces:${spaceId}:home:`)
   }
 }

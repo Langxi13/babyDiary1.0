@@ -11,7 +11,7 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:8}
-      minimum-idle: ${DB_POOL_MIN:2}
+      minimum-idle: ${DB_POOL_MIN:1}
       connection-timeout: 5000
       validation-timeout: 2000
   flyway:
@@ -78,6 +78,7 @@ app:
       secret-key: ${S3_SECRET_KEY:}
   export:
     pdf-font-path: ${PDF_FONT_PATH:/usr/share/fonts/truetype/unifont/unifont.ttf}
+    render-max-bytes: ${EXPORT_RENDER_MAX_BYTES:8388608}
   media:
     url-signing-key: ${MEDIA_URL_SIGNING_KEY:${JWT_SECRET:development-only-media-signing-key}}
     url-lifetime-seconds: ${MEDIA_URL_LIFETIME_SECONDS:1800}
@@ -101,6 +102,13 @@ app:
   cache:
     enabled: ${CACHE_ENABLED:true}
     prefix: ${CACHE_PREFIX:baby-diary:cache:}
+  access-cache:
+    account:
+      maximum-size: ${ACCOUNT_ACCESS_CACHE_MAX:2048}
+      expire-after-access: ${ACCOUNT_ACCESS_CACHE_TTL:120s}
+    space:
+      maximum-size: ${SPACE_ACCESS_CACHE_MAX:8192}
+      expire-after-access: ${SPACE_ACCESS_CACHE_TTL:120s}
   outbox:
     enabled: ${OUTBOX_ENABLED:true}
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:2000}

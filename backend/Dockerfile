@@ -13,7 +13,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system baby-diary \
     && useradd --system --gid baby-diary --home-dir /app baby-diary \
-    && install -d -o baby-diary -g baby-diary /app/config /data/objects
+    && install -d -o baby-diary -g baby-diary /app/config /app/logs /data/objects
 
 WORKDIR /app
 COPY --from=build --chown=baby-diary:baby-diary /workspace/backend/target/Baby-Diary.jar /app/app.jar
@@ -25,4 +25,4 @@ EXPOSE 10002
 HEALTHCHECK --interval=10s --timeout=5s --start-period=45s --retries=12 \
   CMD curl --fail --silent http://127.0.0.1:10002/actuator/health >/dev/null || exit 1
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar", "--spring.config.location=file:/app/config/application-prod.yml"]
+ENTRYPOINT ["java", "-Xms128m", "-Xmx768m", "-Xlog:gc*:file=/app/logs/backend-gc.log:time,uptime,level,tags:filecount=5,filesize=10M", "-jar", "/app/app.jar", "--spring.config.location=file:/app/config/application-prod.yml"]

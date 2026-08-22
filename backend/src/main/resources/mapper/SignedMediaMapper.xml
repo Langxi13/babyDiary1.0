@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.langxi.babydiary.media.infrastructure.SignedMediaMapper">
+    <select id="resolve" resultType="com.langxi.babydiary.media.infrastructure.SignedMediaMapper$VariantRow">
+        SELECT EXISTS (
+                 SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                   ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                 WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id
+                   AND lock_d.locked=1
+               ) AS protected_content,
+               v.variant_type,v.profile,v.storage_provider,v.storage_key,v.content_type,v.size_bytes,
+               v.checksum_sha256,v.width,v.height,v.duration_millis,v.quality_score,v.status
+        FROM diary_space s
+        <choose>
+            <when test="source == 'DIRECT'">
+                JOIN media_asset a ON a.space_id=s.space_id
+                JOIN space_member m ON m.space_id=s.space_id AND m.account_id=#{accountId}
+                  AND m.status='ACTIVE'
+            </when>
+            <when test="source == 'DIARY'">
+                JOIN diary d ON d.space_id=s.space_id AND d.public_id=#{contextId}
+                JOIN diary_media dm ON dm.space_id=d.space_id AND dm.diary_id=d.diary_id
+                JOIN media_asset a ON a.space_id=dm.space_id AND a.asset_id=dm.asset_id
+                JOIN space_member m ON m.space_id=s.space_id AND m.account_id=#{accountId}
+                  AND m.status='ACTIVE'
+            </when>
+            <when test="source == 'ALBUM'">
+                JOIN album al ON al.space_id=s.space_id AND al.public_id=#{contextId}
+                JOIN album_media am ON am.space_id=al.space_id AND am.album_id=al.album_id
+                JOIN media_asset a ON a.space_id=am.space_id AND a.asset_id=am.asset_id
+                JOIN space_member m ON m.space_id=s.space_id AND m.account_id=#{accountId}
+                  AND m.status='ACTIVE'
+            </when>
+            <when test="source == 'ANNIVERSARY'">
+                JOIN anniversary an ON an.space_id=s.space_id AND an.public_id=#{contextId}
+                JOIN media_asset a ON a.space_id=an.space_id AND a.asset_id=an.cover_asset_id
+                JOIN space_member m ON m.space_id=s.space_id AND m.account_id=#{accountId}
+                  AND m.status='ACTIVE'
+            </when>
+            <when test="source == 'AVATAR'">
+                JOIN user_avatar ua ON ua.space_id=s.space_id
+                JOIN account target ON target.account_id=ua.account_id AND target.public_id=#{contextId}
+                JOIN media_asset a ON a.space_id=ua.space_id AND a.asset_id=ua.asset_id
+            </when>
+            <otherwise>
+                JOIN private_share ps ON ps.space_id=s.space_id AND ps.public_id=#{contextId}
+                JOIN diary d ON d.space_id=ps.space_id AND d.diary_id=ps.diary_id
+                JOIN diary_media dm ON dm.space_id=d.space_id AND dm.diary_id=d.diary_id
+                JOIN media_asset a ON a.space_id=dm.space_id AND a.asset_id=dm.asset_id
+            </otherwise>
+        </choose>
+        JOIN media_variant v ON v.asset_id=a.asset_id AND v.variant_type=#{type}
+          AND v.profile=#{profile} AND v.status='READY' AND v.deleted_at IS NULL
+        WHERE s.public_id=#{spaceId} AND s.deleted_at IS NULL AND a.public_id=#{assetId}
+          AND a.deleted_at IS NULL AND a.status='READY'
+        <if test="source == 'DIRECT'">
+          AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+        </if>
+        <if test="source == 'DIARY'">
+          AND d.deleted_at IS NULL AND (d.visibility='SHARED' OR d.author_id=#{accountId})
+        </if>
+        <if test="source == 'ALBUM'">AND al.deleted_at IS NULL</if>
+        <if test="source == 'ANNIVERSARY'">AND an.deleted_at IS NULL</if>
+        <if test="source == 'SHARE'">
+          AND ps.revoked_at IS NULL AND ps.expires_at&gt;UTC_TIMESTAMP(6) AND d.deleted_at IS NULL
+        </if>
+        LIMIT 1
+    </select>
+</mapper>

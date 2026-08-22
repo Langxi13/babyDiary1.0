@@ -37,6 +37,35 @@ public class MyBatisTransferRepository implements TransferRepository {
     }
 
     @Override
+    public ExportPreflight exportPreflight(long spaceId, long accountId) {
+        TransferMapper.ExportPreflightRow row = mapper.exportPreflight(spaceId, accountId);
+        return new ExportPreflight(
+                row.diaryCount(),
+                row.mediaCount(),
+                row.totalMediaBytes(),
+                row.maxMediaBytes(),
+                row.requiresStepUp());
+    }
+
+    @Override
+    public List<DiaryData> findDiaryBatch(
+            long spaceId, long accountId, LocalDate afterDate, Long afterId, int limit) {
+        return mapper.findDiaryBatch(spaceId, accountId, afterDate, afterId, limit).stream()
+                .map(
+                        row ->
+                                new DiaryData(
+                                        row.diaryId(),
+                                        row.publicId(),
+                                        row.title(),
+                                        row.diaryDate(),
+                                        row.contentHtml(),
+                                        row.moodKey(),
+                                        row.visibility(),
+                                        row.locked()))
+                .toList();
+    }
+
+    @Override
     public List<TagData> findTags(List<Long> diaryIds) {
         return mapper.findTags(diaryIds).stream()
                 .map(row -> new TagData(row.diaryId(), row.name(), row.color()))

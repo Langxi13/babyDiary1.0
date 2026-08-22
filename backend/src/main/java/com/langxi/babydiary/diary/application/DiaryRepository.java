@@ -1,6 +1,7 @@
 package com.langxi.babydiary.diary.application;
 
 import com.langxi.babydiary.diary.domain.DiaryEntry;
+import com.langxi.babydiary.diary.domain.DiarySummary;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -9,6 +10,8 @@ import java.util.UUID;
 
 public interface DiaryRepository {
     List<DiaryEntry> findPage(Query query);
+
+    List<DiarySummary> findSummaryPage(Query query);
 
     long count(Query query);
 

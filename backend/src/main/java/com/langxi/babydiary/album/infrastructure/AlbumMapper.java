@@ -13,6 +13,101 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface AlbumMapper {
     @Select(
+            """
+            WITH library AS (
+              SELECT a.asset_id,a.public_id,YEAR(COALESCE(a.taken_at,a.created_at)) AS media_year,
+                     COALESCE(a.taken_at,a.created_at) AS media_time
+              FROM media_asset a
+              WHERE a.space_id=#{spaceId} AND a.media_type='IMAGE' AND a.library_visible=true
+                AND a.deleted_at IS NULL AND a.status='READY'
+                AND (a.owner_id=#{accountId} OR a.access_scope='SPACE')
+                AND (#{includeProtected}=true OR NOT EXISTS (
+                  SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                    ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                  WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+                ))
+            ), library_ranked AS (
+              SELECT library.*,
+                     ROW_NUMBER() OVER(ORDER BY media_time DESC,asset_id DESC) AS overall_rank,
+                     ROW_NUMBER() OVER(PARTITION BY media_year ORDER BY media_time DESC,asset_id DESC) AS year_rank,
+                     COUNT(*) OVER() AS overall_count,
+                     COUNT(*) OVER(PARTITION BY media_year) AS year_count
+              FROM library
+            ), favorites AS (
+              SELECT a.asset_id,a.public_id,f.created_at
+              FROM favorite_media f JOIN media_asset a ON a.space_id=f.space_id AND a.asset_id=f.asset_id
+              WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE'
+                AND a.deleted_at IS NULL AND a.status='READY'
+                AND (#{includeProtected}=true OR NOT EXISTS (
+                  SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                    ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                  WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+                ))
+            ), favorite_ranked AS (
+              SELECT favorites.*,ROW_NUMBER() OVER(ORDER BY created_at DESC,asset_id DESC) AS media_rank,
+                     COUNT(*) OVER() AS media_count
+              FROM favorites
+            )
+            SELECT 'all' AS system_key,COALESCE(MAX(overall_count),0) AS media_count,
+                   MAX(CASE WHEN overall_rank=1 THEN public_id END) AS cover_public_id,0 AS sort_order
+            FROM library_ranked
+            UNION ALL
+            SELECT 'favorites',COALESCE(MAX(media_count),0),
+                   MAX(CASE WHEN media_rank=1 THEN public_id END),1
+            FROM favorite_ranked
+            UNION ALL
+            SELECT CONCAT('year:',media_year),MAX(year_count),
+                   MAX(CASE WHEN year_rank=1 THEN public_id END),10000-media_year
+            FROM library_ranked GROUP BY media_year
+            ORDER BY sort_order
+            """)
+    List<SystemCatalogRow> findSystemCatalog(
+            @Param("spaceId") long spaceId,
+            @Param("accountId") long accountId,
+            @Param("includeProtected") boolean includeProtected);
+
+    @Select(
+            """
+            WITH accessible_media AS (
+              SELECT a.album_id,am.asset_id,ma.public_id,
+                     ROW_NUMBER() OVER(PARTITION BY a.album_id ORDER BY am.position,am.asset_id) AS media_rank,
+                     COUNT(*) OVER(PARTITION BY a.album_id) AS media_count
+              FROM album a JOIN album_media am ON am.space_id=a.space_id AND am.album_id=a.album_id
+              JOIN media_asset ma ON ma.space_id=am.space_id AND ma.asset_id=am.asset_id
+              WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
+                AND ma.deleted_at IS NULL AND ma.status='READY'
+                AND (#{includeProtected}=true OR NOT EXISTS (
+                  SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                    ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                  WHERE lock_dm.space_id=ma.space_id AND lock_dm.asset_id=ma.asset_id AND lock_d.locked=1
+                ))
+            ), album_rows AS (
+              SELECT a.album_id,a.public_id,a.group_id,a.type,a.name,a.description,a.sort_order,
+                     COALESCE(explicit_cover.public_id,fallback_cover.public_id) AS cover_public_id,
+                     COALESCE(fallback_cover.media_count,0) AS media_count
+              FROM album a
+              LEFT JOIN accessible_media explicit_cover
+                ON explicit_cover.album_id=a.album_id AND explicit_cover.asset_id=a.cover_asset_id
+              LEFT JOIN accessible_media fallback_cover
+                ON fallback_cover.album_id=a.album_id AND fallback_cover.media_rank=1
+              WHERE a.space_id=#{spaceId} AND a.deleted_at IS NULL
+            )
+            SELECT g.group_id,g.public_id AS group_public_id,g.name AS group_name,g.sort_order AS group_sort_order,
+                   a.album_id,a.public_id AS album_public_id,a.type AS album_type,a.name AS album_name,
+                   a.description AS album_description,a.cover_public_id,a.media_count,
+                   COALESCE(a.sort_order,0) AS album_sort_order
+            FROM album_group g LEFT JOIN album_rows a ON a.group_id=g.group_id
+            WHERE g.space_id=#{spaceId}
+            UNION ALL
+            SELECT NULL,NULL,NULL,2147483647,a.album_id,a.public_id,a.type,a.name,a.description,
+                   a.cover_public_id,a.media_count,a.sort_order
+            FROM album_rows a WHERE a.group_id IS NULL
+            ORDER BY group_sort_order,group_id,album_sort_order,album_id
+            """)
+    List<CustomCatalogRow> findCustomCatalog(
+            @Param("spaceId") long spaceId, @Param("includeProtected") boolean includeProtected);
+
+    @Select(
             "SELECT group_id,public_id,name,sort_order FROM album_group WHERE space_id=#{spaceId} ORDER BY sort_order,group_id")
     List<GroupRow> findGroups(long spaceId);
 
@@ -369,6 +464,138 @@ public interface AlbumMapper {
             @Param("includeProtected") boolean includeProtected,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    final class SystemCatalogRow {
+        private String systemKey;
+        private long mediaCount;
+        private byte[] coverPublicId;
+
+        public String systemKey() {
+            return systemKey;
+        }
+
+        public long mediaCount() {
+            return mediaCount;
+        }
+
+        public byte[] coverPublicId() {
+            return coverPublicId;
+        }
+
+        public void setSystemKey(String value) {
+            systemKey = value;
+        }
+
+        public void setMediaCount(long value) {
+            mediaCount = value;
+        }
+
+        public void setCoverPublicId(byte[] value) {
+            coverPublicId = value;
+        }
+    }
+
+    final class CustomCatalogRow {
+        private Long groupId;
+        private byte[] groupPublicId;
+        private String groupName;
+        private Integer groupSortOrder;
+        private Long albumId;
+        private byte[] albumPublicId;
+        private String albumType;
+        private String albumName;
+        private String albumDescription;
+        private byte[] coverPublicId;
+        private long mediaCount;
+
+        public Long groupId() {
+            return groupId;
+        }
+
+        public byte[] groupPublicId() {
+            return groupPublicId;
+        }
+
+        public String groupName() {
+            return groupName;
+        }
+
+        public Integer groupSortOrder() {
+            return groupSortOrder;
+        }
+
+        public Long albumId() {
+            return albumId;
+        }
+
+        public byte[] albumPublicId() {
+            return albumPublicId;
+        }
+
+        public String albumType() {
+            return albumType;
+        }
+
+        public String albumName() {
+            return albumName;
+        }
+
+        public String albumDescription() {
+            return albumDescription;
+        }
+
+        public byte[] coverPublicId() {
+            return coverPublicId;
+        }
+
+        public long mediaCount() {
+            return mediaCount;
+        }
+
+        public void setGroupId(Long value) {
+            groupId = value;
+        }
+
+        public void setGroupPublicId(byte[] value) {
+            groupPublicId = value;
+        }
+
+        public void setGroupName(String value) {
+            groupName = value;
+        }
+
+        public void setGroupSortOrder(Integer value) {
+            groupSortOrder = value;
+        }
+
+        public void setAlbumId(Long value) {
+            albumId = value;
+        }
+
+        public void setAlbumPublicId(byte[] value) {
+            albumPublicId = value;
+        }
+
+        public void setAlbumType(String value) {
+            albumType = value;
+        }
+
+        public void setAlbumName(String value) {
+            albumName = value;
+        }
+
+        public void setAlbumDescription(String value) {
+            albumDescription = value;
+        }
+
+        public void setCoverPublicId(byte[] value) {
+            coverPublicId = value;
+        }
+
+        public void setMediaCount(long value) {
+            mediaCount = value;
+        }
+    }
 
     final class YearRow {
         private int mediaYear;

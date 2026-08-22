@@ -10,3 +10,4 @@ mapfile -d '' FRONTEND_TESTS < <(find public src -type f -name '*.test.js' -prin
 node --test "${FRONTEND_TESTS[@]}"
 npm run test:unit:coverage
 npm run build
+node "$SCRIPT_DIR/check-frontend-budgets.mjs"
