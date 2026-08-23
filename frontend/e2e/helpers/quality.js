@@ -1,7 +1,8 @@
 import { expect } from '@playwright/test'
 
 const ignoredConsoleErrors = [
-  /favicon\.ico/i
+  /favicon\.ico/i,
+  /^Viewport argument key "interactive-widget" not recognized and ignored\.$/
 ]
 
 export function watchPageQuality(page) {

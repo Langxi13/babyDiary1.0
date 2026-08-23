@@ -12,7 +12,11 @@ git -C "$REPO" init -q
 git -C "$REPO" config user.name test
 git -C "$REPO" config user.email test@example.com
 
-printf '%s\n' 'PUBLIC_URL=https://diary.example.com' 'MAIL_FROM=admin@example.com' > "$REPO/config/public.env.example"
+printf '%s\n' \
+  'PUBLIC_URL=https://diary.example.com' \
+  'MAIL_FROM=admin@example.com' \
+  'DEPLOY_ROOT=/srv/baby-diary' \
+  > "$REPO/config/public.env.example"
 printf '%s\n' 'loopback=127.0.0.1' 'android_emulator=10.0.2.2' > "$REPO/README.md"
 external_host="outside-machine.$(printf '%s' 'cn')"
 printf 'PUBLIC_URL=https://%s\n' "$external_host" > "$TMP_DIR/private-local-file"
@@ -62,9 +66,11 @@ fi
 private_email="owner@family-journal.$(printf '%s' 'cn')"
 public_ip="8.8.4.$(printf '%s' '4')"
 server_path="/usr/local/$(printf '%s' 'Web-Project/private-instance')"
+similar_deploy_path="/$(printf '%s' 'srv')/baby-diary-private"
 phone_number="138$(printf '%s' '00138000')"
-printf 'MAIL_FROM=%s\nPUBLIC_IP=%s\nSERVER_PATH=%s\nPHONE=%s\n' \
-  "$private_email" "$public_ip" "$server_path" "$phone_number" > "$REPO/config/private-values.txt"
+printf 'MAIL_FROM=%s\nPUBLIC_IP=%s\nSERVER_PATH=%s\nSIMILAR_DEPLOY_PATH=%s\nPHONE=%s\n' \
+  "$private_email" "$public_ip" "$server_path" "$similar_deploy_path" "$phone_number" \
+  > "$REPO/config/private-values.txt"
 touch "$REPO/.env"
 
 if PROJECT_ROOT="$REPO" PRIVACY_SCAN_HISTORY=false \
@@ -79,7 +85,7 @@ grep -q 'server-specific filesystem path' "$TMP_DIR/categories.out"
 grep -q 'possible phone number' "$TMP_DIR/categories.out"
 grep -q 'sensitive file path' "$TMP_DIR/categories.out"
 
-for private_value in "$private_email" "$public_ip" "$server_path" "$phone_number"; do
+for private_value in "$private_email" "$public_ip" "$server_path" "$similar_deploy_path" "$phone_number"; do
   if grep -qF "$private_value" "$TMP_DIR/categories.out"; then
     echo "privacy scan must redact detected private values" >&2
     exit 1

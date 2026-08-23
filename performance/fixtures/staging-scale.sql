@@ -5,16 +5,24 @@ SET @fixture_space_id = (
   SELECT space_id FROM diary_space WHERE personal_owner_id=@fixture_account_id AND deleted_at IS NULL LIMIT 1
 );
 
-CREATE TEMPORARY TABLE fixture_digits (n int PRIMARY KEY);
-INSERT INTO fixture_digits VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+CREATE TEMPORARY TABLE fixture_ones (n int PRIMARY KEY);
+INSERT INTO fixture_ones VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9);
+CREATE TEMPORARY TABLE fixture_tens LIKE fixture_ones;
+CREATE TEMPORARY TABLE fixture_hundreds LIKE fixture_ones;
+CREATE TEMPORARY TABLE fixture_thousands LIKE fixture_ones;
+CREATE TEMPORARY TABLE fixture_ten_thousands LIKE fixture_ones;
+INSERT INTO fixture_tens SELECT n FROM fixture_ones;
+INSERT INTO fixture_hundreds SELECT n FROM fixture_ones;
+INSERT INTO fixture_thousands SELECT n FROM fixture_ones;
+INSERT INTO fixture_ten_thousands SELECT n FROM fixture_ones;
 CREATE TEMPORARY TABLE fixture_numbers (n int PRIMARY KEY);
 INSERT INTO fixture_numbers
 SELECT ones.n + tens.n*10 + hundreds.n*100 + thousands.n*1000 + ten_thousands.n*10000 + 1
-FROM fixture_digits ones
-CROSS JOIN fixture_digits tens
-CROSS JOIN fixture_digits hundreds
-CROSS JOIN fixture_digits thousands
-CROSS JOIN fixture_digits ten_thousands
+FROM fixture_ones ones
+CROSS JOIN fixture_tens tens
+CROSS JOIN fixture_hundreds hundreds
+CROSS JOIN fixture_thousands thousands
+CROSS JOIN fixture_ten_thousands ten_thousands
 WHERE ones.n + tens.n*10 + hundreds.n*100 + thousands.n*1000 + ten_thousands.n*10000 < 20000;
 
 INSERT INTO tag(public_id,space_id,name,color,created_by)

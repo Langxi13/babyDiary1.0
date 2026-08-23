@@ -2,6 +2,7 @@
 
 ## 2026-08-23
 
+- Restored green CI by approving the reviewed application icons and documented `/srv/baby-diary` deployment root, narrowly filtering WebKit's unsupported `interactive-widget` viewport diagnostic, updating vulnerable transitive `nanoid`, `brace-expansion`, and `undici` releases, and making the staging performance fixture use independent MySQL temporary digit tables with a regression gate.
 - Fixed home favorite photos when only `ORIGINAL/source` exists by exposing the original profile and keeping a signed original fallback; reused the persisted space ID to overlap home and space-list requests on returning sessions.
 - Added bounded diary summaries, lazy timeline month pages, one-request home projection, consolidated album reads and context-aware signed-media hydration to reduce SQL/request amplification and browser payloads.
 - Added Redis single-flight read fallback, account/space projection caches, post-commit invalidation, SQL request metrics and cache payload observability while preserving step-up and elevated-response no-store rules.

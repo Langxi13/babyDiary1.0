@@ -116,7 +116,7 @@ ip_is_allowed() {
 
 path_is_allowed() {
   case "$1" in
-    /home/wiremock*)
+    /home/wiremock*|/srv/baby-diary|/srv/baby-diary/*|/srv/baby-diary\})
       return 0
       ;;
   esac
