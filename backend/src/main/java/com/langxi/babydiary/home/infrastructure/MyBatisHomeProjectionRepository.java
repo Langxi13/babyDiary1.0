@@ -48,6 +48,7 @@ public class MyBatisHomeProjectionRepository implements HomeProjectionRepository
                                                 row.mediaType(),
                                                 row.status(),
                                                 row.protectedContent(),
+                                                row.originalProfile(),
                                                 row.thumbnailProfile(),
                                                 row.previewProfile()))
                         .toList();
@@ -76,6 +77,7 @@ public class MyBatisHomeProjectionRepository implements HomeProjectionRepository
                                     row.mediaPosition() == null ? 0 : row.mediaPosition(),
                                     row.mediaStatus(),
                                     row.protectedContent(),
+                                    row.originalProfile(),
                                     row.thumbnailProfile(),
                                     row.previewProfile()));
                 }

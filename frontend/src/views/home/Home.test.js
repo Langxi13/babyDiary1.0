@@ -6,7 +6,8 @@ const source = readFileSync(new URL('./Home.vue', import.meta.url), 'utf8')
 const apiSource = readFileSync(new URL('../../api/home.js', import.meta.url), 'utf8')
 
 test('home uses one bounded projection request', () => {
-  assert.match(source, /homeApi\.get\(await requireSpaceId\(\)\)/)
+  assert.match(source, /const cachedSpaceId = workspaceStore\.activeSpaceId/)
+  assert.match(source, /homeApi\.get\(spaceId\)/)
   assert.doesNotMatch(source, /getSystemPhotoPage|fetchDiaries|draftApi|anniversaryApi/)
   assert.match(apiSource, /spaces\/\$\{spaceId\}\/home/)
   assert.match(apiSource, /ttl: options\.ttl \?\? 30000/)

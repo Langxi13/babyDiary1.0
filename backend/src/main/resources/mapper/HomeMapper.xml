@@ -18,6 +18,8 @@
           GROUP BY dm.diary_id
         ), image_profiles AS (
           SELECT dm.diary_id,a.asset_id,a.public_id,a.media_type,dm.position,a.status,
+                 COALESCE(MAX(CASE WHEN v.variant_type='ORIGINAL' AND v.profile='source' THEN v.profile END),
+                          MAX(CASE WHEN v.variant_type='ORIGINAL' THEN v.profile END)) AS original_profile,
                  COALESCE(MAX(CASE WHEN v.variant_type='THUMBNAIL' AND v.profile='compact' THEN v.profile END),
                           MAX(CASE WHEN v.variant_type='THUMBNAIL' THEN v.profile END)) AS thumbnail_profile,
                  COALESCE(MAX(CASE WHEN v.variant_type='PREVIEW' AND v.profile='screen' THEN v.profile END),
@@ -28,7 +30,7 @@
           JOIN media_asset a ON a.asset_id=dm.asset_id AND a.media_type='IMAGE'
             AND a.deleted_at IS NULL AND a.status='READY'
           LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.status='READY'
-            AND v.deleted_at IS NULL AND v.variant_type IN ('THUMBNAIL','PREVIEW')
+            AND v.deleted_at IS NULL AND v.variant_type IN ('ORIGINAL','THUMBNAIL','PREVIEW')
           GROUP BY dm.diary_id,a.asset_id,a.public_id,a.media_type,dm.position,a.status
         ), ranked_images AS (
           SELECT image_profiles.*,
@@ -40,7 +42,7 @@
                t.public_id AS tag_public_id,t.name AS tag_name,t.color AS tag_color,
                i.public_id AS media_public_id,i.media_type,i.position AS media_position,
                i.status AS media_status,COALESCE(i.protected_content,0) AS protected_content,
-               i.thumbnail_profile,i.preview_profile,COALESCE(c.media_count,0) AS media_count
+               i.original_profile,i.thumbnail_profile,i.preview_profile,COALESCE(c.media_count,0) AS media_count
         FROM recent_diaries r
         LEFT JOIN diary_tag dt ON dt.diary_id=r.diary_id
         LEFT JOIN tag t ON t.tag_id=dt.tag_id
@@ -68,13 +70,15 @@
         SELECT a.public_id,a.media_type,a.status,
                EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
                        WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1) AS protected_content,
+               COALESCE(MAX(CASE WHEN v.variant_type='ORIGINAL' AND v.profile='source' THEN v.profile END),
+                        MAX(CASE WHEN v.variant_type='ORIGINAL' THEN v.profile END)) AS original_profile,
                COALESCE(MAX(CASE WHEN v.variant_type='THUMBNAIL' AND v.profile='compact' THEN v.profile END),
                         MAX(CASE WHEN v.variant_type='THUMBNAIL' THEN v.profile END)) AS thumbnail_profile,
                COALESCE(MAX(CASE WHEN v.variant_type='PREVIEW' AND v.profile='screen' THEN v.profile END),
                         MAX(CASE WHEN v.variant_type='PREVIEW' THEN v.profile END)) AS preview_profile
         FROM favorite_media f JOIN media_asset a ON a.asset_id=f.asset_id AND a.space_id=f.space_id
         LEFT JOIN media_variant v ON v.asset_id=a.asset_id AND v.status='READY' AND v.deleted_at IS NULL
-          AND v.variant_type IN ('THUMBNAIL','PREVIEW')
+          AND v.variant_type IN ('ORIGINAL','THUMBNAIL','PREVIEW')
         WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE'
           AND a.deleted_at IS NULL AND a.status='READY'
           AND (#{elevated}=true OR NOT EXISTS (

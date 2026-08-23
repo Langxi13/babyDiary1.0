@@ -179,9 +179,12 @@ const previewText = (diary, limit = 100) => {
 const firstDiaryImage = diary => diary?.media?.find(item => item.mediaType === 'IMAGE')
 
 const requireSpaceId = async () => {
-  await workspaceStore.loadSpaces()
+  const cachedSpaceId = workspaceStore.activeSpaceId
+  const spacesRequest = workspaceStore.loadSpaces()
+  if (cachedSpaceId) return { spaceId: cachedSpaceId, spacesRequest }
+  await spacesRequest
   if (!workspaceStore.activeSpaceId) throw new Error('当前账户没有可用日记空间')
-  return workspaceStore.activeSpaceId
+  return { spaceId: workspaceStore.activeSpaceId, spacesRequest }
 }
 
 const draftTypeLabel = (draft) => String(draft.draftKey || '').startsWith('create') ? '新日记草稿' : '编辑草稿'
@@ -212,7 +215,17 @@ const anniversaryText = (item) => {
 const loadHome = async () => {
   Object.keys(loading).forEach(key => { loading[key] = true })
   try {
-    const result = await homeApi.get(await requireSpaceId())
+    const { spaceId, spacesRequest } = await requireSpaceId()
+    let result
+    try {
+      result = await homeApi.get(spaceId)
+    } catch (error) {
+      // A removed persisted space can race the space-list refresh once.
+      const spaces = await spacesRequest.catch(() => [])
+      const fallbackSpaceId = workspaceStore.activeSpaceId || spaces[0]?.id
+      if (!fallbackSpaceId || fallbackSpaceId === spaceId) throw error
+      result = await homeApi.get(fallbackSpaceId)
+    }
     recentDiaries.value = result.recentDiaries
     totalDiaries.value = result.diaryTotal
     drafts.value = result.drafts

@@ -41,6 +41,7 @@ public interface HomeMapper {
         private Integer mediaPosition;
         private String mediaStatus;
         private boolean protectedContent;
+        private String originalProfile;
         private String thumbnailProfile;
         private String previewProfile;
         private long mediaCount;
@@ -123,6 +124,10 @@ public interface HomeMapper {
 
         public boolean protectedContent() {
             return protectedContent;
+        }
+
+        public String originalProfile() {
+            return originalProfile;
         }
 
         public String thumbnailProfile() {
@@ -215,6 +220,10 @@ public interface HomeMapper {
 
         public void setProtectedContent(boolean value) {
             protectedContent = value;
+        }
+
+        public void setOriginalProfile(String value) {
+            originalProfile = value;
         }
 
         public void setThumbnailProfile(String value) {
@@ -313,6 +322,7 @@ public interface HomeMapper {
         private String mediaType;
         private String status;
         private boolean protectedContent;
+        private String originalProfile;
         private String thumbnailProfile;
         private String previewProfile;
 
@@ -330,6 +340,10 @@ public interface HomeMapper {
 
         public boolean protectedContent() {
             return protectedContent;
+        }
+
+        public String originalProfile() {
+            return originalProfile;
         }
 
         public String thumbnailProfile() {
@@ -354,6 +368,10 @@ public interface HomeMapper {
 
         public void setProtectedContent(boolean value) {
             protectedContent = value;
+        }
+
+        public void setOriginalProfile(String value) {
+            originalProfile = value;
         }
 
         public void setThumbnailProfile(String value) {

@@ -99,8 +99,10 @@ public class MediaRepresentationService {
             String previewProfile,
             MediaAccessContext context,
             boolean reveal) {
+        // Keep older cached home projections readable while they expire.
+        String resolvedOriginalProfile = originalProfile == null ? "source" : originalProfile;
         return new MediaView.Representations(
-                link(spaceId, assetId, "ORIGINAL", originalProfile, context, reveal),
+                link(spaceId, assetId, "ORIGINAL", resolvedOriginalProfile, context, reveal),
                 link(spaceId, assetId, "THUMBNAIL", thumbnailProfile, context, reveal),
                 link(spaceId, assetId, "PREVIEW", previewProfile, context, reveal),
                 null,

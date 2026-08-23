@@ -178,7 +178,7 @@ public class HomeController {
                     media.links(
                             spaceId,
                             value.id(),
-                            null,
+                            value.originalProfile(),
                             value.thumbnailProfile(),
                             value.previewProfile(),
                             MediaAccessContext.diary(accountId, diaryId, elevated),
@@ -201,7 +201,7 @@ public class HomeController {
                     media.links(
                             spaceId,
                             value.id(),
-                            null,
+                            value.originalProfile(),
                             value.thumbnailProfile(),
                             value.previewProfile(),
                             MediaAccessContext.direct(accountId, elevated),

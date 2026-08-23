@@ -42,6 +42,7 @@ public record HomeProjection(
             int position,
             String status,
             boolean protectedContent,
+            String originalProfile,
             String thumbnailProfile,
             String previewProfile) {}
 
@@ -55,6 +56,7 @@ public record HomeProjection(
             String mediaType,
             String status,
             boolean protectedContent,
+            String originalProfile,
             String thumbnailProfile,
             String previewProfile) {}
 }
