@@ -60,12 +60,6 @@ function parseJson(response, operation, expectedStatus = 200) {
   return payload
 }
 
-function requireStatus(response, operation, expectedStatus) {
-  if (response.status !== expectedStatus) {
-    fail(`${operation} failed: HTTP ${response.status} ${response.body}`)
-  }
-}
-
 export function setup() {
   const login = parseJson(http.post(`${baseUrl}/api/v3/auth/login`, JSON.stringify({
     username,
@@ -76,7 +70,9 @@ export function setup() {
   }), `login ${username}`)
   const spaces = parseJson(http.get(`${baseUrl}/api/v3/spaces`, jsonParams('setup', login.token)), `spaces ${username}`)
   if (!spaces.length) fail('Performance fixture has no space')
-  return { token: login.token, spaceId: spaces[0].id }
+  const stepUp = parseJson(http.post(`${baseUrl}/api/v3/auth/step-up`, JSON.stringify({ password }),
+    jsonParams('setup', login.token)), `step-up ${username}`)
+  return { token: login.token, spaceId: spaces[0].id, stepUpToken: stepUp.token }
 }
 
 const loadParams = (token, endpoint = 'core') => ({
@@ -128,10 +124,12 @@ export function readJourneys({ token, spaceId }) {
   sleep(0.5 + Math.random())
 }
 
-export function exportBook({ token, spaceId }) {
+export function exportBook({ token, spaceId, stepUpToken }) {
+  const params = loadParams(token, 'export')
+  params.headers['X-Step-Up-Token'] = stepUpToken
   const response = http.get(
     `${baseUrl}/api/v3/spaces/${spaceId}/books?format=epub&startDate=2025-01-01&endDate=2025-12-31`,
-    loadParams(token, 'export')
+    params
   )
   serverErrors.add(response.status >= 500, { phase: 'load' })
   check(response, {

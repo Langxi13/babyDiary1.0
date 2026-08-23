@@ -158,6 +158,7 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.items.length()").value(1));
         assertThat(sqlCounts.totalAmount() - beforeSummaries).isLessThanOrEqualTo(4);
 
+        seedCatalogCovers();
         double beforeAlbums = sqlCounts.totalAmount();
         mvc.perform(
                         get("/api/v3/spaces/{spaceId}/album-groups", OWNER_SPACE_ID)
@@ -3370,6 +3371,61 @@ class ApiIntegrationTest {
                         .andExpect(status().isCreated())
                         .andReturn();
         return UUID.fromString(body(result).path("id").asText());
+    }
+
+    private void seedCatalogCovers() {
+        jdbc.update(
+                """
+                INSERT INTO media_asset(public_id,space_id,owner_id,media_type,original_filename,
+                  access_scope,library_visible,status)
+                VALUES(UUID_TO_BIN('90000000-0000-4000-8000-000000000001'),11,101,'IMAGE',
+                  'catalog-cover.png','SPACE',true,'READY')
+                """);
+        long assetId =
+                jdbc.queryForObject(
+                        "SELECT asset_id FROM media_asset WHERE public_id=UUID_TO_BIN('90000000-0000-4000-8000-000000000001')",
+                        Long.class);
+        jdbc.update(
+                """
+                INSERT INTO media_variant(asset_id,variant_type,profile,storage_provider,storage_key,
+                  content_type,size_bytes,width,height,status)
+                VALUES(?,'ORIGINAL','source','LOCAL','tests/catalog-source','image/png',68,1,1,'READY'),
+                      (?,'THUMBNAIL','compact','LOCAL','tests/catalog-compact','image/png',68,1,1,'READY')
+                """,
+                assetId,
+                assetId);
+        jdbc.update(
+                """
+                INSERT INTO album_group(public_id,space_id,name,sort_order,created_by)
+                VALUES(UUID_TO_BIN('90000000-0000-4000-8000-000000000002'),11,'Catalog group',0,101)
+                """);
+        long groupId =
+                jdbc.queryForObject(
+                        "SELECT group_id FROM album_group WHERE public_id=UUID_TO_BIN('90000000-0000-4000-8000-000000000002')",
+                        Long.class);
+        for (int index = 1; index <= 10; index++) {
+            String suffix = String.format("%012x", index + 2);
+            jdbc.update(
+                    """
+                    INSERT INTO album(public_id,space_id,group_id,created_by,name,description,type,
+                      cover_asset_id,sort_order)
+                    VALUES(UUID_TO_BIN(?),11,?,101,?,NULL,'CUSTOM',?,?)
+                    """,
+                    "90000000-0000-4000-8000-" + suffix,
+                    groupId,
+                    "Catalog album " + index,
+                    assetId,
+                    index);
+            long albumId =
+                    jdbc.queryForObject(
+                            "SELECT album_id FROM album WHERE public_id=UUID_TO_BIN(?)",
+                            Long.class,
+                            "90000000-0000-4000-8000-" + suffix);
+            jdbc.update(
+                    "INSERT INTO album_media(space_id,album_id,asset_id,position) VALUES(11,?,?,0)",
+                    albumId,
+                    assetId);
+        }
     }
 
     private String accessToken(MvcResult result) throws Exception {

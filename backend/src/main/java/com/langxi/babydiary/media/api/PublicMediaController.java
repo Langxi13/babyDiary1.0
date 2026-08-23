@@ -5,9 +5,11 @@ import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.media.application.MediaUrlSigner;
 import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
 @RequestMapping((ApiContract.ROOT + "/public/media"))
@@ -32,7 +33,7 @@ public class PublicMediaController {
     @RequestMapping(
             value = "/{spaceId}/{assetId}/{variant}",
             method = {RequestMethod.GET, RequestMethod.HEAD})
-    public ResponseEntity<StreamingResponseBody> content(
+    public ResponseEntity<InputStreamResource> content(
             @PathVariable UUID spaceId,
             @PathVariable UUID assetId,
             @PathVariable String variant,
@@ -42,7 +43,8 @@ public class PublicMediaController {
             @RequestParam String signature,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String range,
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
-            HttpServletRequest request) {
+            HttpServletRequest request)
+            throws IOException {
         MediaUrlSigner.VerifiedVariant verified =
                 signer.verify(spaceId, assetId, variant, profile, ticket, expires, signature);
         MediaService.ResolvedVariant resolved =

@@ -56,8 +56,18 @@ public class MediaRepresentationService {
     public List<MediaView> views(
             List<MediaAsset> assets, Function<MediaAsset, MediaAccessContext> contexts) {
         if (assets == null || assets.isEmpty()) return List.of();
+        return contextualViews(
+                assets.stream()
+                        .map(asset -> new ContextualAsset(asset, contexts.apply(asset), null))
+                        .toList());
+    }
+
+    public List<MediaView> contextualViews(List<ContextualAsset> assets) {
+        if (assets == null || assets.isEmpty()) return List.of();
         Set<UUID> protectedIds = new HashSet<>();
         assets.stream()
+                .filter(value -> value.protectedContent() == null)
+                .map(ContextualAsset::asset)
                 .collect(java.util.stream.Collectors.groupingBy(MediaAsset::spaceId))
                 .forEach(
                         (spaceId, spaceAssets) ->
@@ -68,9 +78,19 @@ public class MediaRepresentationService {
                                                         .map(MediaAsset::id)
                                                         .toList())));
         return assets.stream()
-                .map(asset -> view(asset, contexts.apply(asset), protectedIds.contains(asset.id())))
+                .map(
+                        value ->
+                                view(
+                                        value.asset(),
+                                        value.context(),
+                                        value.protectedContent() == null
+                                                ? protectedIds.contains(value.asset().id())
+                                                : value.protectedContent()))
                 .toList();
     }
+
+    public record ContextualAsset(
+            MediaAsset asset, MediaAccessContext context, Boolean protectedContent) {}
 
     public MediaLinkView link(
             UUID spaceId,

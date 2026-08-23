@@ -12,7 +12,9 @@ import com.langxi.babydiary.platform.api.ApiContract;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -248,10 +250,36 @@ public class AlbumController {
                 MediaRepresentationService media,
                 long accountId,
                 boolean elevated) {
+            List<AlbumCatalog.Album> coverAlbums =
+                    catalog.groups().stream()
+                            .flatMap(group -> group.albums().stream())
+                            .filter(album -> album.coverMedia() != null)
+                            .toList();
+            List<MediaView> coverViews =
+                    media.contextualViews(
+                            coverAlbums.stream()
+                                    .map(
+                                            album ->
+                                                    new MediaRepresentationService.ContextualAsset(
+                                                            album.coverMedia(),
+                                                            context(accountId, elevated, album),
+                                                            elevated ? null : false))
+                                    .toList());
+            Map<AlbumCatalog.Album, MediaView> covers = new IdentityHashMap<>();
+            for (int index = 0; index < coverAlbums.size(); index++) {
+                covers.put(coverAlbums.get(index), coverViews.get(index));
+            }
             return new AlbumCatalogResponse(
                     catalog.groups().stream()
-                            .map(group -> GroupResponse.from(group, media, accountId, elevated))
+                            .map(group -> GroupResponse.from(group, covers))
                             .toList());
+        }
+
+        private static MediaAccessContext context(
+                long accountId, boolean elevated, AlbumCatalog.Album album) {
+            return album.id() == null
+                    ? MediaAccessContext.direct(accountId, elevated)
+                    : MediaAccessContext.album(accountId, album.id(), elevated);
         }
     }
 
@@ -280,6 +308,17 @@ public class AlbumController {
                                                                     elevated)))
                             .toList());
         }
+
+        static GroupResponse from(
+                AlbumCatalog.Group group, Map<AlbumCatalog.Album, MediaView> covers) {
+            return new GroupResponse(
+                    group.id(),
+                    group.type(),
+                    group.name(),
+                    group.albums().stream()
+                            .map(album -> AlbumResponse.from(album, covers.get(album)))
+                            .toList());
+        }
     }
 
     public record AlbumResponse(
@@ -305,6 +344,19 @@ public class AlbumController {
                     album.description(),
                     album.coverAssetId(),
                     album.coverMedia() == null ? null : media.view(album.coverMedia(), context),
+                    album.mediaCount());
+        }
+
+        static AlbumResponse from(AlbumCatalog.Album album, MediaView coverMedia) {
+            return new AlbumResponse(
+                    album.id(),
+                    album.groupId(),
+                    album.systemKey(),
+                    album.type(),
+                    album.name(),
+                    album.description(),
+                    album.coverAssetId(),
+                    coverMedia,
                     album.mediaCount());
         }
     }

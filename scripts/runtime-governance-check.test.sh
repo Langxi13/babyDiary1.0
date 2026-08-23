@@ -14,6 +14,9 @@ HOST_TMP="$TMP_DIR/host-tmp"
 NGINX_SITE_FILE="$TMP_DIR/diary.nginx"
 NGINX_HEALTH_SNIPPET_FILE="$TMP_DIR/backend-health.nginx"
 NGINX_RESOURCE_POLICY_MAP_FILE="$TMP_DIR/resource-policy-map.nginx"
+NGINX_MEDIA_CACHE_PATH_FILE="$TMP_DIR/media-cache-path.nginx"
+NGINX_MEDIA_CACHE_LOCATION_FILE="$TMP_DIR/media-cache-location.nginx"
+export NGINX_MEDIA_CACHE_PATH_FILE NGINX_MEDIA_CACHE_LOCATION_FILE
 
 cat > "$SERVICE_FILE" <<'SERVICE'
 [Service]
@@ -38,6 +41,7 @@ cat > "$NGINX_SITE_FILE" <<'NGINX'
 server {
   include /etc/nginx/snippets/baby-diary-security-headers.conf;
   include /etc/nginx/snippets/baby-diary-backend-health.conf;
+  include /etc/nginx/snippets/baby-diary-media-cache-location.conf;
 }
 NGINX
 
@@ -51,6 +55,16 @@ cat > "$NGINX_RESOURCE_POLICY_MAP_FILE" <<'NGINX'
 map $request_uri $baby_diary_resource_policy {
   default "same-origin";
   ~^/api/v3/public/media/ "cross-origin";
+}
+NGINX
+
+cat > "$NGINX_MEDIA_CACHE_PATH_FILE" <<'NGINX'
+proxy_cache_path /var/cache/nginx/baby-diary-media levels=1:2 keys_zone=baby_diary_media_cache:4m max_size=128m;
+NGINX
+
+cat > "$NGINX_MEDIA_CACHE_LOCATION_FILE" <<'NGINX'
+location ^~ /api/v3/public/media/ {
+  proxy_cache_key "$scheme$request_method$host$request_uri:$http_range";
 }
 NGINX
 
@@ -107,6 +121,7 @@ grep -q "security environment configured" <<<"$OUTPUT"
 grep -q "media processing tools available" <<<"$OUTPUT"
 grep -q "backend bound to loopback" <<<"$OUTPUT"
 grep -q "nginx native resource policy included" <<<"$OUTPUT"
+grep -q "nginx signed-media cache bounded" <<<"$OUTPUT"
 grep -q "nginx backend health proxy included" <<<"$OUTPUT"
 grep -q "private object directory isolated" <<<"$OUTPUT"
 grep -q "object directory writable" <<<"$OUTPUT"

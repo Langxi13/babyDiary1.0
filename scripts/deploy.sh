@@ -36,6 +36,8 @@ scripts/ensure-object-permissions.sh
 install -D -m 0644 config/nginx-security-headers.conf /etc/nginx/snippets/baby-diary-security-headers.conf
 install -D -m 0644 config/nginx-resource-policy-map.conf /etc/nginx/conf.d/baby-diary-resource-policy-map.conf
 install -D -m 0644 config/nginx-backend-health.conf /etc/nginx/snippets/baby-diary-backend-health.conf
+install -D -m 0644 config/nginx-media-cache-path.conf /etc/nginx/conf.d/baby-diary-media-cache-path.conf
+install -D -m 0644 config/nginx-media-cache-location.conf /etc/nginx/snippets/baby-diary-media-cache-location.conf
 install -D -m 0644 config/diary-backend-hardening.conf /etc/systemd/system/diary-backend.service.d/10-baby-diary-hardening.conf
 install -D -m 0644 config/diary-backend-update.conf /etc/systemd/system/diary-backend.service.d/20-baby-diary-update.conf
 java_bin="$(command -v java)"

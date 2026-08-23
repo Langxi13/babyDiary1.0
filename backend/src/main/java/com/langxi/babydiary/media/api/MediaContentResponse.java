@@ -2,36 +2,39 @@ package com.langxi.babydiary.media.api;
 
 import com.langxi.babydiary.media.application.MediaService;
 import com.langxi.babydiary.storage.StoredObject;
+import java.io.IOException;
 import java.time.Duration;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 final class MediaContentResponse {
     private MediaContentResponse() {}
 
-    static ResponseEntity<StreamingResponseBody> create(
+    static ResponseEntity<InputStreamResource> create(
             MediaService media,
             MediaService.ResolvedVariant resolved,
             String rangeHeader,
             String ifNoneMatch,
             boolean head,
-            boolean noStore) {
+            boolean noStore)
+            throws IOException {
         return create(
                 media, resolved, rangeHeader, ifNoneMatch, head, noStore, Duration.ofMinutes(5));
     }
 
-    static ResponseEntity<StreamingResponseBody> create(
+    static ResponseEntity<InputStreamResource> create(
             MediaService media,
             MediaService.ResolvedVariant resolved,
             String rangeHeader,
             String ifNoneMatch,
             boolean head,
             boolean noStore,
-            Duration cacheLifetime) {
+            Duration cacheLifetime)
+            throws IOException {
         Duration maxAge =
                 cacheLifetime == null || cacheLifetime.isNegative()
                         ? Duration.ZERO
@@ -46,7 +49,7 @@ final class MediaContentResponse {
                     .cacheControl(
                             noStore
                                     ? CacheControl.noStore()
-                                    : CacheControl.maxAge(maxAge).cachePrivate())
+                                    : CacheControl.maxAge(maxAge).cachePublic())
                     .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                     .build();
         }
@@ -65,15 +68,10 @@ final class MediaContentResponse {
                     "bytes " + range.start() + '-' + range.end() + '/' + total);
         }
         headers.setCacheControl(
-                noStore ? CacheControl.noStore() : CacheControl.maxAge(maxAge).cachePrivate());
+                noStore ? CacheControl.noStore() : CacheControl.maxAge(maxAge).cachePublic());
         if (head) return new ResponseEntity<>(null, headers, status);
-        StreamingResponseBody body =
-                output -> {
-                    try (StoredObject object =
-                            media.open(resolved, range.start(), range.length())) {
-                        object.stream().transferTo(output);
-                    }
-                };
+        StoredObject object = media.open(resolved, range.start(), range.length());
+        InputStreamResource body = new InputStreamResource(object.stream());
         return new ResponseEntity<>(body, headers, status);
     }
 

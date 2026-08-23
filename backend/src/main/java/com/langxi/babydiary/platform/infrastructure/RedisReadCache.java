@@ -2,6 +2,8 @@ package com.langxi.babydiary.platform.infrastructure;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.langxi.babydiary.platform.application.ReadCache;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class RedisReadCache implements ReadCache {
     private static final Logger log = LoggerFactory.getLogger(RedisReadCache.class);
     private static final Duration VERSION_TTL = Duration.ofDays(30);
+    private static final int FALLBACK_MAX_BYTES = 8 * 1024 * 1024;
 
     private final StringRedisTemplate redis;
     private final ObjectMapper json;
@@ -39,6 +42,7 @@ public class RedisReadCache implements ReadCache {
     private final Set<Invalidation> pendingInvalidations = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, CompletableFuture<Object>> loads =
             new ConcurrentHashMap<>();
+    private final Cache<String, String> fallback;
     private final MeterRegistry metrics;
     private final DistributionSummary payloadBytes;
 
@@ -57,6 +61,18 @@ public class RedisReadCache implements ReadCache {
                         .register(metrics);
         this.enabled = enabled;
         this.prefix = prefix == null || prefix.isBlank() ? "baby-diary:cache:" : prefix;
+        this.fallback =
+                Caffeine.<String, String>newBuilder()
+                        .maximumWeight(FALLBACK_MAX_BYTES)
+                        .weigher(
+                                (String key, String value) ->
+                                        Math.min(
+                                                FALLBACK_MAX_BYTES,
+                                                key.getBytes(StandardCharsets.UTF_8).length
+                                                        + value.getBytes(StandardCharsets.UTF_8)
+                                                                .length))
+                        .expireAfterWrite(Duration.ofSeconds(30))
+                        .build();
     }
 
     @Override
@@ -69,9 +85,13 @@ public class RedisReadCache implements ReadCache {
             TypeReference<T> type,
             Supplier<T> loader) {
         String fallbackKey = dataKey(area, spaceId, accountId, "fallback", variant);
+        if (!enabled) {
+            event(area, "disabled");
+            return singleFlight(fallbackKey, loader);
+        }
         if (!available()) {
             event(area, "fallback");
-            return singleFlight(fallbackKey, loader);
+            return fallback(fallbackKey, area, type, loader);
         }
         String version;
         String key;
@@ -83,13 +103,14 @@ public class RedisReadCache implements ReadCache {
             if (cached != null) {
                 event(area, "hit");
                 payloadBytes.record(cached.getBytes(StandardCharsets.UTF_8).length);
+                fallback.put(fallbackKey, cached);
                 return json.readValue(cached, type);
             }
             event(area, "miss");
         } catch (Exception exception) {
             event(area, "fallback");
             warn(exception);
-            return singleFlight(fallbackKey, loader);
+            return fallback(fallbackKey, area, type, loader);
         }
 
         String resolvedKey = key;
@@ -101,6 +122,7 @@ public class RedisReadCache implements ReadCache {
                     try {
                         String serialized = json.writeValueAsString(value);
                         redis.opsForValue().set(resolvedKey, serialized, ttl);
+                        fallback.put(fallbackKey, serialized);
                         payloadBytes.record(serialized.getBytes(StandardCharsets.UTF_8).length);
                         event(area, "write");
                     } catch (Exception exception) {
@@ -113,6 +135,7 @@ public class RedisReadCache implements ReadCache {
 
     @Override
     public void invalidate(String area, UUID spaceId) {
+        fallback.invalidateAll();
         if (!enabled || redis == null) return;
         if (!available()) {
             pendingInvalidations.add(new Invalidation(area, spaceId));
@@ -214,6 +237,41 @@ public class RedisReadCache implements ReadCache {
         } finally {
             loads.remove(key, mine);
         }
+    }
+
+    private <T> T fallback(String key, String area, TypeReference<T> type, Supplier<T> loader) {
+        String cached = fallback.getIfPresent(key);
+        if (cached != null) {
+            try {
+                event(area, "local-hit");
+                return json.readValue(cached, type);
+            } catch (Exception exception) {
+                fallback.invalidate(key);
+            }
+        }
+        return singleFlight(
+                key,
+                () -> {
+                    String completed = fallback.getIfPresent(key);
+                    if (completed != null) {
+                        try {
+                            event(area, "local-hit");
+                            return json.readValue(completed, type);
+                        } catch (Exception exception) {
+                            fallback.invalidate(key);
+                        }
+                    }
+                    T value = loader.get();
+                    if (value == null) return null;
+                    try {
+                        String serialized = json.writeValueAsString(value);
+                        fallback.put(key, serialized);
+                        payloadBytes.record(serialized.getBytes(StandardCharsets.UTF_8).length);
+                    } catch (Exception exception) {
+                        log.debug("Unable to serialize local read-cache fallback", exception);
+                    }
+                    return value;
+                });
     }
 
     private RuntimeException propagate(Throwable throwable) {

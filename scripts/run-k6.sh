@@ -37,7 +37,15 @@ COMPOSE=(docker compose --env-file "$ENV_FILE" -p "${STAGING_PROJECT_NAME:-baby-
 
 collect_evidence() {
   "${COMPOSE[@]}" logs --no-color > "$RESULT_DIR/staging.log" 2>&1 || true
-  "${COMPOSE[@]}" exec -T backend sh -c 'cat /sys/fs/cgroup/memory.peak 2>/dev/null || true' \
+  "${COMPOSE[@]}" exec -T backend sh -c '
+    if [ -r /sys/fs/cgroup/memory.peak ]; then
+      cat /sys/fs/cgroup/memory.peak
+    elif [ -r /sys/fs/cgroup/memory/memory.max_usage_in_bytes ]; then
+      cat /sys/fs/cgroup/memory/memory.max_usage_in_bytes
+    elif [ -r /sys/fs/cgroup/memory.current ]; then
+      cat /sys/fs/cgroup/memory.current
+    fi
+  ' \
     > "$RESULT_DIR/backend-memory.peak" 2>/dev/null || true
   "${COMPOSE[@]}" exec -T redis redis-cli INFO memory \
     > "$RESULT_DIR/redis-info.txt" 2>/dev/null || true

@@ -1,10 +1,14 @@
 package com.langxi.babydiary.diary.application;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.langxi.babydiary.diary.domain.DiarySummary;
 import com.langxi.babydiary.platform.application.ApiException;
+import com.langxi.babydiary.platform.application.ReadCache;
+import com.langxi.babydiary.platform.application.ReadCacheInvalidator;
 import com.langxi.babydiary.platform.domain.CursorPage;
 import com.langxi.babydiary.space.application.SpaceAccess;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -14,12 +18,16 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class DiarySummaryService {
+    private static final TypeReference<CursorPage<DiarySummary>> SUMMARY_PAGE =
+            new TypeReference<>() {};
     private final SpaceAccess spaces;
     private final DiaryRepository diaries;
+    private final ReadCache cache;
 
-    public DiarySummaryService(SpaceAccess spaces, DiaryRepository diaries) {
+    public DiarySummaryService(SpaceAccess spaces, DiaryRepository diaries, ReadCache cache) {
         this.spaces = spaces;
         this.diaries = diaries;
+        this.cache = cache;
     }
 
     public CursorPage<DiarySummary> list(
@@ -46,9 +54,25 @@ public class DiarySummaryService {
                         cursor == null ? null : cursor.date(),
                         cursor == null ? null : cursor.id(),
                         size + 1);
+        if (elevated) return load(repositoryQuery, size, query.includeTotal(), false);
+        return cache.get(
+                ReadCacheInvalidator.DIARY_AGGREGATES,
+                spaceId,
+                accountId,
+                cacheVariant(repositoryQuery, size, query.includeTotal()),
+                Duration.ofMinutes(2),
+                SUMMARY_PAGE,
+                () -> load(repositoryQuery, size, query.includeTotal(), true));
+    }
+
+    private CursorPage<DiarySummary> load(
+            DiaryRepository.Query repositoryQuery,
+            int size,
+            boolean includeTotal,
+            boolean protectLocked) {
         List<DiarySummary> rows = new ArrayList<>(diaries.findSummaryPage(repositoryQuery));
         Long total =
-                query.includeTotal()
+                includeTotal
                         ? diaries.count(
                                 new DiaryRepository.Query(
                                         repositoryQuery.spaceId(),
@@ -70,8 +94,31 @@ public class DiarySummaryService {
             DiarySummary last = rows.get(rows.size() - 1);
             next = encodeCursor(last.diaryDate(), last.internalId());
         }
-        if (!elevated) rows.replaceAll(this::protectLocked);
+        if (protectLocked) rows.replaceAll(this::protectLocked);
         return new CursorPage<>(rows, next, total);
+    }
+
+    private String cacheVariant(DiaryRepository.Query query, int size, boolean includeTotal) {
+        return String.join(
+                "|",
+                "summaries",
+                value(query.startDate()),
+                value(query.endDate()),
+                value(query.keyword()),
+                value(query.mood()),
+                value(query.tagId()),
+                Boolean.toString(query.trash()),
+                value(query.cursorDate()),
+                value(query.cursorId()),
+                Integer.toString(size),
+                Boolean.toString(includeTotal));
+    }
+
+    private String value(Object value) {
+        if (value == null) return "-";
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(value.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private DiarySummary protectLocked(DiarySummary diary) {

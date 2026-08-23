@@ -29,7 +29,7 @@ public class HomeService {
                 spaceId,
                 accountId,
                 "projection",
-                Duration.ofSeconds(30),
+                Duration.ofMinutes(2),
                 HOME,
                 () -> projections.load(space.internalId(), accountId, false));
     }

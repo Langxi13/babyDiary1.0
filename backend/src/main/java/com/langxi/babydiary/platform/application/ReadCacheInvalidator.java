@@ -24,7 +24,7 @@ public class ReadCacheInvalidator {
     }
 
     public void tags(UUID spaceId) {
-        afterCommit(spaceId, Set.of(TAGS, HOME));
+        afterCommit(spaceId, Set.of(TAGS, DIARY_AGGREGATES, HOME));
     }
 
     public void albums(UUID spaceId) {

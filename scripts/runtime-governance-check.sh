@@ -16,6 +16,8 @@ NGINX_GROUP="${NGINX_GROUP:-www-data}"
 NGINX_SITE_FILE="${NGINX_SITE_FILE:-/etc/nginx/sites-available/diary}"
 NGINX_HEALTH_SNIPPET_FILE="${NGINX_HEALTH_SNIPPET_FILE:-/etc/nginx/snippets/baby-diary-backend-health.conf}"
 NGINX_RESOURCE_POLICY_MAP_FILE="${NGINX_RESOURCE_POLICY_MAP_FILE:-/etc/nginx/conf.d/baby-diary-resource-policy-map.conf}"
+NGINX_MEDIA_CACHE_PATH_FILE="${NGINX_MEDIA_CACHE_PATH_FILE:-/etc/nginx/conf.d/baby-diary-media-cache-path.conf}"
+NGINX_MEDIA_CACHE_LOCATION_FILE="${NGINX_MEDIA_CACHE_LOCATION_FILE:-/etc/nginx/snippets/baby-diary-media-cache-location.conf}"
 TMP_ROOT="${TMP_ROOT:-/tmp}"
 CHECK_OS_USER="${CHECK_OS_USER:-true}"
 
@@ -194,6 +196,30 @@ if [ -f "$NGINX_SITE_FILE" ]; then
     exit 1
   }
   echo "nginx security headers included"
+
+  grep -q 'include /etc/nginx/snippets/baby-diary-media-cache-location.conf;' "$NGINX_SITE_FILE" || {
+    echo "nginx site must include the Baby Diary signed-media cache snippet" >&2
+    exit 1
+  }
+  require_file "$NGINX_MEDIA_CACHE_PATH_FILE"
+  require_file "$NGINX_MEDIA_CACHE_LOCATION_FILE"
+  grep -q 'keys_zone=baby_diary_media_cache:4m' "$NGINX_MEDIA_CACHE_PATH_FILE" || {
+    echo "nginx signed-media cache must use the bounded key zone" >&2
+    exit 1
+  }
+  grep -q 'max_size=128m' "$NGINX_MEDIA_CACHE_PATH_FILE" || {
+    echo "nginx signed-media cache must remain bounded to 128 MiB" >&2
+    exit 1
+  }
+  grep -q 'location \^~ /api/v3/public/media/' "$NGINX_MEDIA_CACHE_LOCATION_FILE" || {
+    echo "nginx signed-media cache location is missing" >&2
+    exit 1
+  }
+  grep -q 'proxy_cache_key.*request_uri.*http_range' "$NGINX_MEDIA_CACHE_LOCATION_FILE" || {
+    echo "nginx signed-media cache key must bind the full signed URL and byte range" >&2
+    exit 1
+  }
+  echo "nginx signed-media cache bounded"
 
   grep -q 'include /etc/nginx/snippets/baby-diary-backend-health.conf;' "$NGINX_SITE_FILE" || {
     echo "nginx site must include the Baby Diary backend health snippet" >&2

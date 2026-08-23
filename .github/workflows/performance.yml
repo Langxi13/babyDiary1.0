@@ -39,9 +39,8 @@ jobs:
             echo 'STAGING_API_PORT=11002'
           } > .env.staging
       - run: STAGING_PROJECT_NAME=baby-diary-performance scripts/start-staging.sh
-      - name: Run 50-user, 10-concurrent-user load
+      - name: Run 10-concurrent-user load
         env:
-          K6_USER_COUNT: "50"
           K6_PEAK_VUS: "10"
           K6_STEADY: ${{ inputs.steady_duration || '3m' }}
         run: scripts/run-k6.sh

@@ -33,15 +33,18 @@ class MediaContentResponseTest {
                 .isEqualTo("bytes 2-6/16");
         assertThat(response.getHeaders().getContentLength()).isEqualTo(5);
         assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+        assertThat(response.getHeaders().getCacheControl()).contains("public");
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        response.getBody().writeTo(output);
+        try (var input = response.getBody().getInputStream()) {
+            input.transferTo(output);
+        }
         assertThat(output.toByteArray())
                 .containsExactly("23456".getBytes(StandardCharsets.US_ASCII));
         verify(media).open(resolved, 2, 5);
     }
 
     @Test
-    void supportsSuffixRangesAndHeadWithoutOpeningStorage() {
+    void supportsSuffixRangesAndHeadWithoutOpeningStorage() throws Exception {
         MediaService media = mock(MediaService.class);
         MediaService.ResolvedVariant resolved = resolved();
 
@@ -55,7 +58,7 @@ class MediaContentResponseTest {
     }
 
     @Test
-    void returnsProtectedNotModifiedResponsesWithoutCaching() {
+    void returnsProtectedNotModifiedResponsesWithoutCaching() throws Exception {
         var response =
                 MediaContentResponse.create(
                         mock(MediaService.class), resolved(), null, "\"checksum\"", false, true);

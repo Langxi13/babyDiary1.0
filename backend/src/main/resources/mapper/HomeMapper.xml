@@ -24,8 +24,10 @@
                           MAX(CASE WHEN v.variant_type='THUMBNAIL' THEN v.profile END)) AS thumbnail_profile,
                  COALESCE(MAX(CASE WHEN v.variant_type='PREVIEW' AND v.profile='screen' THEN v.profile END),
                           MAX(CASE WHEN v.variant_type='PREVIEW' THEN v.profile END)) AS preview_profile,
-                 EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
-                         WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1) AS protected_content
+                 EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                           ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                         WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id
+                           AND lock_d.locked=1) AS protected_content
           FROM recent_diaries r JOIN diary_media dm ON dm.diary_id=r.diary_id
           JOIN media_asset a ON a.asset_id=dm.asset_id AND a.media_type='IMAGE'
             AND a.deleted_at IS NULL AND a.status='READY'
@@ -68,8 +70,10 @@
 
     <select id="findFavorites" resultType="com.langxi.babydiary.home.infrastructure.HomeMapper$FavoriteRow">
         SELECT a.public_id,a.media_type,a.status,
-               EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
-                       WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1) AS protected_content,
+               EXISTS (SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+                         ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+                       WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id
+                         AND lock_d.locked=1) AS protected_content,
                COALESCE(MAX(CASE WHEN v.variant_type='ORIGINAL' AND v.profile='source' THEN v.profile END),
                         MAX(CASE WHEN v.variant_type='ORIGINAL' THEN v.profile END)) AS original_profile,
                COALESCE(MAX(CASE WHEN v.variant_type='THUMBNAIL' AND v.profile='compact' THEN v.profile END),
@@ -82,8 +86,9 @@
         WHERE f.space_id=#{spaceId} AND f.account_id=#{accountId} AND a.media_type='IMAGE'
           AND a.deleted_at IS NULL AND a.status='READY'
           AND (#{elevated}=true OR NOT EXISTS (
-            SELECT 1 FROM diary_media lock_dm JOIN diary lock_d ON lock_d.diary_id=lock_dm.diary_id
-            WHERE lock_dm.asset_id=a.asset_id AND lock_d.locked=1
+            SELECT 1 FROM diary_media lock_dm JOIN diary lock_d
+              ON lock_d.space_id=lock_dm.space_id AND lock_d.diary_id=lock_dm.diary_id
+            WHERE lock_dm.space_id=a.space_id AND lock_dm.asset_id=a.asset_id AND lock_d.locked=1
           ))
         GROUP BY f.created_at,f.asset_id,a.public_id,a.media_type,a.status
         ORDER BY f.created_at DESC,f.asset_id DESC LIMIT 6
