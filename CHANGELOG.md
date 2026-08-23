@@ -2,6 +2,7 @@
 
 ## 2026-08-23
 
+- Updated jsoup to 1.23.1 to close the remaining HTML sanitizer advisory.
 - Removed album-cover authorization N+1 reads, fixed the indexed home-favorite protection lookup, cached bounded diary summaries and home projections with write-driven invalidation, added an 8 MiB/30-second Redis-outage fallback, replaced racy asynchronous media responses with constant-memory resource streaming, added a bounded signed-media proxy cache, updated Tomcat, and corrected the staging EPUB step-up flow.
 - Restored green CI by approving the reviewed application icons and documented `/srv/baby-diary` deployment root, narrowly filtering WebKit's unsupported `interactive-widget` viewport diagnostic, updating vulnerable transitive `nanoid`, `brace-expansion`, and `undici` releases, and making the staging performance fixture use independent MySQL temporary digit tables with a regression gate.
 - Fixed home favorite photos when only `ORIGINAL/source` exists by exposing the original profile and keeping a signed original fallback; reused the persisted space ID to overlap home and space-list requests on returning sessions.
